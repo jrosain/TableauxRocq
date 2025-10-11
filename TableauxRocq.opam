@@ -1,0 +1,21 @@
+opam-version: "2.0"
+license: "GPL-3.0"
+maintainer: "johann.rosain@ens-lyon.org"
+authors: "Johann Rosain"
+bug-reports: "https://github.com/jrosain/TableauxRocq/issues"
+homepage: "https://github.com/jrosain/TableauxRocq"             
+depends: [
+  "ocaml" {>= "4.14.0"}
+  "rocq-core" {>= "9.0.0"}
+  "rocq-stdlib" {>= "9.0.0"}
+  "coq-autosubst"
+]
+build: [
+  ["bash" "./configure.sh" ]
+  ["make" "-f" "RocqMakefile"]
+]
+synopsis: "A library for free-variable tableaux in Rocq"
+description: """
+Tableaux-Rocq is a library providing a deep embedding of various versions (i.e., for
+various logics) of the free-variables tableaux in Rocq.
+"""
