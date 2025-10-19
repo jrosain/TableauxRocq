@@ -223,3 +223,17 @@ Section FVForms.
       | All F'   => rec F'
       end.
 End FVForms.
+
+(** ** Contexts *)
+Class Con_ {pred func var : Atom} :=
+  { car :> Type
+  ; extend : car -> Form_ pred func var -> car }.
+Arguments Con_ : clear implicits.
+Definition Con := Con_ string string string.
+
+Notation "Gamma ,, A" := (extend Gamma A) (at level 20).
+
+Canonical Structure con_list_forms {pred func var : Atom} :=
+  {| car := list (Form_ pred func var)
+  ;  extend := fun Gamma A => A :: Gamma |}.
+Arguments con_list_forms : clear implicits.
