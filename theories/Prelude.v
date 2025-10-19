@@ -177,6 +177,16 @@ Section HasSetNat.
   Class Subst {X : Atom} (A B : Type) `{BV B} :=
     substitute : A -> Substitution X B -> A.
   Arguments substitute {_ _ _ _ _} _ _.
+
+  (** *** Furhter instantiations of [Subst] based on previous ones *)
+  #[global] Instance subst_list {X : Atom} {A B : Type} `{H : BV B} `{@Subst X A B H} :
+    @Subst X (list A) B H :=
+    fun xs sigma =>
+      (fix F (xs : list A) : list A :=
+         match xs with
+         | [] => []
+         | x :: xs => substitute x sigma :: F xs
+         end) xs.
 End HasSetNat.
 
 Notation "x @[ sigma ]" := (substitute x sigma) (at level 3).
@@ -190,4 +200,12 @@ Section FreeVariables.
 
   Class Closed {A : Type} `{FV A} (x : A) :=
     isClosed : fv x = empty_set var.
+
+  (** *** Furhter instantiations of [FV] based on previous ones *)
+  #[global] Instance fv_list {A : Type} `{FV A} : FV (list A) :=
+    fix F (xs : list A) : set_var :=
+      match xs with
+      | [] => empty_set var
+      | x :: xs => union (fv x) (F xs)
+      end.
 End FreeVariables.
