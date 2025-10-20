@@ -113,7 +113,7 @@ Section OpeningSubstTerms.
       match t with
       | Bound m => singleton m
       | Free  _ => empty_set nat
-      | Fun _ l => fold_left (fun s t => union s (F t)) l (empty_set nat)
+      | Fun _ l => fold_left (fun s t => s \union (F t)) l (empty_set nat)
       end.
 
   #[global] Instance subst_term : Subst (Term_ func var) (Term_ func var) :=
@@ -135,7 +135,7 @@ Section FVTerms.
       match t with
       | Bound _ => empty_set var
       | Free  x => singleton x
-      | Fun f l => fold_left (fun s t => union s (F t)) l (empty_set var)
+      | Fun f l => fold_left (fun s t => s \union (F t)) l (empty_set var)
       end.
 End FVTerms.
 
@@ -217,9 +217,9 @@ Section FVForms.
     fix rec (F : Form_ pred func var) : set_var :=
       match F with
       | Bot      => empty_set var
-      | Pred f l => fold_left (fun s t => union s (fv t)) l (empty_set var)
+      | Pred f l => fold_left (fun s t => s \union (fv t)) l (empty_set var)
       | Neg F'   => rec F'
-      | Or F1 F2 => union (rec F1) (rec F2)
+      | Or F1 F2 => (rec F1) \union (rec F2)
       | All F'   => rec F'
       end.
 End FVForms.
@@ -227,13 +227,18 @@ End FVForms.
 (** ** Contexts *)
 Class Con_ {pred func var : Atom} :=
   { car :> Type
-  ; extend : car -> Form_ pred func var -> car }.
+  ; extend : car -> Form_ pred func var -> car
+  ; in_ctx : Form_ pred func var -> car -> Type }.
+Arguments extend {_ _ _ _} _ _.
+Arguments in_ctx {_ _ _ _} _ _.
 Arguments Con_ : clear implicits.
 Definition Con := Con_ string string string.
 
 Notation "Gamma ,, A" := (extend Gamma A) (at level 20).
+Notation "A \in Gamma" := (in_ctx A Gamma) (at level 30).
 
 Canonical Structure con_list_forms {pred func var : Atom} :=
   {| car := list (Form_ pred func var)
-  ;  extend := fun Gamma A => A :: Gamma |}.
+  ;  extend := fun Gamma A => A :: Gamma
+  ;  in_ctx := In |}.
 Arguments con_list_forms : clear implicits.

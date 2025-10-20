@@ -4,6 +4,8 @@ From Corelib Require Export ssr.ssreflect.
 
 From Stdlib Require Export Strings.String.
 From Stdlib Require Export Lists.List.
+From Stdlib Require Import MSets.MSetAVL.
+From Stdlib Require Import Structures.Orders.
 
 Export ListNotations.
 
@@ -32,7 +34,7 @@ Section EqDecOtherInstances.
       + left; now rewrite e e0.
       + right; intro e'; injection e' => e0 e1; now apply n.
   Qed.
-End EqDecOtherInstances.  
+End EqDecOtherInstances.
 
 (** *** Equivalence of [EqBool] with [EqDec]. *)
 Section EquivEqBoolEqDec.
@@ -59,6 +61,25 @@ Section EquivEqBoolEqDec.
       intro contra; inversion contra.
   Qed.
 End EquivEqBoolEqDec.
+
+(** *** Usual instances *)
+
+#[global] Instance eq_dec_nat : EqDec nat.
+Proof.
+  intros x; induction x as [|n IHn]; destruct y as [|m].
+  2,3: right; intro contra; inversion contra.
+  - now left.
+  - destruct (IHn m) as [e | ne].
+    + left; now f_equal.
+    + right; intro e. injection e => contra. now apply ne.
+Qed.
+
+#[global] Instance eq_dec_string : EqDec string.
+Proof.
+  apply eq_dec_from_eq_bool; unshelve econstructor.
+  - exact String.eqb.
+  - apply eqb_eq.
+Qed.
 
 (** ** Basic inductives *)
 
@@ -105,50 +126,96 @@ Class set (A : Type) :=
   ; empty_set : car
   ; mem : A -> car -> Prop
   ; add : A -> car -> car
-  ; union : car -> car -> car }.
+  ; union : car -> car -> car
+  ; inter : car -> car -> car
+  ; is_empty : car -> Prop
+  ; disjoint : car -> car -> Prop }.
 Arguments car {_ _}.
 Arguments empty_set _ {_}.
 Arguments mem {_ _} _ _.
 Arguments add {_ _} _ _.
 Arguments union {_ _} _ _.
+Arguments inter {_ _} _ _.
+Arguments is_empty {_ _} _.
+Arguments disjoint {_ _} _ _.
 
 Definition singleton {A : Type} `{set_A : set A} (x : A) : set_A :=
   add x (empty_set A).
+
+Notation "S1 \union S2" := (union S1 S2) (at level 30).
+Notation "S1 \inter S2" := (inter S1 S2) (at level 25).
+
+(** *** Usual instantiations with [MSets] *)
+
+(** Generic instantiation of our [set] from an ordered type *)
+Module SetFromOrdered (X : OrderedType).
+  Module SetOfX_ := MSetAVL.Make X.
+
+  #[global] Instance set_of_ordered : set X.t :=
+  {| car := SetOfX_.t
+  ;  empty_set := SetOfX_.empty
+  ;  mem := SetOfX_.In
+  ;  add := SetOfX_.add
+  ;  union := SetOfX_.union
+  ;  inter := SetOfX_.inter
+  ;  is_empty := SetOfX_.Empty
+  ;  disjoint := fun S S' => SetOfX_.Empty (SetOfX_.inter S S') |}.
+End SetFromOrdered.
+
+(** Set of natural numbers. *)
+Module OrderedNat <: OrderedType.
+  Definition t := nat.
+  Definition eq := @eq nat.
+  Definition eq_equiv := @eq_equivalence nat.
+  Definition lt := lt.
+  Definition lt_strorder := PeanoNat.Nat.lt_strorder.
+  Definition lt_compat := PeanoNat.Nat.lt_compat.
+  Definition compare := PeanoNat.Nat.compare.
+  Definition compare_spec := PeanoNat.Nat.compare_spec.
+  Definition eq_dec := @eqDec nat _.
+End OrderedNat.
+
+Module SetOfNat_ := SetFromOrdered OrderedNat.
+Canonical Structure SetOfNat := SetOfNat_.set_of_ordered.
+
+(** Set of strings. *)
+Module OrderedString <: OrderedType.
+  Definition t := string.
+  Definition eq := @eq string.
+  Definition eq_equiv := @eq_equivalence string.
+  Definition lt := fun s1 s2 => compare s1 s2 = Lt.
+  Definition lt_strorder : StrictOrder lt. Admitted.
+  Definition lt_compat : Proper (eq ==> eq ==> iff) lt. Admitted.
+  Definition compare := compare.
+  Definition compare_spec : forall (x y : t), CompareSpec (eq x y) (lt x y) (lt y x) (compare x y). Admitted.
+  Definition eq_dec := @eqDec string _.
+End OrderedString.
+
+Module SetOfString_ := SetFromOrdered OrderedString.
+Canonical Structure SetOfString := SetOfString_.set_of_ordered.
 
 (** ** Atoms: the class of bound/free variables *)
 
 Class Atom :=
   { atom :> Type
-  ; eq_dec_atom : EqDec atom }.
+  ; set_atom : set atom
+  ; eq_dec_atom : EqDec atom
+  ; isFresh : atom -> set_atom -> Prop }.
+Arguments set_atom : clear implicits.
 
-(** *** Instantiation with natural numbers. *)
-
-#[global] Instance eq_dec_nat : EqDec nat.
-Proof.
-  intros x; induction x as [|n IHn]; destruct y as [|m].
-  2,3: right; intro contra; inversion contra.
-  - now left.
-  - destruct (IHn m) as [e | ne].
-    + left; now f_equal.
-    + right; intro e. injection e => contra. now apply ne.
-Qed.
+(** *** Usual instantiations. *)
 
 Canonical Structure nat_atom :=
   {| atom := nat
-  ;  eq_dec_atom := eq_dec_nat |}.
-
-(** *** Instantiation with strings. *)
-
-#[global] Instance eq_dec_string : EqDec string.
-Proof.
-  apply eq_dec_from_eq_bool; unshelve econstructor.
-  - exact String.eqb.
-  - apply eqb_eq.
-Qed.
+  ;  set_atom := SetOfNat
+  ;  eq_dec_atom := eq_dec_nat
+  ;  isFresh := fun x S => ~(mem x S) |}.
 
 Canonical Structure string_atom :=
   {| atom := string
-  ;  eq_dec_atom := eq_dec_string |}.
+  ;  set_atom := SetOfString
+  ;  eq_dec_atom := eq_dec_string
+  ;  isFresh := fun x S => ~(mem x S) |}.
 
 (** ** Classes for variables manipulation *)
 
@@ -167,7 +234,7 @@ Section HasSetNat.
   Arguments bv {_ _}.
 
   Class LocallyClosed {A : Type} `{BV A} (x : A) :=
-    isLocallyClosed : bv x = empty_set nat.
+    isLocallyClosed : is_empty (bv x).
   Arguments isLocallyClosed {_} _ _.
 
   Class Substitution (X : Atom) (A : Type) `{BV A} :=
@@ -199,13 +266,13 @@ Section FreeVariables.
     fv : A -> set_var.
 
   Class Closed {A : Type} `{FV A} (x : A) :=
-    isClosed : fv x = empty_set var.
+    isClosed : is_empty (fv x).
 
   (** *** Furhter instantiations of [FV] based on previous ones *)
   #[global] Instance fv_list {A : Type} `{FV A} : FV (list A) :=
     fix F (xs : list A) : set_var :=
       match xs with
       | [] => empty_set var
-      | x :: xs => union (fv x) (F xs)
+      | x :: xs => (fv x) \union (F xs)
       end.
 End FreeVariables.

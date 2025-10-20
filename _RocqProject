@@ -1,4 +1,5 @@
 -Q theories Tableaux
 
 theories/Prelude.v
+theories/Proofs.v
 theories/Syntax.v
