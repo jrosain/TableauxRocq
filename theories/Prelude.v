@@ -183,11 +183,50 @@ Module OrderedString <: OrderedType.
   Definition t := string.
   Definition eq := @eq string.
   Definition eq_equiv := @eq_equivalence string.
-  Definition lt := fun s1 s2 => compare s1 s2 = Lt.
-  Definition lt_strorder : StrictOrder lt. Admitted.
-  Definition lt_compat : Proper (eq ==> eq ==> iff) lt. Admitted.
+  Definition lt :=
+    fix rec (s1 s2 : string) : Prop :=
+      match s1, s2 with
+      | EmptyString, EmptyString => False
+      | EmptyString, String _ _ => True
+      | String _ _ , EmptyString => False
+      | String c1 s1', String c2 s2' =>
+          BinNat.N.lt (Ascii.N_of_ascii c1) (Ascii.N_of_ascii c2) \/ (c1 = c2 /\ rec s1' s2')
+      end.
+  Lemma lt_strorder : StrictOrder lt.
+  Proof.
+    split.
+    - intros? H. induction x; red in H; auto.
+      destruct H. apply BinNat.N.lt_strorder in H; auto.
+      destruct H as (_ & H). apply IHx, H.
+    - intros x; induction x; cbn; intros; destruct y, z; auto.
+      + inversion H.
+      + destruct H, H0.
+        * left; etransitivity; eauto.
+        * destruct H0 as (e & _); left. now rewrite -e.
+        * destruct H as (e & _); left; now rewrite e.
+        * right; destruct H, H0. split; try congruence.
+          eapply IHx; eauto.
+  Qed.
+  Definition lt_compat : Proper (eq ==> eq ==> iff) lt.
+  Proof. intros ?? e x' y' e'. rewrite e e'. reflexivity. Defined.
   Definition compare := compare.
-  Definition compare_spec : forall (x y : t), CompareSpec (eq x y) (lt x y) (lt y x) (compare x y). Admitted.
+  Lemma compare_spec : forall (x y : t), CompareSpec (eq x y) (lt x y) (lt y x) (compare x y).
+  Proof.
+    intros x y. destruct (compare x y) eqn:e; constructor.
+    - now apply compare_eq_iff in e.
+    - generalize dependent y. induction x; intros; destruct y; cbn in *;
+        try (trivial || inversion e).
+      destruct (Ascii.compare a a0) eqn:ea.
+      + apply Ascii.compare_eq_iff in ea. right. split; auto.
+      + left. rewrite /Ascii.compare BinNat.N.compare_lt_iff // in ea.
+      + inversion e.
+    - generalize dependent y. induction x; intros; destruct y; cbn in *;
+        try (trivial || inversion e).
+      destruct (Ascii.compare a a0) eqn:ea.
+      + apply Ascii.compare_eq_iff in ea. right. split; auto.
+      + inversion e.
+      + left. rewrite /Ascii.compare BinNat.N.compare_gt_iff // in ea.
+  Qed.
   Definition eq_dec := @eqDec string _.
 End OrderedString.
 
@@ -209,13 +248,13 @@ Canonical Structure nat_atom :=
   {| atom := nat
   ;  set_atom := SetOfNat
   ;  eq_dec_atom := eq_dec_nat
-  ;  isFresh := fun x S => ~(mem x S) |}.
+  ;  isFresh := fun (x : nat) (S : SetOfNat) => ~(mem x S) |}.
 
 Canonical Structure string_atom :=
   {| atom := string
   ;  set_atom := SetOfString
   ;  eq_dec_atom := eq_dec_string
-  ;  isFresh := fun x S => ~(mem x S) |}.
+  ;  isFresh := fun (x : string) (S : SetOfString) => ~(mem x S) |}.
 
 (** ** Classes for variables manipulation *)
 
