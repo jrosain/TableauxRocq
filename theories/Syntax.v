@@ -96,12 +96,12 @@ Section OpeningSubstTerms.
   Context {func var : Atom} `{set_nat : set nat}.
   Existing Instance eq_dec_atom.
 
-  #[global] Instance opening_term : Opening (Term_ func var) :=
-    fun n x =>
+  #[global] Instance opening_term : Opening (Term_ func var) (Term_ func var) :=
+    fun n u =>
       fix F (t : Term_ func var) : Term_ func var :=
       match t with
       | Bound m => match n == m with
-                  | left _ => Free x
+                  | left _ => u
                   | right _ => t
                   end
       | Free  _ => t
@@ -186,12 +186,12 @@ Section OpeningSubstForms.
   Context {pred func var : Atom} `{set_nat : set nat}.
   Existing Instance bv_term.
 
-  #[global] Instance opening_form : Opening (Form_ pred func var) :=
-    fun n x =>
+  #[global] Instance opening_form : Opening (Term_ func var) (Form_ pred func var) :=
+    fun n u =>
       (fix rec (n : nat) (F : Form_ pred func var) : Form_ pred func var :=
          match F with
          | Bot      => Bot
-         | Pred p l => Pred p (map (fun t => t{n \to x}) l)
+         | Pred p l => Pred p (map (fun t => t{n \to u}) l)
          | Neg  F'  => Neg (rec n F')
          | Or F1 F2 => Or (rec n F1) (rec n F2)
          | All  F'  => All (rec (n+1) F')
@@ -242,3 +242,11 @@ Canonical Structure con_list_forms {pred func var : Atom} :=
   ;  extend := fun Gamma A => A :: Gamma
   ;  in_ctx := In |}.
 Arguments con_list_forms : clear implicits.
+
+(** ** Utils functions *)
+
+Fixpoint get_symbol {func var : Atom} (t : Term_ func var) : option func :=
+  match t with
+  | Bound _ | Free _ => None
+  | Fun f _ => Some f
+  end.

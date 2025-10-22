@@ -1,12 +1,14 @@
 (** * Proofs: definition of free-variable tableaux proofs. *)
 
+From Tableaux Require Import Skolemization.
 From Tableaux Require Import Syntax.
 
 Section TableauxProofs.
-  Context {set_nat : set nat} {pred func var : Atom} {con : Con_ pred func var}.
+  Context `{set_nat : set nat} {pred func var : Atom} {con : Con_ pred func var}
+    (sko : Skolemization_ pred func var).
 
-  Definition set_var := set_atom var.
-  Definition set_func := set_atom func.
+  Let set_var := set_atom var.
+  Let set_func := set_atom func.
 
   Inductive hasTableau_
     : con -> set_var -> set_func -> Substitution var (Term_ func var) -> Prop :=
@@ -39,16 +41,21 @@ Section TableauxProofs.
   | hasTableauAll :
     forall (Gamma : con) (S : set_var) (Sf : set_func) (sigma : Substitution var (Term_ func var))
       (x : var) (F : Form_ pred func var),
-      (All F) \in Gamma -> isFresh x S -> hasTableau_ (Gamma ,, F{0 \to x}) S Sf sigma ->
-      hasTableau_ Gamma (add x S) Sf sigma.
+      (All F) \in Gamma -> isFresh x S -> hasTableau_ (Gamma ,, F{0 \to Free x}) S Sf sigma ->
+      hasTableau_ Gamma (add x S) Sf sigma
 
    (** Delta rule *)
-  (* | hasTableauNegAll : *)
-  (*   forall (Gamma : con) (S : set_var) (Sf : set_func) (sigma : Substitution var (Term_ func var)) *)
-  (*     (f : func) (F : Form_ pred func var), *)
-  (*     (Neg (All F)) \in Gamma -> isFresh f Sf -> hasTableau_ (Gamma ,, Neg F{0 \to sko f foo}) S Sf sigma -> *)
-  (*     hasTableau_ Gamma S (add f Sf) sigma. *)
+  | hasTableauNegAll :
+    forall (Gamma : con) (S : set_var) (Sf : set_func) (sigma : Substitution var (Term_ func var))
+      (F : Form_ pred func var),
+      (Neg (All F)) \in Gamma -> hasTableau_ (Gamma ,, Neg F{0 \to sko F S Sf}) S Sf sigma ->
+      hasTableau_ Gamma S (add (symbol sko F S Sf) Sf) sigma.
 
   Definition hasTableau (Gamma : con) (sigma : Substitution var (Term_ func var)) : Prop :=
     exists (S : set_var) (Sf : set_func), hasTableau_ Gamma S Sf sigma.
 End TableauxProofs.
+
+Section TableauxSoundness.
+  Context `{set_nat : set nat} {pred func var : Atom} {con : Con_ pred func var}
+    (sko : Skolemization_ pred func var).
+End TableauxSoundness.

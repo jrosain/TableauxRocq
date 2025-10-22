@@ -259,8 +259,8 @@ Canonical Structure string_atom :=
 (** ** Classes for variables manipulation *)
 
 (** *** Variable opening: replacing a bound variable with an atom *)
-Class Opening {X : Atom} (A : Type) :=
-  varOpening : nat -> X -> A -> A.
+Class Opening (A B : Type) :=
+  varOpening : nat -> A -> B -> B.
 Arguments varOpening {_ _ _} _ _ _.
 Notation "t { n \to x }" := (varOpening n x t) (at level 3).
 
