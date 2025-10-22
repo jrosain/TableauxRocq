@@ -233,6 +233,14 @@ End OrderedString.
 Module SetOfString_ := SetFromOrdered OrderedString.
 Canonical Structure SetOfString := SetOfString_.set_of_ordered.
 
+(** ** Utility functions about defined types *)
+
+Definition option_get {A : Type} (def : A) (x : option A) : A :=
+  match x with
+  | None => def
+  | Some x => x
+  end.
+
 (** ** Atoms: the class of bound/free variables *)
 
 Class Atom :=

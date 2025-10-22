@@ -227,8 +227,10 @@ End FVForms.
 (** ** Contexts *)
 Class Con_ {pred func var : Atom} :=
   { car :> Type
+  ; empty_con : car
   ; extend : car -> Form_ pred func var -> car
   ; in_ctx : Form_ pred func var -> car -> Type }.
+Arguments empty_con {_ _ _ _}.
 Arguments extend {_ _ _ _} _ _.
 Arguments in_ctx {_ _ _ _} _ _.
 Arguments Con_ : clear implicits.
@@ -239,9 +241,12 @@ Notation "A \in Gamma" := (in_ctx A Gamma) (at level 30).
 
 Canonical Structure con_list_forms {pred func var : Atom} :=
   {| car := list (Form_ pred func var)
+  ;  empty_con := []
   ;  extend := fun Gamma A => A :: Gamma
   ;  in_ctx := In |}.
 Arguments con_list_forms : clear implicits.
+
+Notation "{{ F }}" := (empty_con ,, F).
 
 (** ** Utils functions *)
 

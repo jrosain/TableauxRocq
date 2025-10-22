@@ -7,7 +7,10 @@ From Tableaux Require Import Syntax.
     and Nicolosi-Asmundo (in their paper _A Sound Framework for δ-Rule Variants
     in Free-Variable Semantic Tableaux_). The goal is to be able to be
     Skolemization-independent in the definition of tableaux and make it work seamlessly
-    for different instances of this class. *)
+    for different instances of this class.
+
+    Link to the article:
+      https://sci-hub.st/https://doi.org/10.1007/s10817-006-9045-y *)
 Section SkolemizationDef.
   Context (pred func var : Atom).
 

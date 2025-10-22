@@ -1,5 +1,6 @@
 (** * Proofs: definition of free-variable tableaux proofs. *)
 
+From Tableaux Require Import Semantics.
 From Tableaux Require Import Skolemization.
 From Tableaux Require Import Syntax.
 
@@ -58,4 +59,10 @@ End TableauxProofs.
 Section TableauxSoundness.
   Context `{set_nat : set nat} {pred func var : Atom} {con : Con_ pred func var}
     (sko : Skolemization_ pred func var).
+
+  Theorem hasTableau_sound :
+    forall (F : Form_ pred func var) (sigma : Substitution var (Term_ func var)),
+      hasTableau sko {{ Neg F }} sigma -> \models F.
+  Proof.
+    Admitted.
 End TableauxSoundness.
