@@ -5,6 +5,7 @@ From Corelib Require Export ssr.ssreflect.
 From Stdlib Require Export Strings.String.
 From Stdlib Require Export Lists.List.
 From Stdlib Require Import MSets.MSetAVL.
+From Stdlib Require Import MSets.MSetProperties.
 From Stdlib Require Import Structures.Orders.
 
 Export ListNotations.
@@ -78,7 +79,7 @@ Qed.
 Proof.
   apply eq_dec_from_eq_bool; unshelve econstructor.
   - exact String.eqb.
-  - apply eqb_eq.
+  - apply String.eqb_eq.
 Qed.
 
 (** ** Basic inductives *)
@@ -129,7 +130,9 @@ Class set (A : Type) :=
   ; union : car -> car -> car
   ; inter : car -> car -> car
   ; is_empty : car -> Prop
-  ; disjoint : car -> car -> Prop }.
+  ; disjoint : car -> car -> Prop
+  ; set_eq : car -> car -> Prop
+  ; from_list : list A -> car }.
 Arguments car {_ _}.
 Arguments empty_set _ {_}.
 Arguments mem {_ _} _ _.
@@ -138,6 +141,8 @@ Arguments union {_ _} _ _.
 Arguments inter {_ _} _ _.
 Arguments is_empty {_ _} _.
 Arguments disjoint {_ _} _ _.
+Arguments set_eq {_ _} _ _.
+Arguments from_list {_ _} _.
 
 Definition singleton {A : Type} `{set_A : set A} (x : A) : set_A :=
   add x (empty_set A).
@@ -150,6 +155,7 @@ Notation "S1 \inter S2" := (inter S1 S2) (at level 25).
 (** Generic instantiation of our [set] from an ordered type *)
 Module SetFromOrdered (X : OrderedType).
   Module SetOfX_ := MSetAVL.Make X.
+  Module SetOfXProps := WPropertiesOn X SetOfX_.
 
   #[global] Instance set_of_ordered : set X.t :=
   {| car := SetOfX_.t
@@ -159,7 +165,9 @@ Module SetFromOrdered (X : OrderedType).
   ;  union := SetOfX_.union
   ;  inter := SetOfX_.inter
   ;  is_empty := SetOfX_.Empty
-  ;  disjoint := fun S S' => SetOfX_.Empty (SetOfX_.inter S S') |}.
+  ;  disjoint := fun S S' => SetOfX_.Empty (SetOfX_.inter S S')
+  ;  set_eq := SetOfX_.eq
+  ;  from_list := SetOfXProps.of_list |}.
 End SetFromOrdered.
 
 (** Set of natural numbers. *)

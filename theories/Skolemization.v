@@ -12,20 +12,34 @@ From Tableaux Require Import Syntax.
     Link to the article:
       https://sci-hub.st/https://doi.org/10.1007/s10817-006-9045-y *)
 Section SkolemizationDef.
-  Context (pred func var : Atom).
+  Context {pred func var : Atom}.
 
-  #[local] Definition set_var := set_atom var.
-  #[local] Definition set_func := set_atom func.
+  Let set_var := set_atom var.
+  Let set_func := set_atom func.
 
   Class Skolemization_ :=
-    { sko :> Form_ pred func var -> set_var -> set_func -> Term_ func var
-    ; symbol : Form_ pred func var -> set_var -> set_func -> func
-
-    ; symbol_is_sko : forall F S Sf, get_symbol (sko F S Sf) = Some (symbol F S Sf) }.
+    { is_sko :> Term_ func var -> Form_ pred func var -> set_var -> set_func -> Prop
+    ; symbol :
+        forall (t : Term_ func var) (F : Form_ pred func var) (S : set_var) (Sf : set_func),
+          is_sko t F S Sf -> func }.
 End SkolemizationDef.
 
-Arguments sko {_ _ _} _ _ _.
-Arguments symbol {_ _ _} _ _ _.
-Arguments symbol_is_sko {_ _ _} _ _ _.
+Arguments Skolemization_ : clear implicits.
+Arguments is_sko {_ _ _ _} _ _ _ _.
+Arguments symbol {_ _ _} _ _ _ _ _.
 
 Definition Skolemization := Skolemization_ string string nat.
+
+(** ** Some classic instances *)
+(* Section SkolemizationInstances. *)
+(*   Context {pred func var : Atom}. *)
+
+(*   Let set_var := set_atom var. *)
+(*   Let set_func := set_atom func. *)
+
+(*   #[global] Instance OuterSkolemization := *)
+(*     {| is_sko := *)
+(*         fun t F S Sf => *)
+(*           match t with *)
+(*           | Bound _ | Free _ => False *)
+(*           | Fun f l => (* TODO: of_list set_term l = S *) *)
