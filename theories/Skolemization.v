@@ -26,20 +26,46 @@ End SkolemizationDef.
 
 Arguments Skolemization_ : clear implicits.
 Arguments is_sko {_ _ _ _} _ _ _ _.
-Arguments symbol {_ _ _} _ _ _ _ _.
+Arguments symbol {_ _ _} _ _ {_ _ _} _.
 
 Definition Skolemization := Skolemization_ string string nat.
 
 (** ** Some classic instances *)
-(* Section SkolemizationInstances. *)
-(*   Context {pred func var : Atom}. *)
+Section SkolemizationInstances.
+  Context {pred func var : Atom} `{set_term : set (Term_ func var)}.
 
-(*   Let set_var := set_atom var. *)
-(*   Let set_func := set_atom func. *)
+  Let set_var := set_atom var.
+  Let set_func := set_atom func.
 
-(*   #[global] Instance OuterSkolemization := *)
-(*     {| is_sko := *)
-(*         fun t F S Sf => *)
-(*           match t with *)
-(*           | Bound _ | Free _ => False *)
-(*           | Fun f l => (* TODO: of_list set_term l = S *) *)
+  Definition gen_is_sko (t : Term_ func var) (P : func -> list (Term_ func var) -> Prop) : Prop :=
+    match t with
+    | Bound _ | Free _ => False
+    | Fun f l => P f l
+    end.
+
+  Definition gen_symbol (t : Term_ func var) {P : func -> list (Term_ func var) -> Prop}
+    (hsko : gen_is_sko t P) : func.
+    refine
+      (match t as t0 return t = t0 -> func with
+       | Bound _ | Free _ => fun e => False_rect func _
+       | Fun f _ => fun _ => f
+       end eq_refl).
+    all: now rewrite e in hsko.
+  Defined.
+
+  Instance OuterSkolemization : Skolemization_ pred func var :=
+    {| is_sko :=
+        fun t _ S Sf =>
+          gen_is_sko t (fun f l => (forall (x : var), mem (Free x) (from_list l) <-> mem x S) /\
+                                  isFresh f Sf)
+
+    ;  symbol := fun t _ _ _ hsko => gen_symbol t hsko |}.
+
+  Instance InnerSkolemization : Skolemization_ pred func var :=
+    {| is_sko :=
+        fun t F _ Sf =>
+          gen_is_sko t (fun f l => (forall (x : var), mem (Free x) (from_list l) <-> mem x (fv F)) /\
+                                  isFresh f Sf)
+
+    ;  symbol := fun t _ _ _ hsko => gen_symbol t hsko |}.
+End SkolemizationInstances.

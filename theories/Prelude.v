@@ -315,7 +315,9 @@ Notation "x @[ sigma ]" := (substitute x sigma) (at level 3).
 
 (** *** Free variables and closedness *)
 Section FreeVariables.
-  Context {var : Atom} `{set_var : set var}.
+  Context {var : Atom}.
+
+  Let set_var := set_atom var.
 
   Class FV (A : Type) :=
     fv : A -> set_var.

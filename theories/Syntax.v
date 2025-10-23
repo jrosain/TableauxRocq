@@ -128,7 +128,9 @@ End OpeningSubstTerms.
 
 (** *** Free variables of terms *)
 Section FVTerms.
-  Context {func var : Atom} `{set_var : set var}.
+  Context {func var : Atom}.
+
+  Let set_var := set_atom var.
 
   #[global] Instance fv_term : FV (Term_ func var) :=
     fix F (t : Term_ func var) : set_var :=
@@ -211,7 +213,9 @@ End OpeningSubstForms.
 
 (** *** Free variables of forms *)
 Section FVForms.
-  Context {pred func var : Atom} `{set_var : set var}.
+  Context {pred func var : Atom}.
+
+  Let set_var := set_atom var.
 
   #[global] Instance fv_form : FV (Form_ pred func var) :=
     fix rec (F : Form_ pred func var) : set_var :=
