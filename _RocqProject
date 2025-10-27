@@ -1,6 +1,7 @@
 -Q theories Tableaux
 
 theories/All.v
+theories/ATPCompat.v
 theories/Prelude.v
 theories/Proofs.v
 theories/Semantics.v

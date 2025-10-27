@@ -20,7 +20,7 @@ Section TableauxProofs.
       (Bot \in Gamma) -> hasTableau_ Gamma S Sf sigma
   | hasTableauContr :
     forall (Gamma : con) (S : set_var) (Sf : set_func) (sigma : Substitution var (Term_ func var))
-      (P : Form_ pred func var), (P@[sigma] \in Gamma) -> (Neg P@[sigma] \in Gamma) -> hasTableau_ Gamma S Sf sigma
+      (P P' : Form_ pred func var), (P \in Gamma) -> (P' \in Gamma) -> Neg P@[sigma] = P'@[sigma] -> hasTableau_ Gamma S Sf sigma
 
   (** Alpha rules *)
   | hasTableauNegNeg :
@@ -50,7 +50,7 @@ Section TableauxProofs.
     forall (Gamma : con) (S : set_var) (Sf : set_func) (sigma : Substitution var (Term_ func var))
       (F : Form_ pred func var) (t : Term_ func var) (Hsko : is_sko t F S Sf),
       (Neg (All F)) \in Gamma -> hasTableau_ (Gamma ,, Neg F{0 \to t}) S Sf sigma ->
-      hasTableau_ Gamma S (add (symbol sko t F S Sf Hsko) Sf) sigma.
+      hasTableau_ Gamma S (add (symbol sko t Hsko) Sf) sigma.
 
   Definition hasTableau (Gamma : con) (sigma : Substitution var (Term_ func var)) : Prop :=
     exists (S : set_var) (Sf : set_func), hasTableau_ Gamma S Sf sigma.

@@ -28,7 +28,7 @@ Arguments Skolemization_ : clear implicits.
 Arguments is_sko {_ _ _ _} _ _ _ _.
 Arguments symbol {_ _ _} _ _ {_ _ _} _.
 
-Definition Skolemization := Skolemization_ string string nat.
+Definition Skolemization := Skolemization_ string string string.
 
 (** ** Some classic instances *)
 Section SkolemizationInstances.

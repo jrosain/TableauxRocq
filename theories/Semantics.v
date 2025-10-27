@@ -31,7 +31,7 @@ Section SemanticsDef.
         | Fun f l => interp_func f (map F l)
         end.
 
-  #[global] Instance interpret_form (M : Model) : Interpret M (Form_ pred func var) Prop :=
+  #[global] Instance interpret_form_ (M : Model) : Interpret M (Form_ pred func var) Prop :=
     fix rec (rho : list M) (sigma : env M var) (F : Form_ pred func var) : Prop :=
       match F with
       | Bot        => False
@@ -42,10 +42,16 @@ Section SemanticsDef.
       end.
 
   Definition is_valid (F : Form_ pred func var) :=
-    forall (M : Model), interpret_form M [] (empty_env M var) F.
+    forall (M : Model), interpret_form_ M [] (empty_env M var) F.
 End SemanticsDef.
 
+Arguments Model : clear implicits.
+Arguments Interpret {_ _ _} _ _ _.
 Arguments interpret {_ _ _} _ {_ _ _} _ _ _.
+
+Definition interpret_form (M : Model string string) : Interpret M Form Prop :=
+  interpret_form_ M.
+Existing Instance interpret_form.
 
 Notation "\models F" := (is_valid F) (at level 40).
 Notation "[[ M # rho # sigma |- F ]]" := (interpret M rho sigma F).

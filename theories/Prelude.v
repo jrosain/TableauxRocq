@@ -6,6 +6,7 @@ From Stdlib Require Export Strings.String.
 From Stdlib Require Export Lists.List.
 From Stdlib Require Import MSets.MSetAVL.
 From Stdlib Require Import MSets.MSetProperties.
+From Stdlib Require Import MSets.MSetFacts.
 From Stdlib Require Import Structures.Orders.
 
 Export ListNotations.
@@ -122,27 +123,32 @@ Section EquivForallIn.
 End EquivForallIn.
 
 (** ** Axiomatized Sets *)
-Class set (A : Type) :=
+Class set {A : Type} :=
   { car :> Type
   ; empty_set : car
   ; mem : A -> car -> Prop
   ; add : A -> car -> car
+  ; remove : A -> car -> car
   ; union : car -> car -> car
   ; inter : car -> car -> car
   ; is_empty : car -> Prop
   ; disjoint : car -> car -> Prop
   ; set_eq : car -> car -> Prop
-  ; from_list : list A -> car }.
-Arguments car {_ _}.
+  ; from_list : list A -> car
+
+  ; Equivalence_eq : Equivalence set_eq
+  ; is_empty_spec : is_empty empty_set
+  ; empty_unitl   : forall (s : car), set_eq (union empty_set s) s
+  ; empty_unitr   : forall (s : car), set_eq (union s empty_set) s }.
+  (* SetOfString_.SetOfX_.Empty *)
+  (*   (fold_left *)
+  (*      (fun (s : SetOfString_.SetOfX_.t) (t : Term_ string string) => *)
+  (*       SetOfString_.SetOfX_.union s (fv t)) *)
+  (*      (map (translate_ETerm []) l) *)
+  (*      (SetOfString_.SetOfX_.union SetOfString_.SetOfX_.empty (fv (translate_ETerm [] a)))) *)
+
+Arguments set : clear implicits.
 Arguments empty_set _ {_}.
-Arguments mem {_ _} _ _.
-Arguments add {_ _} _ _.
-Arguments union {_ _} _ _.
-Arguments inter {_ _} _ _.
-Arguments is_empty {_ _} _.
-Arguments disjoint {_ _} _ _.
-Arguments set_eq {_ _} _ _.
-Arguments from_list {_ _} _.
 
 Definition singleton {A : Type} `{set_A : set A} (x : A) : set_A :=
   add x (empty_set A).
@@ -156,18 +162,34 @@ Notation "S1 \inter S2" := (inter S1 S2) (at level 25).
 Module SetFromOrdered (X : OrderedType).
   Module SetOfX_ := MSetAVL.Make X.
   Module SetOfXProps := WPropertiesOn X SetOfX_.
+  Module SetOfXOrdProps := MSetProperties.OrdProperties SetOfX_.
+  Module SetOfXFacts := WFactsOn X SetOfX_.
 
-  #[global] Instance set_of_ordered : set X.t :=
+  #[refine,global] Instance set_of_ordered : set X.t :=
   {| car := SetOfX_.t
   ;  empty_set := SetOfX_.empty
   ;  mem := SetOfX_.In
   ;  add := SetOfX_.add
+  ;  remove := SetOfX_.remove
   ;  union := SetOfX_.union
   ;  inter := SetOfX_.inter
   ;  is_empty := SetOfX_.Empty
   ;  disjoint := fun S S' => SetOfX_.Empty (SetOfX_.inter S S')
-  ;  set_eq := SetOfX_.eq
-  ;  from_list := SetOfXProps.of_list |}.
+  ;  set_eq := SetOfX_.Equal
+  ;  from_list := SetOfXProps.of_list
+
+  ;  Equivalence_eq := SetOfX_.eq_equiv
+  ;  is_empty_spec := SetOfX_.empty_spec
+  ;  empty_unitl := _
+  ;  empty_unitr := _ |}.
+  Proof.
+    - intros s; cbn.
+      apply SetOfXProps.empty_union_1, SetOfX_.empty_spec.
+    - intros s; cbn.
+      apply SetOfXProps.empty_union_2, SetOfX_.empty_spec.
+  Defined.
+
+  Definition proper_empty : Proper (set_eq ==> iff) is_empty := SetOfXOrdProps.P.FM.Empty_m.
 End SetFromOrdered.
 
 (** Set of natural numbers. *)
@@ -247,6 +269,12 @@ Definition option_get {A : Type} (def : A) (x : option A) : A :=
   match x with
   | None => def
   | Some x => x
+  end.
+
+Definition bind {A B : Type} (x : option A) (f : A -> option B) : option B :=
+  match x with
+  | Some x => f x
+  | None => None
   end.
 
 (** ** Atoms: the class of bound/free variables *)
