@@ -138,23 +138,27 @@ Class set {A : Type} :=
 
   ; Equivalence_eq : Equivalence set_eq
   ; is_empty_spec : is_empty empty_set
-  ; empty_unitl   : forall (s : car), set_eq (union empty_set s) s
-  ; empty_unitr   : forall (s : car), set_eq (union s empty_set) s }.
-  (* SetOfString_.SetOfX_.Empty *)
-  (*   (fold_left *)
-  (*      (fun (s : SetOfString_.SetOfX_.t) (t : Term_ string string) => *)
-  (*       SetOfString_.SetOfX_.union s (fv t)) *)
-  (*      (map (translate_ETerm []) l) *)
-  (*      (SetOfString_.SetOfX_.union SetOfString_.SetOfX_.empty (fv (translate_ETerm [] a)))) *)
+  ; empty_unitl   : forall (s : car), (union empty_set s) = s
+  ; empty_unitr   : forall (s : car), (union s empty_set) = s
+  ; empty_disjointl : forall (s : car), disjoint empty_set s
+  ; disjoint_sym  : forall (s1 s2 : car), disjoint s1 s2 <-> disjoint s2 s1 }.
 
 Arguments set : clear implicits.
 Arguments empty_set _ {_}.
 
-Definition singleton {A : Type} `{set_A : set A} (x : A) : set_A :=
-  add x (empty_set A).
-
 Notation "S1 \union S2" := (union S1 S2) (at level 30).
 Notation "S1 \inter S2" := (inter S1 S2) (at level 25).
+
+Section SetProperties.
+  Context {A : Type} `{set_A : set A}.
+
+  Definition singleton (x : A) : set_A :=
+    add x (empty_set A).
+
+  Lemma empty_disjointr :
+    forall (s : set_A), disjoint s (empty_set A).
+  Proof using Type. intros. rewrite disjoint_sym. apply empty_disjointl. Qed.
+End SetProperties.
 
 (** *** Usual instantiations with [MSets] *)
 
@@ -165,7 +169,55 @@ Module SetFromOrdered (X : OrderedType).
   Module SetOfXOrdProps := MSetProperties.OrdProperties SetOfX_.
   Module SetOfXFacts := WFactsOn X SetOfX_.
 
-  #[refine,global] Instance set_of_ordered : set X.t :=
+  (** Here, we assume that the proofs of sets being sets are irrelevant. *)
+  Axiom Ok_irrelevant : forall (s : SetOfX_.Raw.tree) (e1 e2 : SetOfX_.Raw.Ok s), e1 = e2.
+
+  #[local] Lemma SetOfX__eq :
+    forall (s1 s2 : SetOfX_.t),
+      SetOfX_.this s1 = SetOfX_.this s2 ->
+      s1 = s2.
+  Proof.
+    intros [] [] e. cbn in *. destruct e. f_equal.
+    apply Ok_irrelevant.
+  Qed.
+
+  #[local] Lemma set_empty_unitl :
+    forall (s : SetOfX_.t), SetOfX_.union SetOfX_.empty s = s.
+  Proof. intros []. apply SetOfX__eq; now cbn. Qed.
+
+  #[local] Lemma set_empty_unitr :
+    forall (s : SetOfX_.t), SetOfX_.union s SetOfX_.empty = s.
+  Proof.
+    intros []. apply SetOfX__eq; cbn.
+    destruct this; reflexivity.
+  Qed.
+
+  #[local] Definition set_disjoint (s1 s2 : SetOfX_.t) :=
+    SetOfX_.Empty (SetOfX_.inter s1 s2).
+
+  #[local] Lemma set_empty_disjointl :
+    forall (s : SetOfX_.t), set_disjoint SetOfX_.empty s.
+  Proof.
+    intro; unfold set_disjoint.
+    have H := @SetOfXProps.inter_subset_1 SetOfX_.empty s.
+    apply SetOfXProps.empty_is_empty_2. split.
+    + intro; now apply H.
+    + apply SetOfXProps.subset_empty.
+  Qed.
+
+  #[local] Lemma set_disjoint_sym :
+    forall (s1 s2 : SetOfX_.t), set_disjoint s1 s2 <-> set_disjoint s2 s1.
+  Proof.
+    intros ??; unfold set_disjoint; split.
+    - intro. apply SetOfXOrdProps.P.empty_is_empty_1 in H.
+      apply SetOfXOrdProps.P.empty_is_empty_2.
+      rewrite SetOfXOrdProps.P.inter_sym //.
+    - intro. apply SetOfXOrdProps.P.empty_is_empty_1 in H.
+      apply SetOfXOrdProps.P.empty_is_empty_2.
+      rewrite SetOfXOrdProps.P.inter_sym //.
+  Qed.
+
+  #[global] Instance set_of_ordered : set X.t :=
   {| car := SetOfX_.t
   ;  empty_set := SetOfX_.empty
   ;  mem := SetOfX_.In
@@ -174,20 +226,16 @@ Module SetFromOrdered (X : OrderedType).
   ;  union := SetOfX_.union
   ;  inter := SetOfX_.inter
   ;  is_empty := SetOfX_.Empty
-  ;  disjoint := fun S S' => SetOfX_.Empty (SetOfX_.inter S S')
+  ;  disjoint := set_disjoint
   ;  set_eq := SetOfX_.Equal
   ;  from_list := SetOfXProps.of_list
 
   ;  Equivalence_eq := SetOfX_.eq_equiv
   ;  is_empty_spec := SetOfX_.empty_spec
-  ;  empty_unitl := _
-  ;  empty_unitr := _ |}.
-  Proof.
-    - intros s; cbn.
-      apply SetOfXProps.empty_union_1, SetOfX_.empty_spec.
-    - intros s; cbn.
-      apply SetOfXProps.empty_union_2, SetOfX_.empty_spec.
-  Defined.
+  ;  empty_unitl := set_empty_unitl
+  ;  empty_unitr := set_empty_unitr
+  ;  empty_disjointl := set_empty_disjointl
+  ;  disjoint_sym  := set_disjoint_sym |}.
 
   Definition proper_empty : Proper (set_eq ==> iff) is_empty := SetOfXOrdProps.P.FM.Empty_m.
 End SetFromOrdered.
@@ -318,7 +366,6 @@ Section HasSetNat.
 
   Class LocallyClosed {A : Type} `{BV A} (x : A) :=
     isLocallyClosed : is_empty (bv x).
-  Arguments isLocallyClosed {_} _ _.
 
   Class Substitution (X : Atom) (A : Type) `{BV A} :=
     { subst :> X -> A
