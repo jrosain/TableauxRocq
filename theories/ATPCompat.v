@@ -180,8 +180,8 @@ Section ESyntaxTranslation.
     | ENeg F => ENeg (instantiate_eform x u F)
     | EOr F G => EOr (instantiate_eform x u F) (instantiate_eform x u G)
     | EAnd F G => EAnd (instantiate_eform x u F) (instantiate_eform x u G)
-    | EImp F G => EAnd (instantiate_eform x u F) (instantiate_eform x u G)
-    | EEqu F G => EAnd (instantiate_eform x u F) (instantiate_eform x u G)
+    | EImp F G => EImp (instantiate_eform x u F) (instantiate_eform x u G)
+    | EEqu F G => EEqu (instantiate_eform x u F) (instantiate_eform x u G)
     | EEx y F =>
         match x == y with
         | left _ => EEx y F
@@ -207,8 +207,8 @@ Section ESyntaxTranslation.
     forall (F : EForm), WellScoped F -> is_empty (@fv string _ _ (translate_EForm F)).
   Proof.
     intros F hscope; induction F.
-    - cbn; apply is_empty_spec.
-    - cbn; apply is_empty_spec.
+    - cbn. rewrite is_empty_spec //.
+    - cbn; rewrite is_empty_spec //.
     - cbn in *. admit.
     - cbn in *. now apply IHF.
     - admit.
@@ -233,7 +233,7 @@ Notation "[[ M ]]" := (translate M).
 
 Coercion translate_EForm : EForm >-> Form.
 
-(** ** 4. Corresopndance of the syntax *)
+(** ** 4. Correspondance of the syntax *)
 
 (** ** 5. Helper to transform substitution into internal substitution *)
 Section TranslateSubst.
@@ -246,26 +246,42 @@ Section TranslateSubst.
                      end
     end.
 
+  Lemma eterm_translation_is_always_locally_closed :
+    forall (t : ETerm), @LocallyClosed _ Term _ [[ t ]].
+  Proof.
+    intro t. induction t using eterm_ind.
+    - cbn; rewrite is_empty_spec //.
+    - induction l as [|x xs IHxs].
+      + cbn; rewrite is_empty_spec //.
+      + cbn. rewrite empty_unitl.
+        have Hbv := Forall_In _ _ H x (ltac:(now right)).
+        red in Hbv. unfold is_empty in Hbv; cbn in Hbv.
+        rewrite is_empty_spec in Hbv. rewrite Hbv.
+        cbn. apply IHxs, In_Forall=>u hu.
+        apply Forall_In with (x := u) in H; auto.
+        now left.
+  Qed.
+
   Lemma locally_closed_subst_translation :
     forall (l : list (string * ETerm)) (x : string),
       (forall (x : string) (t : ETerm), In (x, t) l -> @LocallyClosed _ Term _ [[ t ]]) ->
       LocallyClosed (subst_translation l x).
   Proof.
     intros l x H. induction l as [|y ys IHys].
-    - apply is_empty_spec.
+    - cbn; rewrite is_empty_spec //.
     - cbn. destruct (fst y == x).
       + eapply (H (fst y)). right. now destruct y.
       + apply IHys. intros; apply (H x0).
         now left.
   Qed.
 
-  Definition translate_substitution (l : list (string * ETerm))
-    (H : forall (x : string) (t : ETerm), In (x, t) l -> @LocallyClosed _ Term _ [[ t ]]) :
+  Definition translate_substitution (l : list (string * ETerm)) :
     Substitution string Term.
   Proof.
     unshelve econstructor.
     - apply (subst_translation l).
-    - intro x; apply (locally_closed_subst_translation l x H).
+    - intro x; refine (locally_closed_subst_translation l x _).
+      intros; apply eterm_translation_is_always_locally_closed.
   Defined.
 End TranslateSubst.
 
@@ -529,12 +545,13 @@ Section HasTableauLemmas.
 
   Lemma hasTableauNegAll :
     forall (Gamma : Con) (sigma : Substitution string Term) (S Sf : SetOfString) (i : nat) (F : EForm)
-      (x : string) (t : ETerm) (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] F)) S Sf),
-      con_nth Gamma i = Some [[ ENeg (EAll x F) ]] ->
-      hasTableau_ sko (Gamma ,, [[ instantiate_eform x t F ]]) S Sf sigma ->
-      hasTableau_ sko Gamma S (add (symbol sko [[ t ]] hsko) Sf) sigma.
+      (x : string) (t : ETerm) (f : string)
+      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] F)) S Sf),
+      con_nth Gamma i = Some [[ ENeg (EAll x F) ]] -> symbol sko [[ t ]] hsko = f ->
+      hasTableau_ sko (Gamma ,, [[ instantiate_eform x t (ENeg F) ]]) S Sf sigma ->
+      hasTableau_ sko Gamma S (add f Sf) sigma.
   Proof.
-    intros ???????? hsko e htab.
+    intros ????????? hsko e [] htab.
     apply (hasTableauNegAll sko Gamma S Sf sigma (translate_EForm_ [x] F) [[ t ]] hsko).
     - cbn in e |- *; eapply con_nth_in; eauto.
     - admit. (* TODO: [is_sko t F Sf S -> ~(y \in fv F) -> F{0 \to t} = instantiate_eform x t F] *)
@@ -542,15 +559,24 @@ Section HasTableauLemmas.
 
   Lemma hasTableauEx :
     forall (Gamma : Con) (sigma : Substitution string Term) (S Sf : SetOfString) (i : nat) (F : EForm)
-      (x : string) (t : ETerm) (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F))) S Sf),
-      con_nth Gamma i = Some [[ EEx x F ]] ->
-      hasTableau_ sko (Gamma ,, [[ instantiate_eform x t (ENeg F) ]]) S Sf sigma ->
-      hasTableau_ sko Gamma S (add (symbol sko [[ t ]] hsko) Sf) sigma.
+      (x : string) (t : ETerm) (f : string)
+      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F))) S Sf),
+      con_nth Gamma i = Some [[ EEx x F ]] -> symbol sko [[ t ]] hsko = f ->
+      hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (instantiate_eform x t F)) ]] ,,
+                         [[ instantiate_eform x t F ]]) S Sf sigma ->
+      hasTableau_ sko Gamma S (add f Sf) sigma.
   Proof using Type.
-    intros ???????? hsko e htab. unshelve eapply hasTableauNegAll.
-    - exact i.
-    - cbn in e |- *; assumption.
+    intros ????????? hsko e e' htab. unshelve eapply hasTableauNegAll.
+    1: exact i.
+    1,2,3: shelve.
+    - eassumption.
     - assumption.
+    - assumption.
+    - unshelve eapply hasTableauNegNeg.
+      1: exact 0.
+      1: shelve.
+      1: reflexivity.
+      assumption.
   Qed.
 
   Lemma hasTableauNegEx :

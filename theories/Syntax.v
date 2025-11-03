@@ -435,7 +435,7 @@ Arguments Con_ : clear implicits.
 Notation "Gamma ,, A" := (extend Gamma A) (at level 20).
 Notation "A \in Gamma" := (in_ctx A Gamma) (at level 30).
 
-Canonical Structure Con :=
+Canonical Structure Con : Con_ string string string :=
   {| car := list Form
   ;  empty_con := []
   ;  extend := fun Gamma A => A :: Gamma
@@ -447,7 +447,7 @@ Notation "{{ F }}" := (empty_con ,, F).
 
 (** ** Utils functions *)
 
-Fixpoint get_symbol {func var : Atom} (t : Term_ func var) : option func :=
+Definition get_symbol {func var : Atom} (t : Term_ func var) : option func :=
   match t with
   | Bound _ | Free _ => None
   | Fun f _ => Some f

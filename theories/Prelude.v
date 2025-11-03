@@ -137,7 +137,7 @@ Class set {A : Type} :=
   ; from_list : list A -> car
 
   ; Equivalence_eq : Equivalence set_eq
-  ; is_empty_spec : is_empty empty_set
+  ; is_empty_spec : forall (s : car), is_empty s <-> s = empty_set
   ; empty_unitl   : forall (s : car), (union empty_set s) = s
   ; empty_unitr   : forall (s : car), (union s empty_set) = s
   ; empty_disjointl : forall (s : car), disjoint empty_set s
@@ -158,6 +158,9 @@ Section SetProperties.
   Lemma empty_disjointr :
     forall (s : set_A), disjoint s (empty_set A).
   Proof using Type. intros. rewrite disjoint_sym. apply empty_disjointl. Qed.
+
+  Lemma is_empty_spec' : is_empty (empty_set A).
+  Proof using Type. rewrite is_empty_spec //. Qed.
 End SetProperties.
 
 (** *** Usual instantiations with [MSets] *)
@@ -217,6 +220,18 @@ Module SetFromOrdered (X : OrderedType).
       rewrite SetOfXOrdProps.P.inter_sym //.
   Qed.
 
+  #[local] Lemma set_is_empty_spec :
+    forall (s : SetOfX_.t), SetOfX_.Empty s <-> s = SetOfX_.empty.
+  Proof.
+    intros s; split.
+    - unfold SetOfX_.Empty; intro. apply SetOfX__eq.
+      destruct s; cbn. induction this.
+      + reflexivity.
+      + specialize (H t0). exfalso. apply H.
+        now constructor.
+    - intros ->. apply SetOfX_.empty_spec.
+  Qed.
+
   #[global] Instance set_of_ordered : set X.t :=
   {| car := SetOfX_.t
   ;  empty_set := SetOfX_.empty
@@ -231,7 +246,7 @@ Module SetFromOrdered (X : OrderedType).
   ;  from_list := SetOfXProps.of_list
 
   ;  Equivalence_eq := SetOfX_.eq_equiv
-  ;  is_empty_spec := SetOfX_.empty_spec
+  ;  is_empty_spec := set_is_empty_spec
   ;  empty_unitl := set_empty_unitl
   ;  empty_unitr := set_empty_unitr
   ;  empty_disjointl := set_empty_disjointl
