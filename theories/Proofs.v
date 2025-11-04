@@ -48,7 +48,7 @@ Section TableauxProofs.
    (** Delta rule *)
   | hasTableauNegAll :
     forall (Gamma : con) (S : set_var) (Sf : set_func) (sigma : Substitution var (Term_ func var))
-      (F : Form_ pred func var) (t : Term_ func var) (Hsko : is_sko t (Neg F) S Sf),
+      (F : Form_ pred func var) (t : Term_ func var) (Hsko : is_sko t (Neg F) (fv Gamma) Sf),
       (Neg (All F)) \in Gamma -> hasTableau_ (Gamma ,, Neg F{0 \to t}) S Sf sigma ->
       hasTableau_ Gamma S (add (symbol sko t Hsko) Sf) sigma.
 

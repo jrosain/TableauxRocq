@@ -7,6 +7,7 @@ From Stdlib Require Export Lists.List.
 From Stdlib Require Import MSets.MSetAVL.
 From Stdlib Require Import MSets.MSetProperties.
 From Stdlib Require Import MSets.MSetFacts.
+From Stdlib Require Import MSets.MSetDecide.
 From Stdlib Require Import Structures.Orders.
 
 Export ListNotations.
@@ -138,8 +139,10 @@ Class set {A : Type} :=
 
   ; Equivalence_eq : Equivalence set_eq
   ; is_empty_spec : forall (s : car), is_empty s <-> s = empty_set
+  ; singleton_spec : forall (x : A), mem x (add x empty_set)
   ; empty_unitl   : forall (s : car), (union empty_set s) = s
   ; empty_unitr   : forall (s : car), (union s empty_set) = s
+  ; union_idemp   : forall (s : car), set_eq (union s s) s
   ; empty_disjointl : forall (s : car), disjoint empty_set s
   ; disjoint_sym  : forall (s1 s2 : car), disjoint s1 s2 <-> disjoint s2 s1 }.
 
@@ -171,6 +174,7 @@ Module SetFromOrdered (X : OrderedType).
   Module SetOfXProps := WPropertiesOn X SetOfX_.
   Module SetOfXOrdProps := MSetProperties.OrdProperties SetOfX_.
   Module SetOfXFacts := WFactsOn X SetOfX_.
+  Module SetOfXDecide := WDecideOn X SetOfX_.
 
   (** Here, we assume that the proofs of sets being sets are irrelevant. *)
   Axiom Ok_irrelevant : forall (s : SetOfX_.Raw.tree) (e1 e2 : SetOfX_.Raw.Ok s), e1 = e2.
@@ -232,6 +236,18 @@ Module SetFromOrdered (X : OrderedType).
     - intros ->. apply SetOfX_.empty_spec.
   Qed.
 
+  #[local] Lemma set_union_idemp :
+    forall (s : SetOfX_.t), SetOfX_.eq (SetOfX_.union s s) s.
+  Proof.
+    intro s. intros x; split.
+    - intro. rewrite SetOfX_.union_spec in H. now destruct H.
+    - intros; rewrite SetOfX_.union_spec. now left.
+  Qed.
+
+  #[local] Lemma set_singleton_spec :
+    forall (x : X.t), SetOfX_.In x (SetOfX_.add x SetOfX_.empty).
+  Proof. intro; apply SetOfXFacts.add_1. reflexivity. Qed.
+
   #[global] Instance set_of_ordered : set X.t :=
   {| car := SetOfX_.t
   ;  empty_set := SetOfX_.empty
@@ -247,8 +263,10 @@ Module SetFromOrdered (X : OrderedType).
 
   ;  Equivalence_eq := SetOfX_.eq_equiv
   ;  is_empty_spec := set_is_empty_spec
+  ;  singleton_spec := set_singleton_spec
   ;  empty_unitl := set_empty_unitl
   ;  empty_unitr := set_empty_unitr
+  ;  union_idemp := set_union_idemp
   ;  empty_disjointl := set_empty_disjointl
   ;  disjoint_sym  := set_disjoint_sym |}.
 

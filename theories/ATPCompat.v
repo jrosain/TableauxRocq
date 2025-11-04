@@ -14,7 +14,8 @@ From Tableaux Require Import Skolemization.
       3. a translation function from this syntax to the internal one,
       4. a proof that the two syntaxes are semantically equivalent,
       5. helper functions for transforming finite substitutions into internal substitutions,
-      6. helper lemmas to build a tableau more easily *)
+      6. helper lemmas to build a tableau more easily
+      7. tactics to simplify extended syntax stuff & solve set-related stuff *)
 
 (** ** 1. Extended syntax *)
 Section ESyntax.
@@ -182,16 +183,16 @@ Section ESyntaxTranslation.
     | EAnd F G => EAnd (instantiate_eform x u F) (instantiate_eform x u G)
     | EImp F G => EImp (instantiate_eform x u F) (instantiate_eform x u G)
     | EEqu F G => EEqu (instantiate_eform x u F) (instantiate_eform x u G)
-    | EEx y F =>
-        match x == y with
-        | left _ => EEx y F
-        | right _ => EEx y (instantiate_eform x u F)
-        end
-    | EAll y F =>
-        match x == y with
-        | left _ => EAll y F
-        | right _ => EAll y (instantiate_eform x u F)
-        end
+    | EEx y F => EEx (match x == y with left _ => x | right _ => y end)
+                  (match x == y with
+                   | left _ => F
+                   | right _ => (instantiate_eform x u F)
+                   end)
+    | EAll y F => EAll (match x == y with left _ => x | right _ => y end)
+                  (match x == y with
+                   | left _ => F
+                   | right _ => (instantiate_eform x u F)
+                   end)
     end.
 
   Lemma WellScoped_no_fv_eterm :
@@ -546,7 +547,7 @@ Section HasTableauLemmas.
   Lemma hasTableauNegAll :
     forall (Gamma : Con) (sigma : Substitution string Term) (S Sf : SetOfString) (i : nat) (F : EForm)
       (x : string) (t : ETerm) (f : string)
-      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] F)) S Sf),
+      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] F)) (fv Gamma) Sf),
       con_nth Gamma i = Some [[ ENeg (EAll x F) ]] -> symbol sko [[ t ]] hsko = f ->
       hasTableau_ sko (Gamma ,, [[ instantiate_eform x t (ENeg F) ]]) S Sf sigma ->
       hasTableau_ sko Gamma S (add f Sf) sigma.
@@ -560,7 +561,7 @@ Section HasTableauLemmas.
   Lemma hasTableauEx :
     forall (Gamma : Con) (sigma : Substitution string Term) (S Sf : SetOfString) (i : nat) (F : EForm)
       (x : string) (t : ETerm) (f : string)
-      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F))) S Sf),
+      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F))) (fv Gamma) Sf),
       con_nth Gamma i = Some [[ EEx x F ]] -> symbol sko [[ t ]] hsko = f ->
       hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (instantiate_eform x t F)) ]] ,,
                          [[ instantiate_eform x t F ]]) S Sf sigma ->
@@ -596,3 +597,30 @@ Section HasTableauLemmas.
       all: auto.
   Qed.
 End HasTableauLemmas.
+
+(** ** 7. Tactics *)
+
+Ltac esimpl :=
+  repeat (destruct eqDec; cbn);
+  try congruence.
+
+Ltac set_decide :=
+  try (repeat split; cbn); esimpl;
+  repeat (progress (rewrite !empty_unitl || rewrite !empty_unitr || erewrite union_idemp));
+  repeat (progress (match goal with
+  | [ |- forall x : (SetOfTerm_.SetOfX_.In ?y ?S), ?P ] =>
+      let H := fresh x in intro H; inversion H; subst
+  | [ |- forall x : (SetOfString_.SetOfX_.In ?y ?S), ?P ] =>
+      let H := fresh x in intro H; inversion H; subst
+  | [ |-  ~(SetOfTerm_.SetOfX_.In ?y ?S) ] =>
+      let H := fresh "H" in intro H; inversion H; subst
+  | [ |-  ~(SetOfString_.SetOfX_.In ?y ?S) ] =>
+      let H := fresh "H" in intro H; inversion H; subst
+  | [ H : SetOfTerm_.SetOfX_.Raw.InT ?x SetOfTerm_.SetOfX_.Raw.Leaf |- _ ] => inversion H
+  | [ H : SetOfString_.SetOfX_.Raw.InT ?x SetOfString_.SetOfX_.Raw.Leaf |- _ ] => inversion H
+  | [ e : Free ?x = Free ?y |- _ ] => injection e => e'; subst
+  | [ e : ?x = ?y |- _ ] => try (inversion e; fail)
+  | _ => idtac
+  end));
+  try (SetOfTerm_.SetOfXDecide.fsetdec);
+  try (SetOfString_.SetOfXDecide.fsetdec).

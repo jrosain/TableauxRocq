@@ -420,12 +420,17 @@ Section FVForms.
 End FVForms.
 
 (** ** Contexts *)
+
 Class Con_ {pred func var : Atom} :=
   { car :> Type
   ; empty_con : car
   ; extend : car -> Form_ pred func var -> car
   ; in_ctx : Form_ pred func var -> car -> Type
-  ; con_nth : car -> nat -> option (Form_ pred func var) }.
+  ; con_nth : car -> nat -> option (Form_ pred func var)
+  ; con_ind : forall (P : car -> Type),
+      P empty_con ->
+      (forall (F : Form_ pred func var) (Gamma : car), P Gamma -> P (extend Gamma F)) ->
+      forall (Gamma : car), P Gamma}.
 Arguments empty_con {_ _ _ _}.
 Arguments extend {_ _ _ _} _ _.
 Arguments in_ctx {_ _ _ _} _ _.
@@ -440,10 +445,24 @@ Canonical Structure Con : Con_ string string string :=
   ;  empty_con := []
   ;  extend := fun Gamma A => A :: Gamma
   ;  in_ctx := In
-  ;  con_nth := @nth_error Form |}.
+  ;  con_nth := @nth_error Form
+  ;  con_ind := @list_rect Form |}.
 Arguments Con : clear implicits.
 
 Notation "{{ F }}" := (empty_con ,, F).
+
+Section FVCon.
+  Context {pred func var : Atom} {con : Con_ pred func var}.
+
+  Let set_var := set_atom var.
+
+  #[global] Instance fv_con : FV con.
+  Proof.
+    refine (con_ind (fun _ => set_var) _ _).
+    - exact (empty_set var).
+    - intros F Gamma s. exact (fv F \union s).
+  Defined.
+End FVCon.
 
 (** ** Utils functions *)
 
