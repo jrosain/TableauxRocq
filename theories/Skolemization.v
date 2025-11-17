@@ -1,6 +1,6 @@
 (** * Skolemization: a generic class for Skolemization *)
 
-From Tableaux Require Import Prelude.
+From Tableaux Require Import Prelude.All.
 From Tableaux Require Import Syntax.
 
 (** In this file, we implement first-order Skolemization in the framework of Cantone
@@ -27,8 +27,6 @@ End SkolemizationDef.
 Arguments Skolemization_ : clear implicits.
 Arguments is_sko {_ _ _ _} _ _ _ _.
 Arguments symbol {_ _ _} _ _ {_ _ _} _.
-
-Definition Skolemization := Skolemization_ string string string.
 
 (** ** Some classic instances *)
 Section SkolemizationInstances.
@@ -69,3 +67,12 @@ Section SkolemizationInstances.
 
     ;  symbol := fun t _ _ _ hsko => gen_symbol t hsko |}.
 End SkolemizationInstances.
+
+Module ConcreteSkolemizationInstances.
+  Import ConcreteSyntaxInstances.
+
+  Definition Skolemization := Skolemization_ string string string.
+
+  Existing Instance OuterSkolemization.
+  Existing Instance InnerSkolemization.
+End ConcreteSkolemizationInstances.

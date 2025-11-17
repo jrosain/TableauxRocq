@@ -2,7 +2,7 @@
 
 From Stdlib Require Import Classical.
 
-From Tableaux Require Import Prelude.
+From Tableaux Require Import Prelude.All.
 From Tableaux Require Import Syntax.
 
 Section SemanticsDef.
@@ -48,10 +48,6 @@ End SemanticsDef.
 Arguments Model : clear implicits.
 Arguments Interpret {_ _ _} _ _ _.
 Arguments interpret {_ _ _} _ {_ _ _} _ _ _.
-
-Definition interpret_form (M : Model string string) : Interpret M Form Prop :=
-  interpret_form_ M.
-Existing Instance interpret_form.
 
 Notation "\models F" := (is_valid F) (at level 40).
 Notation "[[ M # rho # sigma |- F ]]" := (interpret M rho sigma F).

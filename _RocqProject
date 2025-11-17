@@ -1,8 +1,17 @@
 -Q theories Tableaux
 
+theories/Prelude/All.v
+theories/Prelude/Atoms.v
+theories/Prelude/Classes.v
+theories/Prelude/Ind.v
+theories/Prelude/Init.v
+theories/Prelude/Sets.v
+theories/Prelude/Utils.v
+theories/Prelude/LocallyNamelessClasses.v
+
 theories/All.v
 theories/ATPCompat.v
-theories/Prelude.v
+theories/Core.v
 theories/Proofs.v
 theories/Semantics.v
 theories/Skolemization.v
