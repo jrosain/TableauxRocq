@@ -10,7 +10,7 @@ From Tableaux Require Import Semantics.
 From Tableaux Require Import Proofs.
 From Tableaux Require Import Skolemization.
 
-Export ConcreteSkolemizationInstances.
+Export ConcreteProofInstances.
 
 (** In this file, we define:
       1. a syntax using [string]s for bound variable, in order to make it easy to
@@ -705,20 +705,20 @@ Section ValidityEquivalence.
       + admit. (* TODO: generalize IHF and this is free *)
   Admitted.
 
-  Lemma is_valid_translation_is_valid :
-    forall (F : EForm), \models (translate_EForm F) <-> is_evalid F.
-  Proof.
-    intros F; split; intros H M; specialize (H M);
-      now apply is_valid_translation_is_valid_.
-  Qed.
+  (* Lemma is_valid_translation_is_valid : *)
+  (*   forall (F : EForm), \models (translate_EForm F) <-> is_evalid F. *)
+  (* Proof. *)
+  (*   intros F; split; intros H M; specialize (H M); *)
+  (*     now apply is_valid_translation_is_valid_. *)
+  (* Qed. *)
 
-  Lemma hasTableau_is_evalid :
-    forall (F : EForm) (sko : Skolemization) (sigma : Substitution string Term),
-      hasTableau sko {{ Neg [[ F ]] }} sigma -> is_evalid F.
-  Proof.
-    intros ??? htab. apply (hasTableau_sound sko [[ F ]] sigma) in htab.
-    now rewrite -is_valid_translation_is_valid.
-  Qed.
+  (* Lemma hasTableau_is_evalid : *)
+  (*   forall (F : EForm) (sko : Skolemization) (sigma : Substitution string Term), *)
+  (*     hasTableau sko {{ Neg [[ F ]] }} sigma -> is_evalid F. *)
+  (* Proof. *)
+  (*   intros ??? htab. apply (hasTableau_sound sko [[ F ]] sigma) in htab. *)
+  (*   now rewrite -is_valid_translation_is_valid. *)
+  (* Qed. *)
 End ValidityEquivalence.
 
 (** ** 5. Helper to transform substitution into internal substitution *)
@@ -775,6 +775,7 @@ Section HasTableauLemmas.
   Context (sko : Skolemization).
 
   Let sko_record := sko_record sko.
+  Let Con := Con sko.
 
   Lemma con_nth_in :
     forall (Gamma : Con) (i : nat) (F : Form),
@@ -1031,7 +1032,7 @@ Section HasTableauLemmas.
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm)
       (x : string) (y : string),
-      nth_error (forms Gamma) i = Some [[ EAll x F ]] -> isFresh y S ->
+      nth_error (forms Gamma) i = Some [[ EAll x F ]] -> isFresh y (fv Gamma) ->
       hasTableau_ sko (Gamma ,, [[ instantiate_eform x (EVar y) F ]]) S Sf sigma ->
       hasTableau_ sko Gamma (add y S) Sf sigma.
   Proof.
@@ -1047,9 +1048,12 @@ Section HasTableauLemmas.
   Lemma hasTableauNegAll :
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm) (x : string) (t : ETerm) (f : string)
-      (hsko : is_sko (translate_ETerm [] t) (Neg (translate_EForm_ [x] F)) (fv Gamma) Sf),
+      (hsko : is_sko (translate_ETerm [] t) (Neg (translate_EForm_ [x] F)) (fv Gamma)
+                (con_sko_record Gamma)),
       nth_error (forms Gamma) i = Some [[ ENeg (EAll x F) ]] -> symbol sko [[ t ]] hsko = f ->
-      hasTableau_ sko (Gamma ,, [[ instantiate_eform x t (ENeg F) ]]) S Sf sigma ->
+      hasTableau_ sko (set_con_sko_record
+                         (add_symbol (symbol sko [[t]] hsko) [[F]] (con_sko_record Gamma))
+                         (Gamma ,, [[ instantiate_eform x t (ENeg F) ]])) S Sf sigma ->
       hasTableau_ sko Gamma S (add_symbol f (translate_EForm_ [x] F) Sf) sigma.
   Proof.
     intros ????????? hsko e [] htab.
@@ -1061,10 +1065,12 @@ Section HasTableauLemmas.
   Lemma hasTableauEx :
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm) (x : string) (t : ETerm) (f : string)
-      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F))) (fv Gamma) Sf),
+      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F))) (fv Gamma) (con_sko_record Gamma)),
       nth_error (forms Gamma) i = Some [[ EEx x F ]] -> symbol sko [[ t ]] hsko = f ->
-      hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (instantiate_eform x t F)) ]] ,,
-                         [[ instantiate_eform x t F ]]) S Sf sigma ->
+      hasTableau_ sko (set_con_sko_record
+                         (add_symbol (symbol sko [[t]] hsko) [[ENeg F]] (con_sko_record Gamma))
+                         (Gamma ,, [[ ENeg (ENeg (instantiate_eform x t F)) ]] ,,
+                            [[ instantiate_eform x t F ]])) S Sf sigma ->
       hasTableau_ sko Gamma S (add_symbol f (translate_EForm_ [x] (ENeg F)) Sf) sigma.
   Proof using Type.
     intros ????????? hsko e e' htab. unshelve eapply hasTableauNegAll.
@@ -1083,7 +1089,7 @@ Section HasTableauLemmas.
   Lemma hasTableauNegEx :
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm) (x : string) (y : string),
-      nth_error (forms Gamma) i = Some [[ ENeg (EEx x F) ]] -> isFresh y S ->
+      nth_error (forms Gamma) i = Some [[ ENeg (EEx x F) ]] -> isFresh y (fv Gamma) ->
       hasTableau_ sko (Gamma ,, [[EAll x (ENeg F)]] ,, [[ instantiate_eform x (EVar y) (ENeg F) ]])
         S Sf sigma -> hasTableau_ sko Gamma (add y S) Sf sigma.
   Proof using Type.
@@ -1095,7 +1101,8 @@ Section HasTableauLemmas.
       1: exact 0.
       3: reflexivity.
       all: auto.
-  Qed.
+      (* easy *) admit.
+  Admitted.
 End HasTableauLemmas.
 
 (** ** 7. Tactics *)

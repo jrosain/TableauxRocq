@@ -57,7 +57,7 @@ Proof.
 
       On a Skolemization step, we want to specify the Skolemized term, so we use the
       [unshelve] prefix to the tactic [eapply], and the 3rd goal will let us define
-      our term. 
+      our term.
 
       Note that we specify the skolemization used in order to make the rule appliable without
       further elaboration. *)
