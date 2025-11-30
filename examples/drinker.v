@@ -57,8 +57,11 @@ Proof.
 
       On a Skolemization step, we want to specify the Skolemized term, so we use the
       [unshelve] prefix to the tactic [eapply], and the 3rd goal will let us define
-      our term. *)
-  unshelve eapply hasTableauNegAll with (i := 1).
+      our term. 
+
+      Note that we specify the skolemization used in order to make the rule appliable without
+      further elaboration. *)
+  unshelve eapply hasTableauNegAll with (sko := OuterSkolemization) (i := 1).
 
   (** As we are only interested in the 3rd goal to continue, we can always shelve (i.e., let Rocq
       infer the terms with what we give for the other goals) the first two goals after a
@@ -135,7 +138,7 @@ Proof.
   1: reflexivity.
 
   (** And we give ["c"] as the Skolem symbol here. *)
-  unshelve eapply hasTableauNegAll with (i := 1).
+  unshelve eapply hasTableauNegAll with (sko := InnerSkolemization) (i := 1).
   1, 2: shelve.
   1: exact (EFun "c" [ ]).
   2, 3: reflexivity.

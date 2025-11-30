@@ -229,25 +229,55 @@ Section FVForms.
 End FVForms.
 
 (** ** Contexts *)
-Definition Con_ (pred func var : Atom) := list (Form_ pred func var).
-
-Notation "Gamma ,, A" := (A :: Gamma) (at level 20).
-Notation "A \in Gamma" := (In A Gamma) (at level 30).
-
-Notation "{{ F }}" := ([] ,, F).
-
-Section FVCon.
+Section Contexts.
   Context {pred func var : Atom}.
 
-  Let set_var := set_atom var.
+  Record Con_ :=
+    { forms : list (Form_ pred func var)
+    ; sko_symbols_form : list (func * Form_ pred func var) }.
 
-  #[global] Instance fv_con : FV (Con_ pred func var) :=
-    fix F (Gamma : Con_ pred func var) : set_var :=
-      match Gamma with
-      | [] => empty_set
-      | G :: Gamma => fv G \union (F Gamma)
-      end.
-End FVCon.
+  Definition empty_ctx : Con_ :=
+    {| forms := []
+    ;  sko_symbols_form := [] |}.
+
+  Definition in_ctx (F : Form_ pred func var) (Gamma : Con_) : Prop :=
+    List.In F (forms Gamma).
+
+  Definition extend_ctx (Gamma : Con_) (A : Form_ pred func var) : Con_ :=
+    {| forms := A :: forms Gamma
+    ;  sko_symbols_form := sko_symbols_form Gamma |}.
+
+  Fixpoint fv_ctx_ (Gamma : list (Form_ pred func var)) : set_atom var :=
+    match Gamma with
+    | [] => empty_set
+    | F :: Fs => fv F \union fv_ctx_ Fs
+    end.
+
+  Definition fv_ctx : @FV var Con_ :=
+    fun Gamma => fv_ctx_ (forms Gamma).
+
+  Fixpoint skolem_symbols_ctx_ (l : list (func * Form_ pred func var)) : set_atom func :=
+    match l with
+    | [] => empty_set
+    | (f , _) :: xs => add f (skolem_symbols_ctx_ xs)
+    end.
+
+  Definition skolem_symbols_ctx (Gamma : Con_) : set_atom func :=
+    skolem_symbols_ctx_ (sko_symbols_form Gamma).
+
+  Definition add_skolem_symbol_ctx (f : func) (F : Form_ pred func var) (Gamma : Con_) : Con_ :=
+    {| forms := forms Gamma
+    ;  sko_symbols_form := (f, F) :: sko_symbols_form Gamma |}.
+End Contexts.
+
+Arguments Con_ : clear implicits.
+
+Notation "Gamma ,, A" := (extend_ctx Gamma A) (at level 20).
+Notation "A \in Gamma" := (in_ctx A Gamma) (at level 30).
+Notation "{{ }}" := (empty_ctx).
+Notation "{{ F }}" := (empty_ctx ,, F).
+Notation "{{ F1 ;; F2 ;; .. ;; Fk }}" :=
+  (extend_ctx .. (extend_ctx (extend_ctx empty_ctx F1) F2) .. Fk).
 
 (** ** Utils functions *)
 Definition get_symbol {func var : Atom} (t : Term_ func var) : option func :=

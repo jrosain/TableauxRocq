@@ -196,8 +196,9 @@ Section SetProperties.
 End SetProperties.
 
 (** We denote [\{ x, y, ..., z \}] for finite sets *)
-Notation "\{ x , y , .. , z \}" := (add x (add y .. (add z empty_set) ..)).
-Notation "\{ x \}" := (add x empty_set).
+Notation "\{ \}" := empty_set.
+Notation "\{ x \}" := (add x \{\}).
+Notation "\{ x , y , .. , z \}" := (add x (add y .. (add z \{\}) ..)).
 
 (** ** Built-in instances *)
 

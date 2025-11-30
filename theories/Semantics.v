@@ -12,8 +12,7 @@ Section SemanticsDef.
     { car :> Type
     ; interp_func : func -> list car -> car
     ; interp_pred : pred -> list car -> Prop
-    ; non_empty : car
-    ; eq_dec_car : EqDec car }.
+    ; non_empty : car }.
 
   Definition env (M : Model) (A : Type) := A -> option M.
 
@@ -43,6 +42,9 @@ Section SemanticsDef.
 
   Definition is_valid (F : Form_ pred func var) :=
     forall (M : Model), interpret_form_ M [] (empty_env M var) F.
+
+  Definition is_countersat (F : Form_ pred func var) :=
+    forall (M : Model), ~(interpret_form_ M [] (empty_env M var) F).
 End SemanticsDef.
 
 Arguments Model : clear implicits.
