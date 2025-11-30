@@ -3,6 +3,7 @@
 From Corelib Require Import Morphisms.
 
 From Stdlib Require Import Classical.
+From Stdlib Require Import Lia.
 
 From Tableaux Require Import Prelude.All.
 From Tableaux Require Import Syntax.
@@ -228,59 +229,136 @@ Section SemanticsFacts.
     apply in_form_list_models in hin. specialize (hin M). destruct hin; auto.
   Qed.
 
-  (* Lemma term_env_inst_commutes : *)
-  (*   forall (M : Model pred func) (rho : list M) (sigma : env M var) (t u : Term) (n : nat), *)
-  (*     (nth_error rho n = Some [[ M # rho # sigma |- t ]]) -> *)
-  (*     interpret_term rho sigma (u {n \to t}) = *)
-  (*       interpret_term rho sigma u. *)
-  (* Proof using Type. *)
-  (*   intros ?????? e. induction u using term_ind; cbn; auto. *)
-  (*   - destruct (n == n0); subst. *)
-  (*     + now rewrite e. *)
-  (*     + reflexivity. *)
-  (*   - rewrite map_map. *)
-  (*     have hmap : (map (fun u => interpret_term rho sigma u {n \to t}) l) = *)
-  (*                   (map (interpret_term rho sigma) l). *)
-  (*     { induction l as [|v vs IHvs]; auto. *)
-  (*       cbn. rewrite IHvs. *)
-  (*       - now apply Forall_tail in X. *)
-  (*       - apply Forall_In with (x := v) in X. *)
-  (*         2: now right. *)
-  (*         now rewrite X. } *)
-  (*     rewrite hmap //. *)
-  (* Qed. *)
+  Lemma isLocallyClosed_interp_env :
+    forall (M : Model pred func) (rho0 rho1 : list M) (sigma : env M var) (t : Term),
+      isLocallyClosed t ->
+      interpret_term rho0 sigma t = interpret_term rho1 sigma t.
+  Proof.
+    intros ??????. induction t using term_ind.
+    - red in H. inversion H.
+    - now cbn.
+    - cbn. have hmap : map (interpret_term rho0 sigma) l =
+                         map (interpret_term rho1 sigma) l.
+      { induction l as [|u us IHus]; cbn; auto.
+        rewrite IHus.
+        - (* isLocallyClosed l -> isLocallyClosed Fun *) admit.
+        - now apply Forall_tail in X.
+        - apply Forall_In with (x := u) in X.
+          2: now right.
+          rewrite X; auto.
+          (* isLocallyClosed (Fun f l) -> In u l -> isLocallyClosed u *) admit. }
+      rewrite hmap //.
+  Admitted.
 
-  (* Lemma form_env_inst_commutes : *)
-  (*   forall (M : Model pred func) (rho0 rho1 : list M) (sigma : env M var) (F : Form) (t : Term) (n : nat), *)
-  (*     (forall x, [[ M # rho0 # sigma |- t ]] = [[ M # x :: rho0 # sigma |- t ]]) -> *)
-  (*     (nth_error rho1 n = Some [[ M # rho0 # sigma |- t ]]) -> *)
-  (*     interpret_form_ M rho0 sigma (F {n \to t}) = *)
-  (*       interpret_form_ M rho1 sigma F. *)
-  (* Proof. *)
-  (*   intros ???????? e. generalize dependent n; generalize dependent rho0; revert rho1. *)
-  (*   induction F; auto; cbn; intros rho1 rho0 hequ n e. *)
-  (*   - rewrite map_map. *)
-  (*     have hmap : (map (fun u => interpret_term rho0 sigma u {n \to t}) l) = *)
-  (*                   (map (interpret_term rho1 sigma) l). *)
-  (*     { induction l as [|v vs IHvs]; auto; cbn. *)
-  (*       admit. (* rewrite term_env_inst_commutes; auto. now rewrite IHvs. *) } *)
-  (*     rewrite hmap //. *)
-  (*   - erewrite IHF; eauto. *)
-  (*   - erewrite IHF1, IHF2; eauto. *)
-  (*   - apply prodext=>x. erewrite IHF; eauto. *)
-  (*     (* rewrite PeanoNat.Nat.add_1_r nth_error_S; cbn. *) *)
-  (*     Admitted. *)
+  Lemma term_env_inst_commutes :
+    forall (M : Model pred func) (rho : list M) (sigma : env M var) (t u : Term),
+      isLocallyClosed u ->
+      interpret_term rho sigma (t {#|rho| \to u}) =
+        interpret_term (rho ++ [ [[ M # rho # sigma |- u ]] ])%list sigma t.
+  Proof using Type.
+    intros ??????. induction t using term_ind.
+    - cbn. destruct (#|rho| == n).
+      + rewrite nth_error_app2.
+        * rewrite e; apply le_n.
+        * rewrite e; cbn. rewrite PeanoNat.Nat.sub_diag; now cbn.
+      + cbn. destruct (nth_error rho n) eqn:e.
+        * have hlt : n < #|rho|.
+          { apply Compare_dec.not_ge. intro hgt. inversion hgt; auto.
+            subst. apply nth_error_split in e.
+            destruct e as [l1 [l2 [e0 e1] ] ].
+            subst. rewrite length_app e1 in H0.
+            cbn in H0. lia. }
+          rewrite nth_error_app1; auto.
+          now rewrite e.
+        * have hgt : #|rho ++ [ [[ M # rho # sigma |- u ]] ]|  <= n.
+          { rewrite nth_error_None in e.
+            have hlt : #|rho| < n by lia.
+            rewrite last_length. lia. }
+          rewrite -nth_error_None in hgt.
+          now rewrite hgt.
+    - now cbn.
+    - cbn. rewrite map_map.
+      have hmap : (map (fun x : Term_ func var => interpret_term rho sigma x {#| rho | \to u}) l) =
+                    (map (interpret_term (rho ++ [ [[M # rho # sigma |- u]] ])%list sigma) l).
+      { induction l as [|v vs IHvs]; auto; cbn.
+        rewrite IHvs.
+        - now apply Forall_tail in X.
+        - apply Forall_In with (x := v) in X.
+          2: now right.
+          rewrite X //. }
+      rewrite hmap //.
+  Qed.
 
-  (* Lemma instantiate_by_free_equiv_all : *)
-  (*   forall (F : Form) (x : var), *)
-  (*     isFresh x (fv F) -> *)
-  (*     (F {0 \to Free x}) \equiv All F. *)
-  (* Proof. *)
-  (*   intros F x hfresh M; cbn. split. *)
-  (*   - intros hinterp y. unshelve erewrite form_env_inst_commutes in hinterp. *)
-  (*     + exact [y]. *)
-  (*     + assumption. *)
-  (*     + reflexivity. *)
-  (*     + admit. *)
-  (*   - intros hinterp. unshelve erewrite form_env_inst_commutes. *)
+  Lemma form_env_inst_commutes :
+    forall (M : Model pred func) (rho : list M) (sigma : env M var) (F : Form) (t : Term),
+      isLocallyClosed t ->
+      interpret_form_ M rho sigma (F {#|rho| \to t}) =
+        interpret_form_ M (rho ++ [ [[ M # rho # sigma |- t ]] ])%list sigma F.
+  Proof using Type.
+    intros ??????. revert rho. induction F; auto; cbn; intros rho.
+    - rewrite map_map.
+      have hmap : (map (fun u => interpret_term rho sigma u {#|rho| \to t}) l) =
+                    (map (interpret_term (rho ++ [ [[ M # rho # sigma |- t ]] ])%list sigma) l).
+      { induction l as [|v vs IHvs]; auto; cbn.
+        rewrite IHvs term_env_inst_commutes; auto. }
+      rewrite hmap //.
+    - erewrite IHF; eauto.
+    - erewrite IHF1, IHF2; eauto.
+    - apply prodext=>x. have e := (IHF (x :: rho)).
+      cbn in e. rewrite PeanoNat.Nat.add_1_r e.
+      do 4 f_equal. unfold interpret.
+      apply isLocallyClosed_interp_env; auto.
+  Qed.
+
+  Existing Instance eq_dec_atom.
+
+  (** These lemmas are *not* needed for soundness, hence they are [Admitted] for now. *)
+  Lemma interpret_fresh_free_var :
+    forall (M : Model pred func) (F : Form) (x : var) (n : nat) (rho : list M) (sigma : env M var) (m : M),
+      isFresh x (fv F) ->
+      interpret_form_ M rho sigma (F {n \to Free x}) ->
+      interpret_form_ M rho (fun z => match x == z with
+                                 | left _ => Some m
+                                 | right _ => sigma z
+                                 end) (F {0 \to Free x}).
+  Proof.
+    Admitted.
+
+  Lemma isFresh_env_None :
+    forall (M : Model pred func) (F : Form) (x : var) (rho : list M) (sigma : env M var),
+      isFresh x (fv F) ->
+      interpret_form_ M rho sigma F =
+        interpret_form_ M rho (fun z => match x == z with
+                                   | left _ => None
+                                   | right _ => sigma z
+                                   end) F.
+  Proof.
+    Admitted.
+
+  Lemma instantiate_by_free_equiv_all :
+    forall (F : Form) (x : var),
+      isFresh x (fv F) ->
+      (F {0 \to Free x}) \equiv All F.
+  Proof using Type.
+    intros F x hfresh M; cbn. split.
+    - intros hinterp y.
+      apply interpret_fresh_free_var with (m := y) in hinterp; auto.
+      erewrite form_env_inst_commutes in hinterp.
+      + cbn in hinterp. destruct (x == x); auto.
+        * cbn in *. erewrite isFresh_env_None in hinterp; eauto.
+          have e0 : forall z, match x == z with
+                         | left _ => None
+                         | right _ => match x == z with
+                                     | left _ => Some y
+                                     | right _ => empty_env M var z
+                                     end
+                         end = empty_env M var z.
+          { intros; destruct eqDec; auto. }
+          apply funext in e0. rewrite -e0 //.
+        * destruct n. reflexivity.
+      + red. apply empty_is_empty.
+    - intros hinterp. rewrite form_env_inst_commutes.
+      + red. apply empty_is_empty.
+      + apply hinterp.
+  Qed.
 End SemanticsFacts.
