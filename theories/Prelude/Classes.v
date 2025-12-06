@@ -10,6 +10,29 @@ Class EqDec (A : Type) :=
   eqDec : forall x y : A, { x = y } + { x <> y }.
 Notation "x == y" := (eqDec x y) (at level 40).
 
+Lemma EqDec_UIP :
+  forall {A : Type} `{EqDec A} {x y : A} (p q : x = y), p = q.
+Proof.
+  intros.
+  set g := fun x y (p : x = y) => match eqDec x y with
+    | left e => e
+    | right n => False_ind (x = y) (n p)
+    end.
+  have H0 : forall (p : x = y), p = eq_trans (eq_sym (g x x eq_refl)) (g x y p).
+  { clear; intros; destruct p. symmetry.
+    apply eq_trans_sym_inv_l. }
+  rewrite (H0 p) (H0 q).
+  unfold g; now destruct (eqDec x y).
+Qed.
+
+Lemma EqDec_refl :
+  forall {A : Type} `{EqDec A} (x : A), x == x = left eq_refl.
+Proof.
+  intros ???. destruct (eqDec x x).
+  - f_equal. apply EqDec_UIP.
+  - destruct n. reflexivity.
+Qed.
+
 Class EqBool (A : Type) :=
   { eqb : A -> A -> bool
   ; eqbIsEq : forall (x y : A), eqb x y = true <-> x = y }.

@@ -1008,7 +1008,7 @@ Section HasTableauLemmas.
       hasTableau_ sko (Gamma ,, [[ EOr (ENeg (EImp F G)) (ENeg (EImp G F)) ]] ,, [[ ENeg (EImp G F) ]]
                          ,, [[ ENeg (ENeg G) ]] ,, [[ ENeg F ]] ,, [[ G ]]) S2 Sf2 sigma ->
       S = S1 \union S2 -> Sf = join Sf1 Sf2 ->
-      disjoint S1 S2 -> hasTableau_ sko Gamma (S1 \union S2) (join Sf1 Sf2) sigma.
+      disjoint S1 S2 -> hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????????? e htab1 htab2 -> -> hdisjoint. unshelve eapply hasTableauNegNeg.
     - exact i.
@@ -1111,6 +1111,12 @@ Ltac esimpl :=
   cbn;
   repeat (destruct eqDec; cbn);
   try congruence.
+
+(* Ltac esimpl := *)
+(*   match goal with *)
+(*   | [ |- ?x == ?x ] => rewrite EqDec_refl *)
+(*   | [ H : ?x == ?x |- _ ] => rewrite EqDec_refl in H *)
+(*   end; cbn. *)
 
 Ltac set_decide :=
   cbn; unfold disjoint;
