@@ -1108,9 +1108,7 @@ End HasTableauLemmas.
 (** ** 7. Tactics *)
 
 Ltac esimpl :=
-  cbn;
-  repeat (destruct eqDec; cbn);
-  try congruence.
+  cbn; repeat (progress rewrite !match_eq_dec_eq_bool; cbn).
 
 (* Ltac esimpl := *)
 (*   match goal with *)

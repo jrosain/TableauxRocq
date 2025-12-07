@@ -37,6 +37,32 @@ Class EqBool (A : Type) :=
   { eqb : A -> A -> bool
   ; eqbIsEq : forall (x y : A), eqb x y = true <-> x = y }.
 
+Lemma EqBool_refl :
+  forall {A : Type} `{EqBool A} (x : A), eqb x x = true.
+Proof. intros. now rewrite eqbIsEq. Qed.
+
+Lemma EqBool_neq :
+  forall {A : Type} `{EqBool A} (x y : A),
+    x <> y <-> eqb x y = false.
+Proof.
+  intros; have h0 := not_iff_compat (eqbIsEq x y).
+  split; intro h.
+  - rewrite -h0 in h. now apply Bool.not_true_is_false.
+  - intros e; subst. rewrite EqBool_refl in h. inversion h.
+Qed.
+
+Lemma match_eq_dec_eq_bool :
+  forall {A B : Type} {t u : B} `{EqDec A} `{EqBool A} {x y : A},
+    match x == y with
+    | left _ => t
+    | right _ => u
+    end = if (eqb x y) then t else u.
+Proof.
+  intros. destruct (eqDec x y).
+  - rewrite e. now rewrite EqBool_refl.
+  - rewrite EqBool_neq in n. now rewrite n.
+Qed.
+
 (** ** Generic instances *)
 
 Section EqDecOtherInstances.
@@ -68,16 +94,25 @@ Section EquivEqBoolEqDec.
       rewrite eqbIsEq in e0. now apply e0.
   Qed.
 
-  #[global] Instance eq_bool_from_eq_dec `{EqDec A} : EqBool A.
-  Proof using Type.
-    unshelve econstructor; intros x y.
-    - exact (match x == y with
+  Definition eqb_from_eqDec `{EqDec A} : A -> A -> bool :=
+    (fun x y => match x == y with
              | left _ => true
              | right _ => false
              end).
-    - cbn; destruct (x == y); split; auto.
-      intro contra; inversion contra.
+
+  Lemma eqb_from_eqDec_is_eq `{EqDec A} (x y : A) :
+    eqb_from_eqDec x y = true <-> x = y.
+  Proof using Type.
+    unfold eqb_from_eqDec; cbn; destruct (x == y); split; auto.
+    intro contra; inversion contra.
   Qed.
+
+  #[global] Instance eq_bool_from_eq_dec `{EqDec A} : EqBool A.
+  Proof using Type.
+    unshelve econstructor; intros x y.
+    - exact (eqb_from_eqDec x y).
+    - exact (eqb_from_eqDec_is_eq x y).
+  Defined.
 End EquivEqBoolEqDec.
 
 (** ** Common instances *)
@@ -92,9 +127,13 @@ Proof.
     + right; intro e. injection e => contra. now apply ne.
 Qed.
 
-#[global] Instance eq_dec_string : EqDec string.
+#[global] Instance eq_bool_string : EqBool string.
 Proof.
-  apply eq_dec_from_eq_bool; unshelve econstructor.
+  unshelve econstructor.
   - exact String.eqb.
   - apply String.eqb_eq.
-Qed.
+Defined.
+
+#[global] Instance eq_dec_string : EqDec string.
+Proof. apply eq_dec_from_eq_bool; exact eq_bool_string. Defined.
+
