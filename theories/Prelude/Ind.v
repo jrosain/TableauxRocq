@@ -47,3 +47,8 @@ Lemma Forall_tail :
   forall {A : Type} {x : A} {xs : list A} (P : A -> Type),
     Forall P (x :: xs) -> Forall P xs.
 Proof. intros ???? H. now inversion H. Qed.
+
+Lemma Forall_inv :
+  forall {A : Type} {x : A} {xs : list A} (P : A -> Type),
+    Forall P (x :: xs) -> P x.
+Proof. intros. now inversion X. Qed.

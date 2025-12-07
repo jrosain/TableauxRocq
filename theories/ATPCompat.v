@@ -727,14 +727,12 @@ Section TranslateSubst.
   Proof.
     intro t. induction t using eterm_ind.
     - unfold isLocallyClosed; cbn. apply empty_is_empty.
-    - induction l as [|x xs IHxs]; unfold isLocallyClosed; cbn.
+    - induction l as [|x xs IHxs]; unfold isLocallyClosed.
       + apply empty_is_empty.
-      + rewrite empty_unitl.
-        have Hbv := Forall_In _ _ H x (ltac:(now right)).
-        red in Hbv. unfold is_empty in Hbv; cbn in Hbv.
-        rewrite Hbv. apply IHxs, In_Forall=>u hu.
-        apply Forall_In with (x := u) in H; auto.
-        now left.
+      + cbn. apply is_empty_spec'; intros y. rewrite union_spec; intros [].
+        * apply Forall_inv in H. red in H. apply is_empty_spec with (x := y) in H; auto.
+        * apply Forall_tail in H. apply IHxs in H. red in H; cbn in H.
+          now apply is_empty_spec with (x := y) in H.
   Qed.
 
   Lemma locally_closed_subst_translation :

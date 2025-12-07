@@ -53,6 +53,10 @@ Section SemanticsDef.
     forall (M : Model), interpret_form_ M [] (empty_env M var) F <->
                      interpret_form_ M [] (empty_env M var) G.
 
+  Definition imply (F G : Form_ pred func var) :=
+    forall (M : Model), interpret_form_ M [] (empty_env M var) F ->
+                     interpret_form_ M [] (empty_env M var) G.
+
   #[global] Instance equiv_refl : Reflexive equiv.
   Proof using Type.
     intros F M. reflexivity.
@@ -103,7 +107,7 @@ Fixpoint ls_to_form {pred func var : Atom} (Gamma : list (Form_ pred func var))
 Notation "Gamma \models F" := (is_valid (Or (Neg (ls_to_form Gamma)) F)) (at level 40).
 
 Section SemanticsFacts.
-  Context {pred func var : Atom}.
+  Context {pred func var : Atom} `{set_nat : set nat}.
 
   Let Form := Form_ pred func var.
   Let Term := Term_ func var.
@@ -164,6 +168,16 @@ Section SemanticsFacts.
     apply H. intros [HF | HG]; auto.
     have HG := in_form_list_models G Gamma hin M. cbn in HG. destruct HG; auto.
     apply HF. now rewrite hequiv.
+  Qed.
+
+  Lemma extend_with_equiv_form' :
+    forall (F G : Form) (Gamma : list Form),
+      (F :: Gamma) \models Bot -> (imply G F) -> List.In G Gamma -> Gamma \models Bot.
+  Proof using Type.
+    intros F G Gamma hext himply hin M.
+    specialize (hext M); cbn in *. left; intro save. destruct hext; auto.
+    apply H. intros [HF | HG]; auto.
+    have HG := in_form_list_models G Gamma hin M. cbn in HG. destruct HG; auto.
   Qed.
 
   Lemma neg_neg_equiv :
@@ -235,20 +249,23 @@ Section SemanticsFacts.
       interpret_term rho0 sigma t = interpret_term rho1 sigma t.
   Proof.
     intros ??????. induction t using term_ind.
-    - red in H. inversion H.
+    - red in H. cbn in H. apply is_empty_spec with (x := n) in H.
+      + inversion H.
+      + now apply singleton_spec.
     - now cbn.
     - cbn. have hmap : map (interpret_term rho0 sigma) l =
                          map (interpret_term rho1 sigma) l.
       { induction l as [|u us IHus]; cbn; auto.
         rewrite IHus.
-        - (* isLocallyClosed l -> isLocallyClosed Fun *) admit.
+        - red in H |- *. cbn in H.
+          now apply is_empty_union2 in H.
         - now apply Forall_tail in X.
         - apply Forall_In with (x := u) in X.
           2: now right.
           rewrite X; auto.
-          (* isLocallyClosed (Fun f l) -> In u l -> isLocallyClosed u *) admit. }
+          red in H; cbn in H. now apply is_empty_union1 in H. }
       rewrite hmap //.
-  Admitted.
+  Qed.
 
   Lemma term_env_inst_commutes :
     forall (M : Model pred func) (rho : list M) (sigma : env M var) (t u : Term),
@@ -312,7 +329,9 @@ Section SemanticsFacts.
 
   Existing Instance eq_dec_atom.
 
-  (** These lemmas are *not* needed for soundness, hence they are [Admitted] for now. *)
+  (** These lemmas are *not* needed for soundness, hence they are [Admitted] for now.
+      Indeed, they are used by [instantiate_by_free_equiv_all], which we avoid to use
+      for soundness, preferring [instantiate_by_free_imply_all]. *)
   Lemma interpret_fresh_free_var :
     forall (M : Model pred func) (F : Form) (x : var) (n : nat) (rho : list M) (sigma : env M var) (m : M),
       isFresh x (fv F) ->
@@ -335,11 +354,22 @@ Section SemanticsFacts.
   Proof.
     Admitted.
 
+  Lemma instantiate_imply_all :
+    forall (F : Form) (t : Term),
+      isLocallyClosed t ->
+      imply (All F) (F {0 \to t}).
+  Proof using Type.
+    intros F x hclosed M hinterp; cbn in *.
+    rewrite form_env_inst_commutes.
+    - red. apply hclosed.
+    - apply hinterp.
+  Qed.
+
   Lemma instantiate_by_free_equiv_all :
     forall (F : Form) (x : var),
       isFresh x (fv F) ->
       (F {0 \to Free x}) \equiv All F.
-  Proof using Type.
+  Proof using set_nat.
     intros F x hfresh M; cbn. split.
     - intros hinterp y.
       apply interpret_fresh_free_var with (m := y) in hinterp; auto.
@@ -357,8 +387,7 @@ Section SemanticsFacts.
           apply funext in e0. rewrite -e0 //.
         * destruct n. reflexivity.
       + red. apply empty_is_empty.
-    - intros hinterp. rewrite form_env_inst_commutes.
-      + red. apply empty_is_empty.
-      + apply hinterp.
+    - intro; apply instantiate_imply_all; auto.
+      unfold isLocallyClosed. now cbn.
   Qed.
 End SemanticsFacts.

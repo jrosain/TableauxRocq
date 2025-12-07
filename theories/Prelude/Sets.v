@@ -94,6 +94,33 @@ Section SetProperties.
     is_empty empty_set.
   Proof using Type. reflexivity. Qed.
 
+  Lemma is_empty_spec' :
+    forall (s : set_A),
+      (forall (x : A), mem x s -> False) -> is_empty s.
+  Proof using Type.
+    intros. have e : s = empty_set.
+    { apply set_ext; intro y; cbn. split.
+      - intro h; apply H in h. inversion h.
+      - intro h. apply empty_spec in h. inversion h. }
+    rewrite e. apply empty_is_empty.
+  Qed.
+
+  Lemma is_empty_union1 :
+    forall (s1 s2 : set_A), is_empty (s1 \union s2) -> is_empty s1.
+  Proof using Type.
+    intros. apply is_empty_spec'. intros x hin.
+    apply is_empty_spec with (x := x) in H; auto.
+    rewrite union_spec. now left.
+  Qed.
+
+  Lemma is_empty_union2 :
+    forall (s1 s2 : set_A), is_empty (s1 \union s2) -> is_empty s2.
+  Proof using Type.
+    intros. apply is_empty_spec'. intros x hin.
+    apply is_empty_spec with (x := x) in H; auto.
+    rewrite union_spec. now right.
+  Qed.
+
   Fixpoint from_list (l : list A) : set_A :=
     match l with
     | [] => empty_set
@@ -186,7 +213,21 @@ Section SetProperties.
       now rewrite inter_sym.
   Qed.
 
-  (* TODO: rewrite it with equalities *)
+  Lemma set_fold_left :
+    forall {B : Type} (f : B -> set_A) (l : list B) (s : set_A),
+      (fold_left (fun (s : set_A) (b : B) => union s (f b)) l s) =
+        s \union (fold_left (fun (s : set_A) (b : B) => union s (f b)) l empty_set).
+  Proof using Type.
+    intros???; induction l as [|y ys IHys]; intros; cbn in *.
+    - now rewrite empty_unitr.
+    - rewrite empty_unitl. rewrite IHys; cbn.
+      have e0 : fold_left (fun (s0 : set_A) (b : B) => s0 \union f b) ys (f y) =
+                  (f y) \union fold_left (fun (s0 : set_A) (b : B) => s0 \union f b) ys empty_set.
+      { apply IHys. }
+      rewrite e0 union_assoc //.
+  Qed.
+
+  (* TODO: rewrite it with equalities. Maybe this is the thing above? *)
   Lemma mem_fold_left_cons_unionl :
     forall {B : Type} (f : B -> set_A) (b : B) (l : list B) (x : A) (s : set_A),
       mem x (fold_left (fun (s : set_A) (b : B) => union s (f b)) (b :: l) s) <->

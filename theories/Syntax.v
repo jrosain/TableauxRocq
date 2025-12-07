@@ -113,7 +113,7 @@ Section OpeningSubstTerms.
       match t with
       | Bound m => singleton m
       | Free  _ => empty_set
-      | Fun _ l => fold_left (fun s t => s \union (F t)) l empty_set
+      | Fun _ l => @bv_list set_nat _ F l
       end.
 
   #[global] Instance subst_term : Subst (Term_ func var) (Term_ func var) :=
@@ -210,6 +210,100 @@ Section OpeningSubstForms.
          | All F'   => All (rec F')
          end) F.
 End OpeningSubstForms.
+
+Section SubstOpeningLemmas.
+  Context {pred func var : Atom} `{set_nat : set nat}.
+
+  Let Term := Term_ func var.
+  Let Form := Form_ pred func var.
+
+  Lemma isLocallyClosed_Fun_isLocallyClosed_list :
+    forall (f : func) (l : list Term),
+      isLocallyClosed (Fun f l) ->
+      Forall isLocallyClosed l.
+  Proof using Type.
+    intros; apply In_Forall; intros t hin.
+    red in H; cbn in H. red. apply is_empty_spec'. intros n hin'.
+    apply (is_empty_spec n) in H; auto.
+    induction l; inversion hin; auto; cbn; rewrite union_spec.
+    - right. apply IHl; auto. cbn in H.
+      now apply is_empty_union2 in H.
+    - subst. now left.
+  Qed.
+
+  Lemma term_locally_closed_inst :
+    forall (t u : Term) (x : nat),
+      isLocallyClosed t ->
+      t { x \to u } = t.
+  Proof using Type.
+    intros t; induction t using term_ind; intros; cbn; auto.
+    - red in H; cbn in H. apply (is_empty_spec n) in H.
+      + inversion H.
+      + now rewrite singleton_spec.
+    - have hmap : map (varOpening x u) l = l.
+      { apply isLocallyClosed_Fun_isLocallyClosed_list in H.
+        induction l as [|t ts IHts]; auto.
+        cbn. rewrite IHts; auto.
+        - now apply Forall_tail in X.
+        - now apply Forall_tail in H.
+        - apply Forall_inv in X. rewrite X; auto.
+          now apply Forall_inv in H. }
+      rewrite hmap //.
+  Qed.
+
+  Lemma isLocallyClosed_isLocallyClosed_subst :
+    forall (t : Term) (sigma : Substitution var Term),
+      isLocallyClosed t ->
+      isLocallyClosed t@[sigma].
+  Proof using Type.
+    intros ???. induction t using term_ind; auto; cbn.
+    - apply sigma.
+    - have hclosed : @isLocallyClosed set_nat _ _ (map (fun t => subst_term t sigma) l).
+      { apply isLocallyClosed_Fun_isLocallyClosed_list in H.
+        induction l as [|t ts IHts]; cbn.
+        - red. now cbn.
+        - red. cbn. apply is_empty_spec'.
+          + intros x; rewrite union_spec; intros [].
+            * apply Forall_inv in X, H.
+              apply X in H. red in H. apply is_empty_spec with (x := x) in H; auto.
+            * apply Forall_tail in X, H. specialize (IHts H X).
+              red in IHts. apply is_empty_spec with (x := x) in IHts; auto. }
+      red; now cbn.
+  Qed.
+
+  Lemma term_subst_opening :
+    forall (t u : Term) (x : nat) (sigma : Substitution var Term),
+      (t { x \to u })@[sigma] = t@[sigma] { x \to u@[sigma] }.
+  Proof using Type.
+    intros t; induction t using term_ind; intros; cbn.
+    - destruct (x == n); cbn; auto.
+    - destruct sigma as [sigma Hsigma]; cbn.
+      rewrite term_locally_closed_inst; auto.
+    - rewrite !map_map; cbn.
+      have hmap : map (fun t => (t { x \to u })@[sigma]) l =
+                    map (fun t => (t@[sigma] { x \to u@[sigma] })) l.
+      { induction l as [|t ts IHts]; auto.
+        cbn; rewrite IHts.
+        - now apply Forall_tail in X.
+        - apply Forall_inv in X. now rewrite X. }
+      now rewrite hmap.
+  Qed.
+
+  Lemma form_subst_opening :
+    forall (F : Form) (u : Term) (x : nat) (sigma : Substitution var Term),
+      (F { x \to u })@[sigma] = F@[sigma] { x \to u@[sigma] }.
+  Proof using Type.
+    intros ??; induction F; intros; auto; cbn.
+    - have hmap : map (fun t => (t { x \to u })@[sigma]) l =
+                         map (fun t => (t@[sigma] { x \to u@[sigma] })) l.
+      { induction l as [|t ts IHts]; auto.
+        cbn; rewrite term_subst_opening IHts //. }
+      rewrite !map_map hmap //.
+    - now rewrite -IHF.
+    - now rewrite -IHF1 -IHF2.
+    - rewrite -IHF //.
+  Qed.
+End SubstOpeningLemmas.
 
 (** *** Free variables of forms *)
 Section FVForms.

@@ -175,8 +175,10 @@ Section TableauxSoundness.
         auto.
       + reflexivity.
       + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
-    - apply extend_with_equiv_form with (F := F0 {0 \to Free x}@[sigma]) (G := (All F0)@[sigma]); auto.
-      + admit.
+    - apply extend_with_equiv_form' with (F := F0 {0 \to Free x}@[sigma]) (G := (All F0)@[sigma]); auto.
+      + cbn. rewrite form_subst_opening.
+        apply instantiate_imply_all, isLocallyClosed_isLocallyClosed_subst.
+        red. now cbn.
       + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
   Admitted.
 End TableauxSoundness.

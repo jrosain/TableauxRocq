@@ -39,6 +39,18 @@ End Substitution.
 
 Notation "x @[ sigma ]" := (substitute x sigma) (at level 3).
 
+(** ** Further free instances of [BV]. *)
+Section BVInstances.
+  Context `{set_nat : set nat}.
+
+  #[global] Instance bv_list {A : Type} `{H : @BV set_nat A} : @BV set_nat (list A) :=
+    fix F (l : list A) : set_nat :=
+      match l with
+      | [] => empty_set
+      | h :: t => (bv h) \union F t
+      end.
+End BVInstances.
+
 (** ** Further free instances of [Subst]. *)
 Section SubstInstances.
   Context `{set_nat : set nat}.

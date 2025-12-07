@@ -18,3 +18,8 @@ theories/Skolemization.v
 theories/Syntax.v
 
 examples/drinker.v
+examples/branching.v
+
+tests/apply_neg_equ.v
+tests/perfs_1.v
+tests/instantiate_apply.v
