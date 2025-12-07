@@ -21,9 +21,8 @@ eapply hasTableauNegEx with(i := 1).
 1: { reflexivity. }
 1: { set_decide. }
 eapply hasTableauNegOr with(i := 0).
-1: { cbn. (* TODO: fix the instantiation order *)
-reflexivity. }
-eapplyhasTableauContr with(i := 4) (j := 1).
+1: { reflexivity. }
+eapply hasTableauContr with(i := 4) (j := 1).
 1: { reflexivity. }
 1: { reflexivity. }
 now esimpl.

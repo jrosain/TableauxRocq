@@ -310,11 +310,7 @@ Section ESyntaxTranslation.
 
   Fixpoint instantiate_eterm (x : string) (u t : ETerm) : ETerm :=
     match t with
-    | EVar y =>
-        match x == y with
-        | left _ => u
-        | right _ => t
-        end
+    | EVar y => if eqb x y then u else t
     | EFun f l => EFun f (map (instantiate_eterm x u) l)
     end.
 
@@ -329,16 +325,10 @@ Section ESyntaxTranslation.
     | EAnd F G => EAnd (instantiate_eform x u F) (instantiate_eform x u G)
     | EImp F G => EImp (instantiate_eform x u F) (instantiate_eform x u G)
     | EEqu F G => EEqu (instantiate_eform x u F) (instantiate_eform x u G)
-    | EEx y F => EEx (match x == y with left _ => x | right _ => y end)
-                  (match x == y with
-                   | left _ => F
-                   | right _ => (instantiate_eform x u F)
-                   end)
-    | EAll y F => EAll (match x == y with left _ => x | right _ => y end)
-                  (match x == y with
-                   | left _ => F
-                   | right _ => (instantiate_eform x u F)
-                   end)
+    | EEx y F => EEx (if eqb x y then x else y)
+                  (if eqb x y then F else instantiate_eform x u F)
+    | EAll y F => EAll (if eqb x y then x else y)
+                   (if eqb x y then F else instantiate_eform x u F)
     end.
 
   (* Lemma WellScoped_no_fv_eterm : *)
@@ -1109,12 +1099,6 @@ End HasTableauLemmas.
 
 Ltac esimpl :=
   cbn; repeat (progress rewrite !match_eq_dec_eq_bool; cbn).
-
-(* Ltac esimpl := *)
-(*   match goal with *)
-(*   | [ |- ?x == ?x ] => rewrite EqDec_refl *)
-(*   | [ H : ?x == ?x |- _ ] => rewrite EqDec_refl in H *)
-(*   end; cbn. *)
 
 Ltac set_decide :=
   cbn; unfold disjoint;
