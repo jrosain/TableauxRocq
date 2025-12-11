@@ -846,7 +846,7 @@ Section HasTableauLemmas.
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F G : EForm),
       nth_error (forms Gamma) i = Some [[ ENeg (EOr F G) ]] ->
-      hasTableau_ sko (Gamma ,, Neg [[ F ]] ,, Neg [[ G ]]) S Sf sigma ->
+      hasTableau_ sko (Gamma ,, [[ ENeg F ]] ,, [[ ENeg G ]]) S Sf sigma ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????? e htab. eapply hasTableauNegOr.
@@ -858,7 +858,7 @@ Section HasTableauLemmas.
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F G : EForm),
       nth_error (forms Gamma) i = Some [[ ENeg (EImp F G) ]] ->
-      hasTableau_ sko (Gamma ,, Neg (Neg [[ F ]]) ,, Neg [[ G ]] ,, [[ F ]]) S Sf sigma ->
+      hasTableau_ sko (Gamma ,, [[ ENeg (ENeg F) ]] ,, [[ ENeg G ]] ,, [[ F ]]) S Sf sigma ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????? e htab. eapply hasTableauNegOr.
@@ -920,10 +920,10 @@ Section HasTableauLemmas.
     forall (Gamma : Con) (sigma : Substitution string Term) (S S1 S2 : SetOfString) (Sf Sf1 Sf2 : sko_record)
       (i : nat) (F G : EForm),
       nth_error (forms Gamma) i = Some [[ (EEqu F G) ]] ->
-      hasTableau_ sko (Gamma ,, Neg [[ ENeg (EImp F G) ]] ,, Neg [[ ENeg (EImp G F) ]] ,,
+      hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (EImp F G)) ]] ,, [[ ENeg (ENeg (EImp G F)) ]] ,,
                          [[ EImp F G ]] ,, [[ EImp G F ]] ,, [[ ENeg F ]] ,, [[ ENeg G ]])
         S1 Sf1 sigma ->
-      hasTableau_ sko (Gamma ,, Neg [[ ENeg (EImp F G) ]] ,, Neg [[ ENeg (EImp G F) ]] ,,
+      hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (EImp F G)) ]] ,, [[ ENeg (ENeg (EImp G F)) ]] ,,
                          [[ EImp F G ]] ,, [[ EImp G F ]] ,, [[ G ]] ,, [[ F ]]) S2 Sf2 sigma ->
       S = S1 \union S2 -> Sf = join Sf1 Sf2 ->
       disjoint S1 S2 -> hasTableau_ sko Gamma S Sf sigma.
