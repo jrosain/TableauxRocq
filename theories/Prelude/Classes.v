@@ -37,6 +37,13 @@ Class EqBool (A : Type) :=
   { eqb : A -> A -> bool
   ; eqbIsEq : forall (x y : A), eqb x y = true <-> x = y }.
 
+(** We set [eqb] [Opaque] for tatics used in proofs, i.e., [cbn], [simpl], etc.
+    This is useful as it allows us to avoid using [change] to get [eqb], and then
+    to simply rewrite with [match_eq_dec_eq_bool] to get a decidable equality and
+    go on with the proof. Of course, an instance of [eqb] can still be locally set
+    [Transparent] if it really needs to compute. *)
+#[global] Opaque eqb.
+
 Lemma EqBool_refl :
   forall {A : Type} `{EqBool A} (x : A), eqb x x = true.
 Proof. intros. now rewrite eqbIsEq. Qed.
@@ -126,6 +133,13 @@ Proof.
     + left; now f_equal.
     + right; intro e. injection e => contra. now apply ne.
 Qed.
+
+#[global] Instance eq_bool_nat : EqBool nat.
+Proof.
+  unshelve econstructor.
+  - exact Nat.eqb.
+  - apply PeanoNat.Nat.eqb_eq.
+Defined.
 
 #[global] Instance eq_bool_string : EqBool string.
 Proof.

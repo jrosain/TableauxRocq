@@ -60,7 +60,7 @@ End TermInd.
 (** *** Decidable equality for terms *)
 Section DecEqTerms.
   Context {func var : Atom}.
-  Existing Instance eq_dec_atom.
+  Existing Instance eqb_atom.
 
   #[global] Instance eqDec_Term : EqDec (Term_ func var).
   Proof using Type.
@@ -94,16 +94,13 @@ End DecEqTerms.
 (** *** Opening and substitution for terms *)
 Section OpeningSubstTerms.
   Context {func var : Atom} `{set_nat : set nat}.
-  Existing Instance eq_dec_atom.
+  Existing Instance eqb_atom.
 
   #[global] Instance opening_term : Opening (Term_ func var) (Term_ func var) :=
     fun n u =>
       fix F (t : Term_ func var) : Term_ func var :=
       match t with
-      | Bound m => match n == m with
-                  | left _ => u
-                  | right _ => t
-                  end
+      | Bound m => if eqb n m then u else t
       | Free  _ => t
       | Fun f l => Fun f (map F l)
       end.
@@ -154,7 +151,7 @@ Arguments Form_ : clear implicits.
 (** *** Decidable equality for formulas *)
 Section DecEqForms.
   Context {pred func var : Atom}.
-  Existing Instance eq_dec_atom.
+  Existing Instance eqb_atom.
   Existing Instance eq_dec_list.
 
   #[global] Instance eq_dec_form : EqDec (Form_ pred func var).
@@ -276,7 +273,8 @@ Section SubstOpeningLemmas.
       (t { x \to u })@[sigma] = t@[sigma] { x \to u@[sigma] }.
   Proof using Type.
     intros t; induction t using term_ind; intros; cbn.
-    - destruct (x == n); cbn; auto.
+    - rewrite -!match_eq_dec_eq_bool.
+      destruct (x == n); cbn; auto.
     - destruct sigma as [sigma Hsigma]; cbn.
       rewrite term_locally_closed_inst; auto.
     - rewrite !map_map; cbn.

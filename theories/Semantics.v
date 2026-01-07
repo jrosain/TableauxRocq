@@ -247,7 +247,7 @@ Section SemanticsFacts.
     forall (M : Model pred func) (rho0 rho1 : list M) (sigma : env M var) (t : Term),
       isLocallyClosed t ->
       interpret_term rho0 sigma t = interpret_term rho1 sigma t.
-  Proof.
+  Proof using Type.
     intros ??????. induction t using term_ind.
     - red in H. cbn in H. apply is_empty_spec with (x := n) in H.
       + inversion H.
@@ -274,7 +274,7 @@ Section SemanticsFacts.
         interpret_term (rho ++ [ [[ M # rho # sigma |- u ]] ])%list sigma t.
   Proof using Type.
     intros ??????. induction t using term_ind.
-    - cbn. destruct (#|rho| == n).
+    - cbn. rewrite -match_eq_dec_eq_bool; destruct (#|rho| == n).
       + rewrite nth_error_app2.
         * rewrite e; apply le_n.
         * rewrite e; cbn. rewrite PeanoNat.Nat.sub_diag; now cbn.
@@ -327,7 +327,7 @@ Section SemanticsFacts.
       apply isLocallyClosed_interp_env; auto.
   Qed.
 
-  Existing Instance eq_dec_atom.
+  Existing Instance eqb_atom.
 
   (** These lemmas are *not* needed for soundness, hence they are [Admitted] for now.
       Indeed, they are used by [instantiate_by_free_equiv_all], which we avoid to use

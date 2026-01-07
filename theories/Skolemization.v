@@ -84,7 +84,7 @@ Section SkolemizationInstances.
       (* We want to check (i) that all the list [l] is composed of all the free variables of
          the set [S], and (ii) that the symbol [f] is fresh in the set of skolem symbols already
          appearing in the branch *)
-      exact (gen_is_sko t (fun f l => (forall (x : var), mem (Free x) (from_list l) <-> mem x S) /\
+      exact (gen_is_sko t (fun f l => (forall (x : var), set_in (Free x) (from_list l) <-> set_in x S) /\
                                      isFresh f Sf)).
     - intros t ??? hsko. apply (gen_symbol t hsko).
   Defined.
@@ -98,7 +98,7 @@ Section SkolemizationInstances.
       (* We want to check (i) that the list [l] is composed of all the free variables appearing
          in the Skolemized formula [F], and (ii) that the symbol [f] is fresh in the set of
          Skolem symbols already appearing in the branch. *)
-      exact (gen_is_sko t (fun f l => (forall (x : var), mem (Free x) (from_list l) <-> mem x (fv F)) /\
+      exact (gen_is_sko t (fun f l => (forall (x : var), set_in (Free x) (from_list l) <-> set_in x (fv F)) /\
                                      isFresh f Sf)).
     - intros t ??? hsko. apply (gen_symbol t hsko).
   Defined.

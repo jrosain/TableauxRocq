@@ -98,14 +98,12 @@ Section ESemantics.
       | EAnd F G  => rec rho F /\ rec rho G
       | EImp F G  => rec rho F -> rec rho G
       | EEqu F G  => rec rho F <-> rec rho G
-      | EEx x F   => exists (v : M), rec (fun y => match eqDec x y with
-                                          | left _ => Some v
-                                          | right _ => rho y
-                                          end) F
-      | EAll x F   => forall (v : M), rec (fun y => match eqDec x y with
-                                           | left _ => Some v
-                                           | right _ => rho y
-                                           end) F
+      | EEx x F   => exists (v : M), rec (fun y => if eqb  x y
+                                          then Some v
+                                          else rho y) F
+      | EAll x F   => forall (v : M), rec (fun y => if eqb x y
+                                           then Some v
+                                           else rho y) F
       end.
 
   Definition is_evalid (F : EForm) : Prop :=
@@ -122,15 +120,16 @@ Section ESyntaxTranslation.
 
   Lemma fv_efun :
     forall (f : string) (l : list ETerm) (t : ETerm) (x : string),
-      In t l -> mem x (fv_eterm t) -> mem x (fv_eterm (EFun f l)).
+      In t l -> set_in x (fv_eterm t) -> set_in x (fv_eterm (EFun f l)).
   Proof.
     intros ???? hin hmem. cbn[fv_eterm] in hmem |- *.
     induction l as [|y ys IHys].
     - inversion hin.
-    - rewrite mem_fold_left_cons_unionl. apply union_spec. destruct hin as [hin | e].
-      + left. now apply IHys.
-      + right. rewrite -e //.
-  Qed.
+    - admit.
+(* rewrite mem_fold_left_cons_unionl. apply union_spec. destruct hin as [hin | e]. *)
+(*       + left. now apply IHys. *)
+(*       + right. rewrite -e //. *)
+  Admitted.
 
   (* Fixpoint fv_eform (F : EForm) : SetOfString := *)
   (*   match F with *)
@@ -152,15 +151,14 @@ Section ESyntaxTranslation.
   (* Definition WellScoped (F : EForm) := is_empty (fv_eform F). *)
 
   Section IndexOf.
-    Context {A : Type} `{EqDec A}.
+    Context {A : Type} `{EqBool A}.
 
     Fixpoint index_of (x : A) (l : list A) : option nat :=
     match l with
     | [] => None
-    | y :: ys => match eqDec x y with
-               | left _ => Some 0
-               | right _ => bind (index_of x ys) (fun n => Some (S n))
-               end
+    | y :: ys => if eqb x y
+               then Some 0
+               else bind (index_of x ys) (fun n => Some (S n))
     end.
 
     Lemma index_of_spec :
@@ -169,7 +167,8 @@ Section ESyntaxTranslation.
     Proof using Type.
       intros ??? e. generalize dependent n. induction l as [|y ys IHys].
       - intros ? e. inversion e.
-      - intros ? e; cbn in *. destruct eqDec; cbn.
+      - intros ? e; cbn in *. rewrite -match_eq_dec_eq_bool in e.
+        destruct eqDec; cbn.
         + injection e => <-. cbn. rewrite e0 //.
         + destruct (index_of x ys) eqn:eid; cbn in *.
           * injection e => en. rewrite -en; cbn.
@@ -183,7 +182,8 @@ Section ESyntaxTranslation.
     Proof using Type.
       intros ???? ex ey. generalize dependent n; induction l as [|z zs IHzs]; intros n ex ey.
       - inversion ex.
-      - cbn in *. repeat (destruct eqDec; cbn in * ).
+      - cbn in *. rewrite -!match_eq_dec_eq_bool in ex, ey.
+        repeat (destruct eqDec; cbn in * ).
         + now rewrite e0.
         + rewrite -ex in ey. destruct (index_of y zs); cbn in *.
           * injection ey => contra; inversion contra.
@@ -211,7 +211,8 @@ Section ESyntaxTranslation.
     Proof using Type.
       intros x l hin. induction l as [|y ys IHys].
       - inversion hin.
-      - cbn. destruct (x == y).
+      - cbn. rewrite -match_eq_dec_eq_bool.
+        destruct (x == y).
         + now exists 0.
         + destruct hin as [hin | e].
           * apply IHys in hin. destruct hin as [m e].
@@ -226,7 +227,7 @@ Section ESyntaxTranslation.
     Proof using Type.
       intros ??. induction l as [|y ys IHys].
       - intros ? contra; inversion contra.
-      - intros ? e; cbn in *. destruct (x == y).
+      - intros ? e; cbn in *. rewrite -match_eq_dec_eq_bool in e. destruct (x == y).
         + now right.
         + left. destruct (index_of x ys); cbn in *.
           * injection e => e'. destruct n.
@@ -239,7 +240,7 @@ Section ESyntaxTranslation.
       forall (x y : A) (l : list A) (n : nat),
         index_of x (y :: l) = Some (S n) -> index_of x l = Some n.
     Proof using Type.
-      intros ???? e; cbn in *.
+      intros ???? e; cbn in *. rewrite -match_eq_dec_eq_bool in e.
       destruct (x == y); cbn.
       - injection e => contra. inversion contra.
       - destruct (index_of x l); cbn in *.
@@ -251,7 +252,7 @@ Section ESyntaxTranslation.
       forall (x y : A) (l : list A) (n : nat),
         x <> y -> index_of x l = Some n -> index_of x (y :: l) = Some (S n).
     Proof using Type.
-      intros ???? e0 e; cbn in *.
+      intros ???? e0 e; cbn in *. rewrite -match_eq_dec_eq_bool.
       destruct (x == y); cbn.
       - congruence.
       - destruct (index_of x l); cbn in *.
@@ -269,7 +270,8 @@ Section ESyntaxTranslation.
       - intros []; auto. intros _ contra; inversion contra.
       - intros [].
         + intros _ _ contra; inversion contra.
-        + intros h hin hin'. cbn. destruct (x == y), (x == a); auto.
+        + intros h hin hin'. cbn. rewrite -!match_eq_dec_eq_bool.
+          destruct (x == y), (x == a); auto.
           * specialize (h 0). cbn in h. specialize (h ltac:(lia)).
             injection h => contra; congruence.
           * specialize (h 0). cbn in h. specialize (h ltac:(lia)).
@@ -516,7 +518,7 @@ Section ESyntaxTranslation.
     intros t; induction t using eterm_ind'; intros rho sigma s n es erho hnone.
     - cbn; destruct (index_of x rho) eqn:ex.
       + destruct (index_of x sigma) eqn:ex'.
-        * cbn. destruct (n == n0).
+        * cbn. rewrite -match_eq_dec_eq_bool. destruct (n == n0).
           -- subst. apply index_of_inj with (x := x) in es; auto.
              subst. have h : index_of s rho = index_of s sigma.
              { apply index_of_nth.
@@ -556,7 +558,7 @@ Section ESyntaxTranslation.
            Also, it makes the translations equal (as [rho] and [sigma] are equal in all the other
            values *) admit.
       + rewrite (IHF (s :: rho) (s :: sigma) x (n + 1)).
-        * cbn. destruct (x == s); try congruence.
+        * cbn. rewrite -match_eq_dec_eq_bool. destruct (x == s); try congruence.
           destruct (index_of x rho); cbn.
           -- rewrite PeanoNat.Nat.add_1_r. injection ex => -> //.
           -- inversion ex.
@@ -569,7 +571,7 @@ Section ESyntaxTranslation.
            Also, it makes the translations equal (as [rho] and [sigma] are equal in all the other
            values *) admit.
       + rewrite (IHF (s :: rho) (s :: sigma) x (n + 1)).
-        * cbn. destruct (x == s); try congruence.
+        * cbn. rewrite -match_eq_dec_eq_bool. destruct (x == s); try congruence.
           destruct (index_of x rho); cbn.
           -- rewrite PeanoNat.Nat.add_1_r. injection ex => -> //.
           -- inversion ex.
@@ -689,7 +691,7 @@ Section ValidityEquivalence.
       { admit. }
       rewrite (H _ _ _ _ s) in hF.
       rewrite (instantiate_var_as_free_in_form _ _ []) in hF.
-      + cbn; destruct (s == s); auto. exfalso; now apply n.
+      + cbn. rewrite -match_eq_dec_eq_bool. destruct (s == s); auto. exfalso; now apply n.
       + intros m contra; inversion contra.
       + reflexivity.
       + admit. (* TODO: generalize IHF and this is free *)
@@ -716,10 +718,9 @@ Section TranslateSubst.
   Fixpoint subst_translation (l : list (string * ETerm)) : string -> Term :=
     match l with
     | [] => fun x => Free x
-    | x :: xs => fun y => match ((fst x) == y) with
-                     | left _ => [[ snd x ]]
-                     | right _ => subst_translation xs y
-                     end
+    | x :: xs => fun y => if (eqb (fst x) y)
+                     then [[ snd x ]]
+                     else subst_translation xs y
     end.
 
   Lemma eterm_translation_is_always_locally_closed :
@@ -742,7 +743,8 @@ Section TranslateSubst.
   Proof.
     intros l x H. induction l as [|y ys IHys]; unfold isLocallyClosed; cbn.
     - apply empty_is_empty.
-    - destruct (fst y == x).
+    - change (fst y =? x) with (eqb (fst y) x).
+      rewrite -match_eq_dec_eq_bool. destruct (fst y == x).
       + eapply (H (fst y)). right. now destruct y.
       + apply IHys. intros; apply (H x0).
         now left.
@@ -1095,28 +1097,4 @@ End HasTableauLemmas.
 
 (** ** 7. Tactics *)
 
-Ltac esimpl :=
-  cbn; repeat (progress rewrite !match_eq_dec_eq_bool; cbn).
-
-Ltac set_decide :=
-  cbn; unfold disjoint;
-  try (repeat split; cbn); esimpl;
-  repeat (progress (rewrite !empty_unitl || rewrite !empty_unitr || erewrite union_idemp));
-  repeat (progress (rewrite !empty_disjointl || rewrite !empty_disjointr));
-  repeat (progress (match goal with
-  | [ |- forall x : (SetOfTerm_.SetOfX_.In ?y ?S), ?P ] =>
-      let H := fresh x in intro H; inversion H; subst
-  | [ |- forall x : (SetOfString_.SetOfX_.In ?y ?S), ?P ] =>
-      let H := fresh x in intro H; inversion H; subst
-  | [ |-  ~(SetOfTerm_.SetOfX_.In ?y ?S) ] =>
-      let H := fresh "H" in intro H; inversion H; subst
-  | [ |-  ~(SetOfString_.SetOfX_.In ?y ?S) ] =>
-      let H := fresh "H" in intro H; inversion H; subst
-  | [ H : SetOfTerm_.SetOfX_.Raw.InT ?x SetOfTerm_.SetOfX_.Raw.Leaf |- _ ] => inversion H
-  | [ H : SetOfString_.SetOfX_.Raw.InT ?x SetOfString_.SetOfX_.Raw.Leaf |- _ ] => inversion H
-  | [ e : Free ?x = Free ?y |- _ ] => injection e => e'; subst
-  | [ e : ?x = ?y |- _ ] => try (inversion e; fail)
-  | _ => idtac
-  end));
-  try (SetOfTerm_.SetOfXDecide.fsetdec);
-  try (SetOfString_.SetOfXDecide.fsetdec).
+Ltac esimpl := native_compute.

@@ -14,19 +14,21 @@ Class set {A : Type} :=
 
   (** *** Basic set operations *)
   ; empty_set : car
-  ; mem : A -> car -> Prop
+  ; mem : A -> car -> bool       (** Use [mem] in definitions to compute *)
+  ; set_in : A -> car -> Prop    (** Use [mem_spec] to convert [mem] to [set_in] in proofs *)
   ; union : car -> car -> car
   ; inter : car -> car -> car
   ; singleton : A -> car
 
   (** *** Extensionality property of sets *)
-  ; set_ext : forall (s1 s2 : car), s1 = s2 <-> (forall (x : A), mem x s1 <-> mem x s2)
+  ; set_ext : forall (s1 s2 : car), s1 = s2 <-> (forall (x : A), set_in x s1 <-> set_in x s2)
 
   (** *** Properties of defined operations *)
-  ; empty_spec : forall (x : A), mem x empty_set -> False
-  ; singleton_spec : forall (x y : A), mem x (singleton y) <-> x = y
-  ; union_spec : forall (x : A) (s1 s2 : car), mem x (union s1 s2) <-> mem x s1 \/ mem x s2
-  ; inter_spec : forall (x : A) (s1 s2 : car), mem x (inter s1 s2) <-> mem x s1 /\ mem x s2 }.
+  ; empty_spec : forall (x : A), set_in x empty_set -> False
+  ; mem_spec : forall (x : A) (s : car), mem x s = true <-> set_in x s
+  ; singleton_spec : forall (x y : A), set_in x (singleton y) <-> x = y
+  ; union_spec : forall (x : A) (s1 s2 : car), set_in x (union s1 s2) <-> set_in x s1 \/ set_in x s2
+  ; inter_spec : forall (x : A) (s1 s2 : car), set_in x (inter s1 s2) <-> set_in x s1 /\ set_in x s2 }.
 Arguments set : clear implicits.
 
 Notation "S1 \union S2" := (union S1 S2) (at level 30).
@@ -40,21 +42,21 @@ Section SetProperties.
 
   Lemma add_spec1 :
     forall (x : A) (s : set_A),
-      mem x (add x s).
+      set_in x (add x s).
   Proof using Type.
     intros x s; unfold add. rewrite union_spec. left. rewrite singleton_spec. reflexivity.
   Qed.
 
   Lemma add_spec2 :
     forall (x y : A) (s : set_A),
-      mem x s -> mem x (add y s).
+      set_in x s -> set_in x (add y s).
   Proof using Type.
     intros x y s hin; unfold add. rewrite union_spec. now right.
   Qed.
 
   Lemma add_inv :
     forall (x y : A) (s : set_A),
-      mem x (add y s) -> x = y \/ mem x s.
+      set_in x (add y s) -> x = y \/ set_in x s.
   Proof using Type.
     intros ??? hin. rewrite /add union_spec in hin. destruct hin as [hin | hin].
     - rewrite singleton_spec in hin. now left.
@@ -72,7 +74,7 @@ Section SetProperties.
   Qed.
 
   Definition subset (s1 s2 : set_A) :=
-    forall (x : A), mem x s1 -> mem x s2.
+    forall (x : A), set_in x s1 -> set_in x s2.
 
   #[global] Instance reflexive_subset : Reflexive subset.
   Proof using Type. intro. unfold subset. tauto. Qed.
@@ -87,7 +89,7 @@ Section SetProperties.
 
   Lemma is_empty_spec :
     forall (x : A) (s : set_A),
-      is_empty s -> mem x s -> False.
+      is_empty s -> set_in x s -> False.
   Proof using Type. intros ?? e. rewrite e. apply empty_spec. Qed.
 
   Lemma empty_is_empty :
@@ -96,7 +98,7 @@ Section SetProperties.
 
   Lemma is_empty_spec' :
     forall (s : set_A),
-      (forall (x : A), mem x s -> False) -> is_empty s.
+      (forall (x : A), set_in x s -> False) -> is_empty s.
   Proof using Type.
     intros. have e : s = empty_set.
     { apply set_ext; intro y; cbn. split.
@@ -129,12 +131,12 @@ Section SetProperties.
 
   Lemma mem_unionl :
     forall (x : A) (s1 s2 : set_A),
-      mem x s1 -> mem x (union s1 s2).
+      set_in x s1 -> set_in x (union s1 s2).
   Proof using Type. intros. rewrite union_spec. now left. Qed.
 
   Lemma mem_unionr :
     forall (x : A) (s1 s2 : set_A),
-      mem x s2 -> mem x (union s1 s2).
+      set_in x s2 -> set_in x (union s1 s2).
   Proof using Type. intros. rewrite union_spec. now right. Qed.
 
   Lemma empty_unitl :
@@ -226,14 +228,6 @@ Section SetProperties.
       { apply IHys. }
       rewrite e0 union_assoc //.
   Qed.
-
-  (* TODO: rewrite it with equalities. Maybe this is the thing above? *)
-  Lemma mem_fold_left_cons_unionl :
-    forall {B : Type} (f : B -> set_A) (b : B) (l : list B) (x : A) (s : set_A),
-      mem x (fold_left (fun (s : set_A) (b : B) => union s (f b)) (b :: l) s) <->
-        mem x (union ((fold_left (fun (s : set_A) (b : B) => union s (f b)) l s)) (f b)).
-  Proof.
-    Admitted.
 End SetProperties.
 
 (** We denote [\{ x, y, ..., z \}] for finite sets *)
@@ -330,7 +324,8 @@ Module SetComputationalInstances.
       {| car := SetOfX_.t
 
       ;  empty_set := SetOfX_.empty
-      ;  mem := SetOfX_.In
+      ;  mem := SetOfX_.mem
+      ;  set_in := SetOfX_.In
       ;  union := SetOfX_.union
       ;  inter := SetOfX_.inter
       ;  singleton := SetOfX_.singleton
@@ -339,6 +334,7 @@ Module SetComputationalInstances.
 
       ;  empty_spec := SetOfX_empty_spec
       ;  singleton_spec := SetOfX_singleton_spec
+      ;  mem_spec x s := SetOfX_.mem_spec s x
       ;  union_spec x s1 s2 := SetOfX_.union_spec s1 s2 x
       ;  inter_spec x s1 s2 := SetOfX_.inter_spec s1 s2 x |}.
   End SetFromOrdered.
