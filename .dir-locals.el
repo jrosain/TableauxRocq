@@ -1,0 +1,16 @@
+;;; Directory Local Variables            -*- no-byte-compile: t -*-
+;;; For more information see (info "(emacs) Directory Variables")
+
+((coq-mode . ((company-coq-dir-local-symbols . (("\\to" . ?→)
+												("\\in" . ?∈)
+												("\\models" . ?⊧)
+												("[[" . ?〚)
+												("]]" . ?〛)
+												("Gamma" . ?Γ)
+												("sigma" . ?σ)
+												("rho" . ?ρ)
+												("Bot" . ?⊥)
+												("Neg" . ?¬)
+												("\\union" . ?∪)
+												("\\inter" . ?∩)
+												("\\equiv" . ?≡))))))
