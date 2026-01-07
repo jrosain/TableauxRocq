@@ -1,5 +1,6 @@
 if [ -f RocqMakefile ]; then
-    make mrproper
+	make cleanall -f RocqMakefile
+	rm RocqMakefile.conf RocqMakefile
 fi
 
 rocq makefile -f _RocqProject -o RocqMakefile
