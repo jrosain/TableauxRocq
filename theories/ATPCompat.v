@@ -873,16 +873,18 @@ Section HasTableauLemmas.
   Qed.
 
   Lemma hasTableauOr :
-    forall (Gamma : Con) (sigma : Substitution string Term) (S1 S2 : SetOfString) (Sf1 Sf2 : sko_record)
+    forall (Gamma : Con) (sigma : Substitution string Term) (S S1 S2 : SetOfString) (Sf Sf1 Sf2 : sko_record)
       (i : nat) (F G : EForm),
       nth_error (forms Gamma) i = Some [[ EOr F G ]] ->
       hasTableau_ sko (Gamma ,, [[ F ]]) S1 Sf1 sigma ->
-      hasTableau_ sko (Gamma ,, [[ G ]]) S2 Sf2 sigma -> disjoint S1 S2 ->
-      hasTableau_ sko Gamma (S1 \union S2) (join Sf1 Sf2) sigma.
+      hasTableau_ sko (Gamma ,, [[ G ]]) S2 Sf2 sigma -> disjoint S1 S2 = true ->
+      eqb S (S1 \union S2) = true -> Sf = (join Sf1 Sf2) -> (* TODO: eqb for sko_record *)
+      hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
-    intros ????????? e htab1 htab2. eapply hasTableauOr.
-    1: cbn in *; eapply con_nth_in; eauto.
-    all: assumption.
+    intros ??????????? e htab1 htab2. rewrite disjoint_are_disjoint.
+    rewrite eqbIsEq. intros ? -> ->. eapply hasTableauOr.
+    all: eauto.
+    cbn in *; eapply con_nth_in; eauto.
   Qed.
 
   Lemma hasTableauImp :
@@ -890,14 +892,14 @@ Section HasTableauLemmas.
       (i : nat) (F G : EForm),
       nth_error (forms Gamma) i = Some [[ EImp F G ]] ->
       hasTableau_ sko (Gamma ,, [[ ENeg F ]]) S1 Sf1 sigma ->
-      hasTableau_ sko (Gamma ,, [[ G ]]) S2 Sf2 sigma -> disjoint S1 S2 ->
-      S = S1 \union S2 -> Sf = join Sf1 Sf2 ->
+      hasTableau_ sko (Gamma ,, [[ G ]]) S2 Sf2 sigma -> disjoint S1 S2 = true ->
+      eqb S (S1 \union S2) = true -> Sf = join Sf1 Sf2 ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????????? e htab1 htab2 hdisjoint e0 e1.
-    rewrite e0 e1; eapply hasTableauOr.
+    eapply hasTableauOr.
     1: cbn in *; change (Neg [[ F ]]) with ([[ ENeg F ]]) in e; eassumption.
-    all: assumption.
+    all: eauto.
   Qed.
 
   Lemma hasTableauNegAnd :
@@ -906,16 +908,18 @@ Section HasTableauLemmas.
       nth_error (forms Gamma) i = Some [[ ENeg (EAnd F G) ]] ->
       hasTableau_ sko (Gamma ,, (Or [[ ENeg F ]] [[ ENeg G ]]) ,, [[ ENeg F ]]) S1 Sf1 sigma ->
       hasTableau_ sko (Gamma ,, (Or [[ ENeg F ]] [[ ENeg G ]]) ,, [[ ENeg G ]]) S2 Sf2 sigma ->
-      S = S1 \union S2 -> Sf = join Sf1 Sf2 ->
-      disjoint S1 S2 -> hasTableau_ sko Gamma S Sf sigma.
+      disjoint S1 S2 = true -> eqb S (S1 \union S2) = true -> Sf = join Sf1 Sf2 ->
+      hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????????? e htab1 htab2 e0 e1 hdisjoint. eapply hasTableauNegNeg.
     - cbn in *. change (Or (Neg [[ F ]]) (Neg [[ G ]])) with ([[ EOr (ENeg F) (ENeg G) ]]) in e.
       eassumption.
-    - rewrite e0 e1. unshelve eapply hasTableauOr.
+    - unshelve eapply hasTableauOr.
+      1-4: shelve.
       1: exact 0.
-      3: reflexivity.
-      all: assumption.
+      1-2: shelve.
+      1: reflexivity.
+      all: eauto.
   Qed.
 
   Lemma hasTableauEqu :
@@ -927,10 +931,10 @@ Section HasTableauLemmas.
         S1 Sf1 sigma ->
       hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (EImp F G)) ]] ,, [[ ENeg (ENeg (EImp G F)) ]] ,,
                          [[ EImp F G ]] ,, [[ EImp G F ]] ,, [[ G ]] ,, [[ F ]]) S2 Sf2 sigma ->
-      S = S1 \union S2 -> Sf = join Sf1 Sf2 ->
-      disjoint S1 S2 -> hasTableau_ sko Gamma S Sf sigma.
+      disjoint S1 S2 = true -> eqb S (S1 \union S2) = true -> Sf = join Sf1 Sf2 ->
+      hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
-    intros ??????????? e htab1 htab2 -> -> hdisjoint. unshelve eapply hasTableauNegOr.
+    intros ??????????? e htab1 htab2 hdisjoint ??. unshelve eapply hasTableauNegOr.
     - exact i.
     - exact (ENeg (EImp F G)).
     - exact (ENeg (EImp G F)).
@@ -944,6 +948,8 @@ Section HasTableauLemmas.
         * exact (EImp G F).
         * now cbn.
         * unshelve eapply hasTableauOr.
+          1-4: shelve.
+          7-9: eauto.
           -- exact 1.
           -- exact (ENeg F).
           -- exact G.
@@ -953,11 +959,12 @@ Section HasTableauLemmas.
              2: apply join_unitr.
              2: apply empty_unitr.
              unshelve eapply hasTableauOr.
+             1-4: shelve.
              ++ exact 1.
              ++ exact (ENeg G).
              ++ exact F.
              ++ now cbn.
-             ++ assumption.
+             ++ eassumption.
              ++ unshelve eapply hasTableauContr.
                 ** exact 0.
                 ** exact 1.
@@ -966,12 +973,16 @@ Section HasTableauLemmas.
                 ** now cbn.
                 ** now cbn.
                 ** reflexivity.
-             ++ apply empty_disjointr.
+             ++ rewrite disjoint_are_disjoint.
+                eapply empty_disjointr.
+             ++ rewrite eqbIsEq //.
+             ++ reflexivity.
           -- replace S2 with (empty_set \union S2).
              replace Sf2 with (join empty_record Sf2).
              2: apply join_unitl.
              2: apply empty_unitl.
              unshelve eapply hasTableauOr.
+             1-4: shelve.
              ++ exact 1.
              ++ exact (ENeg G).
              ++ exact F.
@@ -984,9 +995,11 @@ Section HasTableauLemmas.
                 ** now cbn.
                 ** now cbn.
                 ** reflexivity.
-             ++ assumption.
-             ++ apply empty_disjointl.
-          -- assumption.
+             ++ eassumption.
+             ++ rewrite disjoint_are_disjoint.
+                apply empty_disjointl.
+             ++ rewrite eqbIsEq //.
+             ++ reflexivity.
   Qed.
 
   Lemma hasTableauNegEqu :
@@ -997,16 +1010,18 @@ Section HasTableauLemmas.
                          ,, [[ ENeg (ENeg F) ]] ,, [[ ENeg G ]] ,, [[ F ]]) S1 Sf1 sigma ->
       hasTableau_ sko (Gamma ,, [[ EOr (ENeg (EImp F G)) (ENeg (EImp G F)) ]] ,, [[ ENeg (EImp G F) ]]
                          ,, [[ ENeg (ENeg G) ]] ,, [[ ENeg F ]] ,, [[ G ]]) S2 Sf2 sigma ->
-      S = S1 \union S2 -> Sf = join Sf1 Sf2 ->
-      disjoint S1 S2 -> hasTableau_ sko Gamma S Sf sigma.
+      disjoint S1 S2 = true -> eqb S (S1 \union S2) = true -> Sf = join Sf1 Sf2 ->
+      hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
-    intros ??????????? e htab1 htab2 -> -> hdisjoint. unshelve eapply hasTableauNegNeg.
+    intros ??????????? e htab1 htab2 e1 e2 hdisjoint. unshelve eapply hasTableauNegNeg.
     - exact i.
     - exact (EOr (ENeg (EImp F G)) (ENeg (EImp G F))).
     - now cbn in *.
     - unshelve eapply hasTableauOr.
+      1-4: shelve.
       1: exact 0.
       3: reflexivity.
+      3-5: eauto.
       + unshelve eapply hasTableauNegImp.
         1: exact 0.
         3: reflexivity.
@@ -1015,7 +1030,6 @@ Section HasTableauLemmas.
         1: exact 0.
         3: reflexivity.
         assumption.
-      + assumption.
   Qed.
 
   Lemma hasTableauAll :

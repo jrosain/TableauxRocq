@@ -52,10 +52,10 @@ Proof.
   (** The first goal is, as always, [reflexivity]. *)
   1: reflexivity.
 
-  (** The last three goals should always be automatically solved by [set_decide]. *)
-  3: { esimpl. admit. (* TODO: figure out why [union] does not compute *) }
-  3: { esimpl. admit. (* TODO: figure out why [union] does not compute *) }
-  3: { esimpl. admit. (* TODO: figure out why [union] does not compute *) }
+  (** The last three goals should always be automatically solved by [now esimpl]. *)
+  3: { now esimpl. }
+  3: { now esimpl. }
+  3: { esimpl. admit. (* TODO: skolemization [join] *) }
 
   (** Then, we can go into the different branches. First, let's do the left one. *)
   { (** This is the branch where we have [Neg P a], hence we can directly conclude with the

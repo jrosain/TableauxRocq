@@ -98,7 +98,7 @@ Section TableauxProofs.
     forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
       (F1 F2 : Form),
       (Or F1 F2) \in Gamma -> hasTableau_ (Gamma ,, F1) S1 Sf1 sigma -> hasTableau_ (Gamma ,, F2) S2 Sf2 sigma ->
-      disjoint S1 S2 -> hasTableau_ Gamma (S1 \union S2) (join Sf1 Sf2) sigma
+      are_disjoint S1 S2 -> hasTableau_ Gamma (S1 \union S2) (join Sf1 Sf2) sigma
 
   (** Gamma rule *)
   | hasTableauAll :
