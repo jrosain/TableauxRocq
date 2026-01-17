@@ -5,5 +5,6 @@ pkgs.mkShell {
     gnumake
     rocq-core
     rocqPackages.stdlib
+    ocamlPackages.findlib
   ];
 }
