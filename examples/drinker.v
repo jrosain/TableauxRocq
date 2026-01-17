@@ -143,8 +143,4 @@ Proof.
   Transparent eqb. simpl.
   unfold etranslation_eform, inner_subst, translate_substitution.
   reflexivity.
-
-  (* TODO: figure out why [vm_compute] fails here.
-     --> This is probably due to trying to simplify [isSubst]... *)
-  (* Timeout 1 vm_compute. *)
 Qed.
