@@ -34,3 +34,5 @@ jobs:
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
       - run: nix-shell --run "sh configure.sh; make -f RocqMakefile; cd devtools; sh run-tests.sh"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
