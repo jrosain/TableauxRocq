@@ -15,9 +15,7 @@ warn() { echo "${YELLOW}[WARN]${RESET} $1"; }
 info() { echo "${BLUE}[INFO]${RESET} $1"; }
 action() { echo "${SKY_BLUE}[ACTION]${RESET} $1"; }
 
-ROCQ_compile() {
-	rocq compile -Q ../theories Tableaux $1
-}
+ROCQ_compile="rocq compile -Q ../theories Tableaux"
 
 # Check if ROCQ is installed
 if ! command -v rocq &>/dev/null; then
@@ -28,8 +26,8 @@ fi
 
 # Check if TableauxRocq is compiled
 echo -n "From Tableaux Require Import All." > test_compile.v
-if ROCQ_compile test_compile.v; then
-	rm -rf test_compile.vo*
+if $ROCQ_compile test_compile.v; then
+	rm -rf test_compile.v*
 	rm -rf test_compile.glob
 else
 	info "TableauxRocq has not been compiled. Compiling now..."
@@ -48,6 +46,7 @@ fi
 # both version n times, and average out the compilation time.
 bench_n_compilations=10
 old_TR_name="TR_old"
+bench_results=$(pwd)/results
 
 clone_and_make() {
 	current_commit=$(git rev-parse HEAD)
@@ -55,18 +54,76 @@ clone_and_make() {
 
 	action "Cloning TableauxRocq with commit $old_commit"
 
-	if git clone git@github.com/jrosain/TableauxRocq.git $old_TR_name; then
+	if git clone git@github.com:jrosain/TableauxRocq.git $old_TR_name; then
 		cd $old_TR_name
 		git config --add remote.origin.fetch "+refs/pull/*/head:refs/remotes/origin/pr/*"
 		git fetch --all
 		git checkout $old_commit
 
 		action "Compiling old TableauxRocq"
+		sh configure.sh
 		make -f RocqMakefile
+		cd devtools
 	else
 		error "Could not clone TableauxRocq"
 		exit 1
 	fi
+}
+
+compile_with_time() {
+	folder=$1
+	old_new=$2
+
+	TIMEFORMAT=%R
+
+	if [ -d $folder ]; then
+		for f in $(ls $folder/*.v); do
+			action "Checking that $f compiles..."
+			if $ROCQ_compile $f 2>/dev/null; then
+				action "Running benchs for $f"
+				test_results=$bench_results/$f.$old_new
+				mkdir -p $(dirname $test_results) && touch $test_results
+				for i in $(seq 1 $bench_n_compilations); do
+					out=$( { time rocq compile -Q ../theories Tableaux $f 2>/dev/null; } 2>&1 )
+					echo $out | tr , . >> $test_results
+				done
+			else
+				error "Could not compile $f."
+				info "Exiting with error."
+				exit 1
+			fi
+		done
+	fi
+
+	unset TIMEFORMAT
+}
+
+average() {
+	awk 'BEGIN { sum=0; count=0 } { sum += $1; count++ } END { print sum/count }' $1
+}
+
+make_results_summary() {
+	summary=$bench_results/summary
+	touch $summary
+	echo -e "File\t Diff.\t Avg. (new)\t Avg. (old)" >> $summary
+	for f in $(find $bench_results -type f -name "*.new"); do
+		f_name=${f%.new}
+		f_old=$f_name.old
+		if [ ! -f $f_old ]; then
+			avg=$(average $f)
+			# TODO: fix display + avg computation
+			echo -e "$(basename $f_name)\t -\t $avg sec.\t -" >> $summary
+		else
+			avg_new=average $f
+			avg_old=average $f_old
+			diff=$(( 100-(($avg_new*100)/$avg_old) ))
+			echo -e "$f_name\t $diff %\t $avg_new sec.\t $avg_old sec." >> $summary
+		fi
+	done
+
+	info "Benchs summary:"
+	column -t -s $'\t' $summary
+	echo ""
 }
 
 bench() {
@@ -74,15 +131,17 @@ bench() {
 	current_folder=$(pwd)
 
 	action "Setup benches: cloning old TableauxRocq version"
+	mkdir $bench_results
 	clone_and_make
 
-	# run benches of old commit
-	# run benches of new commit
-	# summarise results
+	compile_with_time $folder "old"
+	cd $current_folder
+	compile_with_time $folder "new"
+	make_results_summary
 
-	action "Cleanup benches: remove old TableauxRocq version"
-	cd current_folder
+	action "Cleanup benches: remove old TableauxRocq version and temporary files"
 	rm -rf $old_TR_name
+	rm -rf $bench_results
 }
 
 compile_with_opt_bench() {
@@ -94,7 +153,7 @@ compile_with_opt_bench() {
 	else
 		for f in $(ls $folder/*.v); do
 			action "ROCQ compile $f"
-			if ROCQ_compile $f 2>/dev/null; then
+			if $ROCQ_compile $f 2>/dev/null; then
 				ok "$f has successfully compiled."
 			else
 				error "Could not compile $f."
