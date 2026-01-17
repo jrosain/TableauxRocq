@@ -55,7 +55,7 @@ Proof.
   (** The last three goals should always be automatically solved by [now esimpl]. *)
   3: { now esimpl. }
   3: { now esimpl. }
-  3: { esimpl. admit. (* TODO: skolemization [join] *) }
+  3: { now esimpl. }
 
   (** Then, we can go into the different branches. First, let's do the left one. *)
   { (** This is the branch where we have [Neg P a], hence we can directly conclude with the
@@ -80,7 +80,7 @@ Proof.
     1: reflexivity.
     1: reflexivity.
     reflexivity. }
-Admitted.
+Qed.
 
 (** The proof in inner Skolemization is the same, as we have no Skolem symbol here. *)
 Theorem inner_branching_proof :
@@ -97,7 +97,7 @@ Proof.
   eapply hasTableauNegAnd with (S1 := @empty_set string _) (S2 := \{ "X2" \})
                                (Sf1 := empty_record) (Sf2 := empty_record) (i := 1).
   1: reflexivity.
-  3-5: admit.
+  3-5: now esimpl.
   { eapply hasTableauContr with (i := 2) (j := 0).
     1: reflexivity.
     1: reflexivity.
@@ -113,4 +113,4 @@ Proof.
     1: reflexivity.
     1: reflexivity.
     reflexivity. }
-Admitted.
+Qed.

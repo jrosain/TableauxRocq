@@ -104,13 +104,13 @@ Section TableauxProofs.
   | hasTableauAll :
     forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
       (x : var) (F : Form),
-      (All F) \in Gamma -> isFresh x (fv Gamma) -> hasTableau_ (Gamma ,, F{0 \to Free x}) S Sf sigma ->
+      (All F) \in Gamma -> isFresh x (fv Gamma) = true -> hasTableau_ (Gamma ,, F{0 \to Free x}) S Sf sigma ->
       hasTableau_ Gamma (add x S) Sf sigma
 
    (** Delta rule *)
   | hasTableauNegAll :
     forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
-      (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) (con_sko_record Gamma)),
+      (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) (con_sko_record Gamma) = true),
       (Neg (All F)) \in Gamma -> hasTableau_ (set_con_sko_record
                                        (add_symbol (symbol sko t Hsko) F (con_sko_record Gamma))
                                        (Gamma ,, Neg F{0 \to t})) S Sf sigma ->

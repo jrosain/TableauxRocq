@@ -878,11 +878,11 @@ Section HasTableauLemmas.
       nth_error (forms Gamma) i = Some [[ EOr F G ]] ->
       hasTableau_ sko (Gamma ,, [[ F ]]) S1 Sf1 sigma ->
       hasTableau_ sko (Gamma ,, [[ G ]]) S2 Sf2 sigma -> disjoint S1 S2 = true ->
-      eqb S (S1 \union S2) = true -> Sf = (join Sf1 Sf2) -> (* TODO: eqb for sko_record *)
+      eqb S (S1 \union S2) = true -> eqb Sf (join Sf1 Sf2) = true ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????????? e htab1 htab2. rewrite disjoint_are_disjoint.
-    rewrite eqbIsEq. intros ? -> ->. eapply hasTableauOr.
+    rewrite !eqbIsEq. intros ? -> ->. eapply hasTableauOr.
     all: eauto.
     cbn in *; eapply con_nth_in; eauto.
   Qed.
@@ -893,7 +893,7 @@ Section HasTableauLemmas.
       nth_error (forms Gamma) i = Some [[ EImp F G ]] ->
       hasTableau_ sko (Gamma ,, [[ ENeg F ]]) S1 Sf1 sigma ->
       hasTableau_ sko (Gamma ,, [[ G ]]) S2 Sf2 sigma -> disjoint S1 S2 = true ->
-      eqb S (S1 \union S2) = true -> Sf = join Sf1 Sf2 ->
+      eqb S (S1 \union S2) = true -> eqb Sf (join Sf1 Sf2) = true ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????????? e htab1 htab2 hdisjoint e0 e1.
@@ -908,7 +908,7 @@ Section HasTableauLemmas.
       nth_error (forms Gamma) i = Some [[ ENeg (EAnd F G) ]] ->
       hasTableau_ sko (Gamma ,, (Or [[ ENeg F ]] [[ ENeg G ]]) ,, [[ ENeg F ]]) S1 Sf1 sigma ->
       hasTableau_ sko (Gamma ,, (Or [[ ENeg F ]] [[ ENeg G ]]) ,, [[ ENeg G ]]) S2 Sf2 sigma ->
-      disjoint S1 S2 = true -> eqb S (S1 \union S2) = true -> Sf = join Sf1 Sf2 ->
+      disjoint S1 S2 = true -> eqb S (S1 \union S2) = true -> eqb Sf (join Sf1 Sf2) = true ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????????? e htab1 htab2 e0 e1 hdisjoint. eapply hasTableauNegNeg.
@@ -931,7 +931,7 @@ Section HasTableauLemmas.
         S1 Sf1 sigma ->
       hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (EImp F G)) ]] ,, [[ ENeg (ENeg (EImp G F)) ]] ,,
                          [[ EImp F G ]] ,, [[ EImp G F ]] ,, [[ G ]] ,, [[ F ]]) S2 Sf2 sigma ->
-      disjoint S1 S2 = true -> eqb S (S1 \union S2) = true -> Sf = join Sf1 Sf2 ->
+      disjoint S1 S2 = true -> eqb S (S1 \union S2) = true -> eqb Sf (join Sf1 Sf2) = true ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????????? e htab1 htab2 hdisjoint ??. unshelve eapply hasTableauNegOr.
@@ -976,7 +976,7 @@ Section HasTableauLemmas.
              ++ rewrite disjoint_are_disjoint.
                 eapply empty_disjointr.
              ++ rewrite eqbIsEq //.
-             ++ reflexivity.
+             ++ rewrite eqbIsEq; reflexivity.
           -- replace S2 with (empty_set \union S2).
              replace Sf2 with (join empty_record Sf2).
              2: apply join_unitl.
@@ -999,7 +999,7 @@ Section HasTableauLemmas.
              ++ rewrite disjoint_are_disjoint.
                 apply empty_disjointl.
              ++ rewrite eqbIsEq //.
-             ++ reflexivity.
+             ++ rewrite eqbIsEq; reflexivity.
   Qed.
 
   Lemma hasTableauNegEqu :
@@ -1010,7 +1010,7 @@ Section HasTableauLemmas.
                          ,, [[ ENeg (ENeg F) ]] ,, [[ ENeg G ]] ,, [[ F ]]) S1 Sf1 sigma ->
       hasTableau_ sko (Gamma ,, [[ EOr (ENeg (EImp F G)) (ENeg (EImp G F)) ]] ,, [[ ENeg (EImp G F) ]]
                          ,, [[ ENeg (ENeg G) ]] ,, [[ ENeg F ]] ,, [[ G ]]) S2 Sf2 sigma ->
-      disjoint S1 S2 = true -> eqb S (S1 \union S2) = true -> Sf = join Sf1 Sf2 ->
+      disjoint S1 S2 = true -> eqb S (S1 \union S2) = true -> eqb Sf (join Sf1 Sf2) = true ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
     intros ??????????? e htab1 htab2 e1 e2 hdisjoint. unshelve eapply hasTableauNegNeg.
@@ -1036,7 +1036,7 @@ Section HasTableauLemmas.
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm)
       (x : string) (y : string),
-      nth_error (forms Gamma) i = Some [[ EAll x F ]] -> isFresh y (fv Gamma) ->
+      nth_error (forms Gamma) i = Some [[ EAll x F ]] -> isFresh y (fv Gamma) = true ->
       hasTableau_ sko (Gamma ,, [[ instantiate_eform x (EVar y) F ]]) S Sf sigma ->
       hasTableau_ sko Gamma (add y S) Sf sigma.
   Proof.
@@ -1053,7 +1053,7 @@ Section HasTableauLemmas.
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm) (x : string) (t : ETerm) (f : string)
       (hsko : is_sko (translate_ETerm [] t) (Neg (translate_EForm_ [x] F)) (fv Gamma)
-                (con_sko_record Gamma)),
+                (con_sko_record Gamma) = true),
       nth_error (forms Gamma) i = Some [[ ENeg (EAll x F) ]] -> symbol sko [[ t ]] hsko = f ->
       hasTableau_ sko (set_con_sko_record
                          (add_symbol (symbol sko [[t]] hsko) [[F]] (con_sko_record Gamma))
@@ -1069,7 +1069,7 @@ Section HasTableauLemmas.
   Lemma hasTableauEx :
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm) (x : string) (t : ETerm) (f : string)
-      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F))) (fv Gamma) (con_sko_record Gamma)),
+      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F))) (fv Gamma) (con_sko_record Gamma) = true),
       nth_error (forms Gamma) i = Some [[ EEx x F ]] -> symbol sko [[ t ]] hsko = f ->
       hasTableau_ sko (set_con_sko_record
                          (add_symbol (symbol sko [[t]] hsko) [[ENeg F]] (con_sko_record Gamma))
@@ -1093,7 +1093,7 @@ Section HasTableauLemmas.
   Lemma hasTableauNegEx :
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm) (x : string) (y : string),
-      nth_error (forms Gamma) i = Some [[ ENeg (EEx x F) ]] -> isFresh y (fv Gamma) ->
+      nth_error (forms Gamma) i = Some [[ ENeg (EEx x F) ]] -> isFresh y (fv Gamma) = true ->
       hasTableau_ sko (Gamma ,, [[EAll x (ENeg F)]] ,, [[ instantiate_eform x (EVar y) (ENeg F) ]])
         S Sf sigma -> hasTableau_ sko Gamma (add y S) Sf sigma.
   Proof using Type.

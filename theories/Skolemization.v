@@ -16,6 +16,7 @@ Section SkolemizationDef.
 
   Class SkoRecord_ :=
     { record :> Type
+    ; record_eqb :: EqBool record
     ; join : record -> record -> record
     ; add_symbol : func -> Form_ pred func var -> record -> record
     ; empty_record : record
@@ -25,10 +26,10 @@ Section SkolemizationDef.
 
   Class Skolemization_ :=
     { sko_record : SkoRecord_
-    ; is_sko :> Term_ func var -> Form_ pred func var -> set_var -> sko_record -> Prop
+    ; is_sko :> Term_ func var -> Form_ pred func var -> set_var -> sko_record -> bool
     ; symbol :
         forall (t : Term_ func var) (F : Form_ pred func var) (S : set_var) (Sf : sko_record),
-          is_sko t F S Sf -> func }.
+          is_sko t F S Sf = true -> func }.
 End SkolemizationDef.
 
 Arguments SkoRecord_ : clear implicits.
@@ -52,21 +53,22 @@ Section SkolemizationInstances.
     - exact set_func.
     - exact union.
     - exact empty_set.
+    - exact set_eqb.
     - intros f _ r. exact (add f r).
     - apply empty_unitr.
     - apply empty_unitl.
   Defined.
 
   (* Use this function to avoid repeating the match on useless terms *)
-  Definition gen_is_sko (t : Term_ func var) (P : func -> list (Term_ func var) -> Prop) : Prop :=
+  Definition SkoWrapper_is_sko (t : Term_ func var) (P : func -> list (Term_ func var) -> bool) : bool :=
     match t with
-    | Bound _ | Free _ => False
+    | Bound _ | Free _ => false
     | Fun f l => P f l
     end.
 
   (* Use this function to get the skolem symbol (it abstracts away the impossible cases) *)
-  Definition gen_symbol (t : Term_ func var) {P : func -> list (Term_ func var) -> Prop}
-    (hsko : gen_is_sko t P) : func.
+  Definition SkoWrapper_symbol (t : Term_ func var) {P : func -> list (Term_ func var) -> bool}
+    (hsko : SkoWrapper_is_sko t P = true) : func.
     refine
       (match t as t0 return t = t0 -> func with
        | Bound _ | Free _ => fun e => False_rect func _
@@ -74,6 +76,18 @@ Section SkolemizationInstances.
        end eq_refl).
     all: now rewrite e in hsko.
   Defined.
+
+  Definition is_fv_in (S : set_atom var) (t : Term_ func var) : bool :=
+    match t with
+    | Bound _ | Fun _ _ => false
+    | Free x => mem x S
+    end.
+
+  Definition only_fv_in (S : set_atom var) (t : Term_ func var) : bool :=
+    match t with
+    | Bound _ | Free _ => false
+    | Fun f l => forallb (is_fv_in S) l
+    end.
 
   Instance OuterSkolemization : Skolemization_ pred func var.
   Proof.
@@ -84,9 +98,9 @@ Section SkolemizationInstances.
       (* We want to check (i) that all the list [l] is composed of all the free variables of
          the set [S], and (ii) that the symbol [f] is fresh in the set of skolem symbols already
          appearing in the branch *)
-      exact (gen_is_sko t (fun f l => (forall (x : var), set_in (Free x) (from_list l) <-> set_in x S) /\
-                                     isFresh f Sf)).
-    - intros t ??? hsko. apply (gen_symbol t hsko).
+      exact (SkoWrapper_is_sko t
+               (fun f l => andb (only_fv_in S t) (isFresh f Sf))).
+    - intros t ??? hsko. apply (SkoWrapper_symbol t hsko).
   Defined.
 
   Instance InnerSkolemization : Skolemization_ pred func var.
@@ -98,9 +112,8 @@ Section SkolemizationInstances.
       (* We want to check (i) that the list [l] is composed of all the free variables appearing
          in the Skolemized formula [F], and (ii) that the symbol [f] is fresh in the set of
          Skolem symbols already appearing in the branch. *)
-      exact (gen_is_sko t (fun f l => (forall (x : var), set_in (Free x) (from_list l) <-> set_in x (fv F)) /\
-                                     isFresh f Sf)).
-    - intros t ??? hsko. apply (gen_symbol t hsko).
+      exact (SkoWrapper_is_sko t (fun f l => andb (only_fv_in (fv F) t) (isFresh f Sf))).
+    - intros t ??? hsko. apply (SkoWrapper_symbol t hsko).
   Defined.
 End SkolemizationInstances.
 

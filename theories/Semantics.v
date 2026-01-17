@@ -257,13 +257,14 @@ Section SemanticsFacts.
                          map (interpret_term rho1 sigma) l.
       { induction l as [|u us IHus]; cbn; auto.
         rewrite IHus.
-        - red in H |- *. cbn in H.
+        - red in H |- *. cbn in H. 
           now apply is_empty_union2 in H.
         - now apply Forall_tail in X.
         - apply Forall_In with (x := u) in X.
           2: now right.
           rewrite X; auto.
-          red in H; cbn in H. now apply is_empty_union1 in H. }
+          red in H; cbn in H. unfold isLocallyClosed.
+          now apply is_empty_union1 in H. }
       rewrite hmap //.
   Qed.
 
@@ -334,7 +335,7 @@ Section SemanticsFacts.
       for soundness, preferring [instantiate_by_free_imply_all]. *)
   Lemma interpret_fresh_free_var :
     forall (M : Model pred func) (F : Form) (x : var) (n : nat) (rho : list M) (sigma : env M var) (m : M),
-      isFresh x (fv F) ->
+      isFresh x (fv F) = true ->
       interpret_form_ M rho sigma (F {n \to Free x}) ->
       interpret_form_ M rho (fun z => match x == z with
                                  | left _ => Some m
@@ -345,7 +346,7 @@ Section SemanticsFacts.
 
   Lemma isFresh_env_None :
     forall (M : Model pred func) (F : Form) (x : var) (rho : list M) (sigma : env M var),
-      isFresh x (fv F) ->
+      isFresh x (fv F) = true ->
       interpret_form_ M rho sigma F =
         interpret_form_ M rho (fun z => match x == z with
                                    | left _ => None
@@ -367,7 +368,7 @@ Section SemanticsFacts.
 
   Lemma instantiate_by_free_equiv_all :
     forall (F : Form) (x : var),
-      isFresh x (fv F) ->
+      isFresh x (fv F) = true ->
       (F {0 \to Free x}) \equiv All F.
   Proof using set_nat.
     intros F x hfresh M; cbn. split.

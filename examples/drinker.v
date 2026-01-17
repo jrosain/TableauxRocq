@@ -83,8 +83,7 @@ Proof.
   (** [OuterSkolemization] stuff is basically saying that ["f"] should be fresh
       and that ["X"] are all the free variables of the branch. We can let [set_decide] do
       the job here as everything is encoded using sets. *)
-  1: { (* todo: make condition computational in skolemization *)
-    esimpl. admit. }
+  1: { now esimpl. }
 
   (** Now, we apply back the drinker formula, which is quite a long way off in the context. *)
   eapply hasTableauNegEx with (i := 6).
@@ -108,7 +107,7 @@ Proof.
 
   (** If everything is as expected, the goal can be closed by [reflexivity]. *)
   reflexivity.
-Admitted.
+Qed.
 
 (** In inner Skolemization, we only have to Skolemize once as ["X"] does not appear in the
     body of the Skolemized formula. As before, we provide the substitution using a finite list,
@@ -135,14 +134,17 @@ Proof.
   1, 2: shelve.
   1: exact (EFun "c" [ ]).
   2, 3: reflexivity.
-  1: { esimpl. admit. }
+  1: { now esimpl. }
 
   (** But now, we can directly find a contradiction between [Neg (P c)] and [P X]. *)
   eapply hasTableauContr with (i := 1) (j := 0).
   1: reflexivity.
   1: reflexivity.
+  Transparent eqb. simpl.
+  unfold etranslation_eform, inner_subst, translate_substitution.
   reflexivity.
 
-  (* TODO: figure out why [vm_compute] fails here *)
+  (* TODO: figure out why [vm_compute] fails here.
+     --> This is probably due to trying to simplify [isSubst]... *)
   (* Timeout 1 vm_compute. *)
-Admitted.
+Qed.

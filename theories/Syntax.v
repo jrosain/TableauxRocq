@@ -224,8 +224,8 @@ Section SubstOpeningLemmas.
       Forall isLocallyClosed l.
   Proof using Type.
     intros; apply In_Forall; intros t hin.
-    red in H; cbn in H. red. apply is_empty_spec'. intros n hin'.
-    apply (is_empty_spec n) in H; auto.
+    red in H; cbn in H. red. apply is_empty_spec'.
+    intros n hin'. apply (is_empty_spec n) in H; auto.
     induction l; inversion hin; auto; cbn; rewrite union_spec.
     - right. apply IHl; auto. cbn in H.
       now apply is_empty_union2 in H.
@@ -266,7 +266,8 @@ Section SubstOpeningLemmas.
         - red. cbn. apply is_empty_spec'.
           + intros x; rewrite union_spec; intros [].
             * apply Forall_inv in X, H.
-              apply X in H. red in H. apply is_empty_spec with (x := x) in H; auto.
+              apply X in H. red in H.
+              apply is_empty_spec with (x := x) in H; auto.
             * apply Forall_tail in X, H. specialize (IHts H X).
               red in IHts. apply is_empty_spec with (x := x) in IHts; auto. }
       red; now cbn.
