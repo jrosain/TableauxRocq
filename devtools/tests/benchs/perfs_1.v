@@ -17,9 +17,10 @@ Theorem T_proof :
 Proof.
   exists \{ "X6_13" , "Y8_17" \}, \{ "skolem@X10@0", "skolem@Y4@1" \}.
   unshelve eapply hasTableauNegAll with (sko := OuterSkolemization) (i := 0).
-  1, 2: shelve.
+  1-3: shelve.
   1: exact ((EFun "skolem@X10@0" [])).
   2, 3: reflexivity.
+  1: { now esimpl. }
   1: { now esimpl. }
   unshelve eapply hasTableauAll with (i := 2).
   1-3: shelve.
@@ -29,9 +30,10 @@ Proof.
   1: { reflexivity. }
   1: { now esimpl. }
   unshelve eapply hasTableauEx with (sko := OuterSkolemization) (i := 0).
-  1, 2: shelve.
+  1-3: shelve.
   1: exact ((EFun "skolem@Y4@1" [(EVar "X6_13")])).
   2, 3: reflexivity.
+  1: { now esimpl. }
   1: { now esimpl. }
   unshelve eapply hasTableauNegEx with (i := 3).
   1-3: shelve.

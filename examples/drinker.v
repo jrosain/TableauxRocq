@@ -85,12 +85,13 @@ Proof.
       further elaboration. *)
   unshelve eapply hasTableauNegAll with (sko := OuterSkolemization) (i := 1).
 
-  (** As we are only interested in the 3rd goal to continue, we can always shelve (i.e., let Rocq
-      infer the terms with what we give for the other goals) the first two goals after a
+  (* TODO: here *)
+  (** As we are only interested in the 4th goal to continue, we can always shelve (i.e., let Rocq
+      infer the terms with what we give for the other goals) the first three goals after a
       Skolemization rule. *)
-  1, 2: shelve.
+  1-3: shelve.
 
-  (** As the first two goals are shelved, the 3rd one becomes the 1st. *)
+  (** As the first two goals are shelved, the 4th one becomes the 1st. *)
   1: exact (EFun "f" [ EVar "X" ]).
 
   (** Note that we close the second and third goal first, in order to resolve the metavariables
@@ -101,9 +102,14 @@ Proof.
   2, 3: reflexivity.
 
   (** [OuterSkolemization] stuff is basically saying that ["f"] should be fresh
-      and that ["X"] are all the free variables of the branch. We can let [set_decide] do
+      and that ["X"] are all the free variables of the branch. We can let [esimpl] do
       the job here as everything is encoded using sets. *)
   1: { now esimpl. }
+
+  (** We now have to show that the symbol of the Skolemised function is indeed in the set
+      of skolem symbols we gave at the start. Once again, this goal is closed by [esimpl] as
+      it suffices to compute if something is a member of a set. *)
+  1: now esimpl.
 
   (** Now, we apply back the drinker formula, which is quite a long way off in the context. *)
   unshelve eapply hasTableauNegEx with (i := 6).
@@ -159,16 +165,15 @@ Proof.
 
   (** And we give ["c"] as the Skolem symbol here. *)
   unshelve eapply hasTableauNegAll with (sko := InnerSkolemization) (i := 1).
-  1, 2: shelve.
+  1-3: shelve.
   1: exact (EFun "c" [ ]).
   2, 3: reflexivity.
+  1: { now esimpl. }
   1: { now esimpl. }
 
   (** But now, we can directly find a contradiction between [Neg (P c)] and [P X]. *)
   eapply hasTableauContr with (i := 1) (j := 0).
   1: reflexivity.
   1: reflexivity.
-  Transparent eqb. simpl.
-  unfold etranslation_eform, inner_subst, translate_substitution.
   reflexivity.
 Qed.

@@ -13,9 +13,10 @@ Theorem T_proof:
 Proof.
   exists\{ "Y5_12"\}, \{ "skolem@X7@0"\}.
   unshelve eapply hasTableauNegAll with (sko := OuterSkolemization) (i := 0).
-  1, 2: shelve.
+  1-3: shelve.
   1: exact((EFun "skolem@X7@0"[])).
   2, 3: reflexivity.
+  1: { now esimpl. }
   1: { now esimpl. }
   eapply hasTableauNegImp with (i := 0).
   1: { reflexivity. }
