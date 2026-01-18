@@ -54,13 +54,13 @@ clone_and_make() {
 	old_commit=$(git merge-base origin/master $current_commit)
 
 	action "Cloning TableauxRocq with commit $old_commit"
-	command="git clone git@github.com:jrosain/TableauxRocq.git $old_TR_name"
+	command="git clone git@github.com:jrosain/TableauxRocq.git"
 
-	if [ ! -n $repo_token ]; then
-		command="git clone https://x-access-token:repo_token$@github.com/jrosain/TableauxRocq.git"
+	if [[ ! -z "$repo_token" ]]; then
+		command="git clone https://x-access-token:$repo_token@github.com/jrosain/TableauxRocq.git"
 	fi
 
-	if $($command); then
+	if $($command $old_TR_name); then
 		cd $old_TR_name
 		git config --add remote.origin.fetch "+refs/pull/*/head:refs/remotes/origin/pr/*"
 		git fetch --all
