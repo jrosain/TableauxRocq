@@ -50,6 +50,10 @@ bench_results=$(pwd)/results
 repo_token=$1
 
 clone_and_make() {
+	if [[ ! -z "$repo_token" ]]; then
+		git fetch --unshallow
+	fi
+
 	current_commit=$(git rev-parse HEAD)
 	old_commit=$(git merge-base origin/master $current_commit)
 
