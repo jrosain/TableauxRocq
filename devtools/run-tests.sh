@@ -121,13 +121,12 @@ make_results_summary() {
 		f_old=$f_name.old
 		if [ ! -f $f_old ]; then
 			avg=$(average $f)
-			# TODO: fix display + avg computation
 			echo -e "$(basename $f_name)\t -\t $avg sec.\t -" >> $summary
 		else
-			avg_new=average $f
-			avg_old=average $f_old
-			diff=$(( 100-(($avg_new*100)/$avg_old) ))
-			echo -e "$f_name\t $diff %\t $avg_new sec.\t $avg_old sec." >> $summary
+			avg_new=$(average $f)
+			avg_old=$(average $f_old)
+			diff=$(echo $avg_old $avg_new | awk '{ print 100 - (($1*100)/$2) }')
+			echo -e "$(basename $f_name)\t $diff %\t $avg_new sec.\t $avg_old sec." >> $summary
 		fi
 	done
 
@@ -146,6 +145,7 @@ bench() {
 
 	compile_with_time $folder "old"
 	cd $current_folder
+	info "Running benches for new version"
 	compile_with_time $folder "new"
 	make_results_summary
 
