@@ -1033,14 +1033,18 @@ Section HasTableauLemmas.
   Qed.
 
   Lemma hasTableauAll :
-    forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
-      (i : nat) (F : EForm)
-      (x : string) (y : string),
+    forall (Gamma : Con) (sigma : Substitution string Term) (S S0 : SetOfString) (Sf : sko_record)
+      (i : nat) (F : EForm) (x : string) (y : string),
       nth_error (forms Gamma) i = Some [[ EAll x F ]] -> isFresh y (fv Gamma) = true ->
-      hasTableau_ sko (Gamma ,, [[ instantiate_eform x (EVar y) F ]]) S Sf sigma ->
-      hasTableau_ sko Gamma (add y S) Sf sigma.
+      S0 = rem y S -> mem y S = true ->
+      hasTableau_ sko (Gamma ,, [[ instantiate_eform x (EVar y) F ]]) S0 Sf sigma ->
+      hasTableau_ sko Gamma S Sf sigma.
   Proof.
-    intros ???????? e hfresh htab. eapply hasTableauAll.
+    intros ????????? e hfresh eS hmem htab.
+    have eS0 : S = add y S0.
+    { rewrite eS add_rem; auto.
+      now rewrite -mem_spec. }
+    rewrite eS0. eapply hasTableauAll.
     - cbn in e. eapply con_nth_in; eauto.
     - assumption.
     - admit. (* TODO: [isFresh y S -> ~(y \in fv F) -> F{0 \to Free y} = instantiate_eform x (EVar y) F]
@@ -1091,20 +1095,22 @@ Section HasTableauLemmas.
   Qed.
 
   Lemma hasTableauNegEx :
-    forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
+    forall (Gamma : Con) (sigma : Substitution string Term) (S S0 : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm) (x : string) (y : string),
       nth_error (forms Gamma) i = Some [[ ENeg (EEx x F) ]] -> isFresh y (fv Gamma) = true ->
+      S0 = rem y S -> mem y S = true ->
       hasTableau_ sko (Gamma ,, [[EAll x (ENeg F)]] ,, [[ instantiate_eform x (EVar y) (ENeg F) ]])
-        S Sf sigma -> hasTableau_ sko Gamma (add y S) Sf sigma.
+        S0 Sf sigma -> hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
-    intros ???????? e hfresh htab. unshelve eapply hasTableauNegNeg.
+    intros ????????? e hfresh eS hmem htab. unshelve eapply hasTableauNegNeg.
     - exact i.
     - exact (EAll x (ENeg F)).
     - now cbn in e |- *.
     - unshelve eapply hasTableauAll.
-      1: exact 0.
-      3: reflexivity.
-      all: auto.
+      2: exact 0.
+      5: reflexivity.
+      1-2: shelve.
+      all: eauto.
       (* easy *) admit.
   Admitted.
 End HasTableauLemmas.

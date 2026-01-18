@@ -21,7 +21,11 @@ Proof.
   1: exact ((EFun "skolem@X10@0" [])).
   2, 3: reflexivity.
   1: { now esimpl. }
-  eapply hasTableauAll with (i := 2).
+  unshelve eapply hasTableauAll with (i := 2).
+  1-3: shelve.
+  1: exact "X6_13".
+  1: { reflexivity. }
+  1: { now esimpl. }
   1: { reflexivity. }
   1: { now esimpl. }
   unshelve eapply hasTableauEx with (sko := OuterSkolemization) (i := 0).
@@ -29,7 +33,11 @@ Proof.
   1: exact ((EFun "skolem@Y4@1" [(EVar "X6_13")])).
   2, 3: reflexivity.
   1: { now esimpl. }
-  eapply hasTableauNegEx with (i := 3).
+  unshelve eapply hasTableauNegEx with (i := 3).
+  1-3: shelve.
+  1: exact "Y8_17".
+  1: { reflexivity. }
+  1: { now esimpl. }
   1: { reflexivity. }
   1: { now esimpl. }
   eapply hasTableauContr with (i := 2) (j := 0).

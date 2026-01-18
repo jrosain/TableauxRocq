@@ -19,7 +19,11 @@ Proof.
   1: { now esimpl. }
   eapply hasTableauNegImp with (i := 0).
   1: { reflexivity. }
-  eapply hasTableauNegEx with(i := 1).
+  unshelve eapply hasTableauNegEx with(i := 1).
+  1-3: shelve.
+  1: exact "Y5_12".
+  1: { reflexivity. }
+  1: { now esimpl. }
   1: { reflexivity. }
   1: { now esimpl. }
   eapply hasTableauNegOr with(i := 0).

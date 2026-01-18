@@ -26,7 +26,11 @@ Proof.
   exists \{ "X", "X2" \}, \{\}.
 
   (** We start by creating a new free variable *)
-  eapply hasTableauNegEx with (i := 0).
+  unshelve eapply hasTableauNegEx with (i := 0).
+  1-3: shelve.
+  1: exact "X".
+  1: reflexivity.
+  1: now esimpl.
   1: reflexivity.
   1: now esimpl.
 
@@ -68,7 +72,11 @@ Proof.
   (** Next, let's do the right branch. *)
   { (** Here, we have to create another metavariable [X2] to conclude using [Neg P b].
         This is what we do with the first two rules. *)
-    eapply hasTableauNegEx with (i := 7).
+    unshelve eapply hasTableauNegEx with (i := 7).
+    1-3: shelve.
+    1: exact "X2".
+    1: reflexivity.
+    1: now esimpl.
     1: reflexivity.
     1: now esimpl.
 
@@ -87,7 +95,11 @@ Theorem inner_branching_proof :
   hasTableau InnerSkolemization {{ translate_EForm (ENeg branching) }} subst.
 Proof.
   exists \{ "X", "X2" \}, \{\}.
-  eapply hasTableauNegEx with (i := 0).
+  unshelve eapply hasTableauNegEx with (i := 0).
+  1-3: shelve.
+  1: exact "X".
+  1: reflexivity.
+  1: now esimpl.
   1: reflexivity.
   1: now esimpl.
 
@@ -102,7 +114,11 @@ Proof.
     1: reflexivity.
     1: reflexivity.
     reflexivity. }
-  { eapply hasTableauNegEx with (i := 7).
+  { unshelve eapply hasTableauNegEx with (i := 7).
+    1-3: shelve.
+    1: exact "X2".
+    1: reflexivity.
+    1: now esimpl.
     1: reflexivity.
     1: now esimpl.
 
