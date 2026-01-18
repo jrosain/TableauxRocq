@@ -25,6 +25,7 @@ jobs:
 
   Bench:
     runs-on: ubuntu-latest
+    if: github.event_name == "pull_request"
     needs: Build
     steps:
       - uses: actions/checkout@v3
