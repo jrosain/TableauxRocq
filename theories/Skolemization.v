@@ -14,15 +14,72 @@ Section SkolemizationDef.
   Let set_var := set_atom var.
   Let set_func := set_atom func.
 
-  Class SkoRecord_ :=
-    { record :> Type
-    ; record_eqb :: EqBool record
-    ; join : record -> record -> record
-    ; add_symbol : func -> Form_ pred func var -> record -> record
-    ; empty_record : record
+  Section SkoRecord.
+    (** A [SkoRecord_] is, morally, a key-value map, with keys being function symbols
+        and values first-order formulas. *)
+    Record SkoRecordData :=
+      { record :> Type
+      ; record_eqb :: EqBool record
 
-    ; join_unitr : forall (r : record), join r empty_record = r
-    ; join_unitl : forall (r : record), join empty_record r = r }.
+      ; value_record : func -> record -> option (Form_ pred func var)
+      ; join : record -> record -> record
+      ; diff_record : record -> record -> record
+      ; single_record : func -> Form_ pred func var -> record
+      ; empty_record : record }.
+    #[global] Arguments value_record {_} _ _.
+    #[global] Arguments diff_record {_} _ _.
+    #[global] Arguments join {_} _ _.
+    #[global] Arguments empty_record {_}.
+
+    Section SkoRecordDataDefs.
+      Context {RecordData : SkoRecordData}.
+
+      Definition in_record (f : func) (r : RecordData) : Prop :=
+        match value_record f r with
+        | None => False
+        | Some _ => True
+        end.
+
+      Definition mem_record (f : func) (r : RecordData) : bool :=
+        match value_record f r with
+        | None => false
+        | Some _ => true
+        end.
+
+      Lemma mem_record_spec :
+        forall (f : func) (r : RecordData),
+          mem_record f r = true <-> in_record f r.
+      Proof using Type.
+        intros. rewrite /mem_record /in_record.
+        destruct (value_record f r).
+        - tauto.
+        - easy.
+      Qed.
+    End SkoRecordDataDefs.
+
+    Class SkoRecordSpecs (RecordData : SkoRecordData) :=
+      { record_ext :
+        forall (r1 r2 : RecordData),
+          r1 = r2 <->
+            (forall (f : func), in_record f r1 <-> in_record f r2)
+      ; single_spec :
+        forall (f g : func) (F : Form_ pred func var),
+          in_record g (single_record RecordData f F) <-> g = f
+      ; join_spec :
+        forall (f : func) (r1 r2 : RecordData),
+          in_record f (join r1 r2) <-> in_record f r1 \/ in_record f r2
+      ; diff_record_spec  :
+        forall (f : func) (r1 r2 : RecordData),
+          in_record f (diff_record r1 r2) <->
+            in_record f r1 /\ ~ in_record f r2
+      ; value_record_spec1 :
+        forall (f : func), @value_record RecordData f empty_record = None
+      }.
+
+    Record SkoRecord_ :=
+      { data :> SkoRecordData
+      ; specs :: SkoRecordSpecs data }.
+  End SkoRecord.
 
   Class Skolemization_ :=
     { sko_record : SkoRecord_
@@ -32,12 +89,112 @@ Section SkolemizationDef.
           is_sko t F S Sf = true -> func }.
 End SkolemizationDef.
 
+Coercion specs : SkoRecord_ >-> SkoRecordSpecs.
+
+Arguments SkoRecordData : clear implicits.
 Arguments SkoRecord_ : clear implicits.
 
 Arguments Skolemization_ : clear implicits.
 Arguments sko_record {_ _ _} _.
 Arguments is_sko {_ _ _ _} _ _ _ _.
 Arguments symbol {_ _ _} _ _ {_ _ _} _.
+
+Section SkoSymbolLemmas.
+  Context {pred func var : Atom} {record : SkoRecord_ pred func var}.
+
+  Existing Instance eqb_atom.
+
+  Definition add_symbol (f : func) (F : Form_ pred func var) (r : record) : record :=
+    join (single_record record f F) r.
+
+  Definition rem_symbol (f : func) (F : Form_ pred func var) (r : record) : record :=
+    diff_record r (single_record record f F).
+
+  Lemma add_symbol_spec1 :
+    forall (f : func) (F : Form_ pred func var) (r : record),
+      in_record f (add_symbol f F r).
+  Proof using Type.
+    intros. unfold add_symbol.
+    rewrite join_spec. left.
+    now rewrite single_spec.
+  Qed.
+
+  Lemma add_symbol_spec2 :
+    forall (f g : func) (G : Form_ pred func var) (r : record),
+      in_record f r -> in_record f (add_symbol g G r).
+  Proof using Type.
+    intros ???? hin; unfold add_symbol.
+    rewrite join_spec. now right.
+  Qed.
+
+  Lemma add_symbol_inv :
+    forall (f g : func) (G : Form_ pred func var) (r : record),
+      in_record f (add_symbol g G r) -> f = g \/ in_record f r.
+  Proof using Type.
+    intros ???? hin. rewrite /add_symbol join_spec in hin. destruct hin as [hin | hin].
+    - rewrite single_spec in hin. now left.
+    - now right.
+  Qed.
+
+  Lemma rem_symbol_spec1 :
+    forall (f : func) (F : Form_ pred func var) (r : record),
+      ~ in_record f (rem_symbol f F r).
+  Proof using Type.
+    intros ??? hin; unfold rem_symbol in hin.
+    rewrite diff_record_spec in hin. destruct hin as (_ & h). apply h.
+    now rewrite single_spec.
+  Qed.
+
+  Lemma rem_symbol_spec2 :
+    forall (f g : func) (G : Form_ pred func var) (r : record),
+      in_record f (rem_symbol g G r) -> in_record f r.
+  Proof using Type.
+    intros ???? h. unfold rem_symbol in h.
+    rewrite diff_record_spec in h. now destruct h as [hin _].
+  Qed.
+
+  Lemma rem_symbol_spec3 :
+    forall (f g : func) (G : Form_ pred func var) (r : record),
+      f <> g -> in_record f r -> in_record f (rem_symbol g G r).
+  Proof using Type.
+    intros ???? n e. unfold rem. rewrite diff_record_spec.
+    split; auto. intro contra. apply n.
+    now rewrite single_spec in contra.
+  Qed.
+
+  Lemma add_rem_symbol :
+    forall (f : func) (F : Form_ pred func var) (r : record),
+      in_record f r -> add_symbol f F (rem_symbol f F r) = r.
+  Proof using Type.
+    intros ??? hin. rewrite record_ext; intros g; split; intro h.
+    - apply add_symbol_inv in h. destruct h as [ e | h ]; subst; auto.
+      eapply rem_symbol_spec2; eauto.
+    - unfold add_symbol. rewrite join_spec.
+      destruct (f == g) as [e | n].
+      + left. rewrite e. now rewrite single_spec.
+      + right. eapply rem_symbol_spec3; eauto.
+  Qed.
+
+  Lemma join_unitr :
+    forall (r : record),
+      join r empty_record = r.
+  Proof using Type.
+    intro; rewrite record_ext; intros f; split.
+    - rewrite join_spec; intros [h | contra]; auto.
+      unfold in_record in contra. now rewrite value_record_spec1 in contra.
+    - rewrite join_spec; intros h; auto.
+  Qed.
+
+  Lemma join_unitl :
+    forall (r : record),
+      join empty_record r = r.
+  Proof using Type.
+    intro; rewrite record_ext; intros f; split.
+    - rewrite join_spec; intros [contra | h]; auto.
+      unfold in_record in contra. now rewrite value_record_spec1 in contra.
+    - rewrite join_spec; intros h; auto.
+  Qed.
+End SkoSymbolLemmas.
 
 (** ** Some classic instances *)
 Section SkolemizationInstances.
@@ -46,17 +203,63 @@ Section SkolemizationInstances.
   Let set_var := set_atom var.
   Let set_func := set_atom func.
 
+  Existing Instance set_func.
+
   (** An instance of [SkoRecord] with sets. *)
-  Definition sko_record_sets : SkoRecord_ pred func var.
+  Definition SkoRecordData_sets :
+    SkoRecordData pred func var.
   Proof.
     unshelve econstructor.
     - exact set_func.
-    - exact union.
-    - exact empty_set.
     - exact set_eqb.
-    - intros f _ r. exact (add f r).
-    - apply empty_unitr.
-    - apply empty_unitl.
+    - exact (fun f s => if mem f s then Some (Neg Bot) else None).
+    - exact union.
+    - exact diff.
+    - exact (fun f _ => singleton f).
+    - exact empty_set.
+  Defined.
+
+  Lemma SkoRecordData_sets_in :
+    forall (f : func) (r : SkoRecordData_sets),
+      in_record f r <-> set_in f r.
+  Proof using Type.
+    intros; split; intro h.
+    - rewrite -mem_spec. rewrite -mem_record_spec in h. rewrite -h.
+      unfold mem_record, value_record; cbn.
+      destruct (mem f r); auto.
+    - rewrite -mem_record_spec. rewrite -mem_spec in h. rewrite -h.
+      unfold mem_record, value_record; cbn.
+      destruct (mem f r); auto.
+  Qed.
+
+  #[global] Instance SkoRecordSpecs_sets :
+    SkoRecordSpecs SkoRecordData_sets.
+  Proof using Type.
+    unshelve econstructor.
+    - intros. split; intro h.
+      + rewrite set_ext in h. intro; now rewrite !SkoRecordData_sets_in.
+      + rewrite set_ext. intro; now rewrite -!SkoRecordData_sets_in.
+    - intros; cbn. split; intro h.
+      + unfold in_record, value_record in h. cbn in h.
+        destruct (mem g (singleton f)) eqn:e.
+        * rewrite mem_spec in e. now apply singleton_spec in e.
+        * inversion h.
+      + have H : set_in g (singleton f).
+        { now rewrite singleton_spec. }
+        now rewrite SkoRecordData_sets_in.
+    - intros. rewrite !SkoRecordData_sets_in.
+      unfold join. cbn. apply union_spec.
+    - intros. rewrite !SkoRecordData_sets_in.
+      unfold diff_record. cbn. apply diff_spec.
+    - intros; cbn. destruct (mem f \{ \}) eqn:e; auto.
+      rewrite mem_spec in e. now apply empty_spec in e.
+  Qed.
+
+  Definition sko_record_sets : SkoRecord_ pred func var.
+  Proof.
+    unshelve econstructor.
+    - exact SkoRecordData_sets.
+    - typeclasses eauto.
   Defined.
 
   (* Use this function to avoid repeating the match on useless terms *)
@@ -89,7 +292,7 @@ Section SkolemizationInstances.
     | Fun f l => forallb (is_fv_in S) l
     end.
 
-  Instance OuterSkolemization : Skolemization_ pred func var.
+  Definition OuterSkolemization : Skolemization_ pred func var.
   Proof.
     unshelve econstructor.
     - exact sko_record_sets. (* in outer skolemization, we only worry about freshness of the
@@ -103,7 +306,7 @@ Section SkolemizationInstances.
     - intros t ??? hsko. apply (SkoWrapper_symbol t hsko).
   Defined.
 
-  Instance InnerSkolemization : Skolemization_ pred func var.
+  Definition InnerSkolemization : Skolemization_ pred func var.
   Proof.
     unshelve econstructor.
     - exact sko_record_sets. (* in inner skolemization, we also only care about freshness of the
