@@ -1054,44 +1054,50 @@ Section HasTableauLemmas.
   Existing Instance fv_ctx.
 
   Lemma hasTableauNegAll :
-    forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
+    forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf Sf0 : sko_record)
       (i : nat) (F : EForm) (x : string) (t : ETerm) (f : string)
       (hsko : is_sko (translate_ETerm [] t) (Neg (translate_EForm_ [x] F)) (fv Gamma)
                 (con_sko_record Gamma) = true),
       nth_error (forms Gamma) i = Some [[ ENeg (EAll x F) ]] -> symbol sko [[ t ]] hsko = f ->
-      hasTableau_ sko (set_con_sko_record
-                         (add_symbol (symbol sko [[t]] hsko) [[F]] (con_sko_record Gamma))
-                         (Gamma ,, [[ instantiate_eform x t (ENeg F) ]])) S Sf sigma ->
-      hasTableau_ sko Gamma S (add_symbol f (translate_EForm_ [x] F) Sf) sigma.
+      Sf0 = rem_symbol f (translate_EForm_ [x] F) Sf -> in_record f Sf ->
+      hasTableau_ sko
+        (set_con_sko_record
+           (add_symbol (symbol sko [[t]] hsko) [[F]] (con_sko_record Gamma))
+           (Gamma ,, [[ instantiate_eform x t (ENeg F) ]])) S Sf0 sigma ->
+      hasTableau_ sko Gamma S Sf sigma.
   Proof.
-    intros ????????? hsko e [] htab.
-    apply (hasTableauNegAll sko Gamma S Sf sigma (translate_EForm_ [x] F) [[ t ]] hsko).
-    - cbn in e |- *; eapply con_nth_in; eauto.
+    intros ??????????? e0 e1 e2 hin htab.
+    have e3 : Sf = add_symbol (symbol sko [[t]] hsko) (translate_EForm_ [x] F) Sf0.
+    { rewrite e1 e2. symmetry; now apply add_rem_symbol. }
+    rewrite e3.
+    apply (hasTableauNegAll sko Gamma S Sf0 sigma (translate_EForm_ [x] F) [[ t ]] hsko).
+    - cbn in e0 |- *; eapply con_nth_in; eauto.
     - admit. (* TODO: [is_sko t F Sf S -> ~(y \in fv F) -> F{0 \to t} = instantiate_eform x t F] *)
   Admitted.
 
   Lemma hasTableauEx :
-    forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf : sko_record)
+    forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf Sf0 : sko_record)
       (i : nat) (F : EForm) (x : string) (t : ETerm) (f : string)
-      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F))) (fv Gamma) (con_sko_record Gamma) = true),
+      (hsko : is_sko [[ t ]] (Neg (translate_EForm_ [x] (ENeg F)))
+                (fv Gamma) (con_sko_record Gamma) = true),
       nth_error (forms Gamma) i = Some [[ EEx x F ]] -> symbol sko [[ t ]] hsko = f ->
+      Sf0 = rem_symbol f (translate_EForm_ [x] (ENeg F)) Sf -> in_record f Sf ->
       hasTableau_ sko (set_con_sko_record
                          (add_symbol (symbol sko [[t]] hsko) [[ENeg F]] (con_sko_record Gamma))
                          (Gamma ,, [[ ENeg (ENeg (instantiate_eform x t F)) ]] ,,
-                            [[ instantiate_eform x t F ]])) S Sf sigma ->
-      hasTableau_ sko Gamma S (add_symbol f (translate_EForm_ [x] (ENeg F)) Sf) sigma.
+                            [[ instantiate_eform x t F ]])) S Sf0 sigma ->
+      hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
-    intros ????????? hsko e e' htab. unshelve eapply hasTableauNegAll.
-    1: exact i.
+    intros ??????????? e0 e1 e2 e3 htab. eapply hasTableauNegAll.
+    all: eauto.
+    Unshelve.
+    3: exact i.
+    all: eauto.
+    unshelve eapply hasTableauNegNeg.
+    1: exact 0.
     1: shelve.
-    - eassumption.
-    - assumption.
-    - assumption.
-    - unshelve eapply hasTableauNegNeg.
-      1: exact 0.
-      1: shelve.
-      1: reflexivity.
-      assumption.
+    1: reflexivity.
+    assumption.
   Qed.
 
   Lemma hasTableauNegEx :
