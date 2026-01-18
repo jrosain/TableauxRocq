@@ -47,14 +47,20 @@ fi
 bench_n_compilations=10
 old_TR_name="TR_old"
 bench_results=$(pwd)/results
+repo_token=$1
 
 clone_and_make() {
 	current_commit=$(git rev-parse HEAD)
 	old_commit=$(git merge-base origin/master $current_commit)
 
 	action "Cloning TableauxRocq with commit $old_commit"
+	command="git clone git@github.com:jrosain/TableauxRocq.git $old_TR_name"
 
-	if git clone git@github.com:jrosain/TableauxRocq.git $old_TR_name; then
+	if [ ! -n $repo_token ]; then
+		command="git clone https://x-access-token:repo_token$@github.com/jrosain/TableauxRocq.git"
+	fi
+
+	if $($command); then
 		cd $old_TR_name
 		git config --add remote.origin.fetch "+refs/pull/*/head:refs/remotes/origin/pr/*"
 		git fetch --all
