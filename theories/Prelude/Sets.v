@@ -8,25 +8,31 @@ From Stdlib Require Import MSets.MSetProperties.
 From Stdlib Require Import MSets.MSetFacts.
 From Stdlib Require Import MSets.MSetDecide.
 
+Create HintDb set_db.
+
 (** ** Axiomatization of sets as a typeclass *)
 Class set {A : Type} :=
   { car :> Type
 
+  ; set_eqb :: EqBool car
+
   (** *** Basic set operations *)
   ; empty_set : car
-  ; mem : A -> car -> Prop
+  ; mem : A -> car -> bool       (** Use [mem] in definitions to compute *)
+  ; set_in : A -> car -> Prop    (** Use [mem_spec] to convert [mem] to [set_in] in proofs *)
   ; union : car -> car -> car
   ; inter : car -> car -> car
   ; singleton : A -> car
 
   (** *** Extensionality property of sets *)
-  ; set_ext : forall (s1 s2 : car), s1 = s2 <-> (forall (x : A), mem x s1 <-> mem x s2)
+  ; set_ext : forall (s1 s2 : car), s1 = s2 <-> (forall (x : A), set_in x s1 <-> set_in x s2)
 
   (** *** Properties of defined operations *)
-  ; empty_spec : forall (x : A), mem x empty_set -> False
-  ; singleton_spec : forall (x y : A), mem x (singleton y) <-> x = y
-  ; union_spec : forall (x : A) (s1 s2 : car), mem x (union s1 s2) <-> mem x s1 \/ mem x s2
-  ; inter_spec : forall (x : A) (s1 s2 : car), mem x (inter s1 s2) <-> mem x s1 /\ mem x s2 }.
+  ; empty_spec : forall (x : A), set_in x empty_set -> False
+  ; mem_spec : forall (x : A) (s : car), mem x s = true <-> set_in x s
+  ; singleton_spec : forall (x y : A), set_in x (singleton y) <-> x = y
+  ; union_spec : forall (x : A) (s1 s2 : car), set_in x (union s1 s2) <-> set_in x s1 \/ set_in x s2
+  ; inter_spec : forall (x : A) (s1 s2 : car), set_in x (inter s1 s2) <-> set_in x s1 /\ set_in x s2 }.
 Arguments set : clear implicits.
 
 Notation "S1 \union S2" := (union S1 S2) (at level 30).
@@ -40,21 +46,21 @@ Section SetProperties.
 
   Lemma add_spec1 :
     forall (x : A) (s : set_A),
-      mem x (add x s).
+      set_in x (add x s).
   Proof using Type.
     intros x s; unfold add. rewrite union_spec. left. rewrite singleton_spec. reflexivity.
   Qed.
 
   Lemma add_spec2 :
     forall (x y : A) (s : set_A),
-      mem x s -> mem x (add y s).
+      set_in x s -> set_in x (add y s).
   Proof using Type.
     intros x y s hin; unfold add. rewrite union_spec. now right.
   Qed.
 
   Lemma add_inv :
     forall (x y : A) (s : set_A),
-      mem x (add y s) -> x = y \/ mem x s.
+      set_in x (add y s) -> x = y \/ set_in x s.
   Proof using Type.
     intros ??? hin. rewrite /add union_spec in hin. destruct hin as [hin | hin].
     - rewrite singleton_spec in hin. now left.
@@ -72,7 +78,7 @@ Section SetProperties.
   Qed.
 
   Definition subset (s1 s2 : set_A) :=
-    forall (x : A), mem x s1 -> mem x s2.
+    forall (x : A), set_in x s1 -> set_in x s2.
 
   #[global] Instance reflexive_subset : Reflexive subset.
   Proof using Type. intro. unfold subset. tauto. Qed.
@@ -87,7 +93,7 @@ Section SetProperties.
 
   Lemma is_empty_spec :
     forall (x : A) (s : set_A),
-      is_empty s -> mem x s -> False.
+      is_empty s -> set_in x s -> False.
   Proof using Type. intros ?? e. rewrite e. apply empty_spec. Qed.
 
   Lemma empty_is_empty :
@@ -96,7 +102,7 @@ Section SetProperties.
 
   Lemma is_empty_spec' :
     forall (s : set_A),
-      (forall (x : A), mem x s -> False) -> is_empty s.
+      (forall (x : A), set_in x s -> False) -> is_empty s.
   Proof using Type.
     intros. have e : s = empty_set.
     { apply set_ext; intro y; cbn. split.
@@ -129,12 +135,12 @@ Section SetProperties.
 
   Lemma mem_unionl :
     forall (x : A) (s1 s2 : set_A),
-      mem x s1 -> mem x (union s1 s2).
+      set_in x s1 -> set_in x (union s1 s2).
   Proof using Type. intros. rewrite union_spec. now left. Qed.
 
   Lemma mem_unionr :
     forall (x : A) (s1 s2 : set_A),
-      mem x s2 -> mem x (union s1 s2).
+      set_in x s2 -> set_in x (union s1 s2).
   Proof using Type. intros. rewrite union_spec. now right. Qed.
 
   Lemma empty_unitl :
@@ -181,6 +187,7 @@ Section SetProperties.
     intros; apply set_ext; intro; split; intro hin; rewrite !union_spec in hin |- *;
       destruct hin as [hin | hin]; try destruct hin as [hin | hin]; firstorder.
   Qed.
+  Hint Rewrite empty_unitl empty_unitr union_idemp union_assoc : set_db.
 
   Lemma inter_sym :
     forall (s1 s2 : set_A), inter s1 s2 = inter s2 s1.
@@ -189,11 +196,22 @@ Section SetProperties.
       firstorder.
   Qed.
 
-  Definition disjoint (s1 s2 : set_A) := inter s1 s2 = empty_set.
+  Definition disjoint (s1 s2 : set_A) := Classes.eqb (s1 \inter s2) empty_set.
+  Definition are_disjoint (s1 s2 : set_A) := s1 \inter s2 = empty_set.
+  Hint Unfold are_disjoint : set_db.
+
+  Lemma disjoint_are_disjoint :
+    forall (s1 s2 : set_A),
+      disjoint s1 s2 = true <-> are_disjoint s1 s2.
+  Proof using Type.
+    intros. transitivity (forall (x : A), set_in x (s1 \inter s2) <-> set_in x empty_set).
+    - rewrite eqbIsEq. apply set_ext.
+    - symmetry. apply set_ext.
+  Qed.
 
   Lemma empty_disjointl :
     forall (s : set_A),
-      disjoint empty_set s.
+      are_disjoint empty_set s.
   Proof using Type.
     intro s. apply set_ext; intro; split; intro hin.
     - now rewrite inter_spec in hin.
@@ -202,14 +220,14 @@ Section SetProperties.
 
   Lemma empty_disjointr :
     forall (s : set_A),
-      disjoint s empty_set.
-  Proof using Type. intro; unfold disjoint. rewrite inter_sym. apply empty_disjointl. Qed.
+      are_disjoint s empty_set.
+  Proof using Type. intro; autounfold with set_db. rewrite inter_sym. apply empty_disjointl. Qed.
 
   Lemma disjoint_sym :
     forall (s1 s2 : set_A),
-      disjoint s1 s2 <-> disjoint s2 s1.
+      are_disjoint s1 s2 <-> are_disjoint s2 s1.
   Proof using Type.
-    intros s1 s2; unfold disjoint. split; intro e;
+    intros s1 s2; autounfold with set_db. split; intro e;
       now rewrite inter_sym.
   Qed.
 
@@ -218,23 +236,17 @@ Section SetProperties.
       (fold_left (fun (s : set_A) (b : B) => union s (f b)) l s) =
         s \union (fold_left (fun (s : set_A) (b : B) => union s (f b)) l empty_set).
   Proof using Type.
-    intros???; induction l as [|y ys IHys]; intros; cbn in *.
-    - now rewrite empty_unitr.
-    - rewrite empty_unitl. rewrite IHys; cbn.
+    intros???; induction l as [|y ys IHys]; intros; cbn in *; autorewrite with set_db.
+    - reflexivity.
+    - rewrite IHys; cbn.
       have e0 : fold_left (fun (s0 : set_A) (b : B) => s0 \union f b) ys (f y) =
                   (f y) \union fold_left (fun (s0 : set_A) (b : B) => s0 \union f b) ys empty_set.
       { apply IHys. }
       rewrite e0 union_assoc //.
   Qed.
-
-  (* TODO: rewrite it with equalities. Maybe this is the thing above? *)
-  Lemma mem_fold_left_cons_unionl :
-    forall {B : Type} (f : B -> set_A) (b : B) (l : list B) (x : A) (s : set_A),
-      mem x (fold_left (fun (s : set_A) (b : B) => union s (f b)) (b :: l) s) <->
-        mem x (union ((fold_left (fun (s : set_A) (b : B) => union s (f b)) l s)) (f b)).
-  Proof.
-    Admitted.
 End SetProperties.
+Hint Rewrite @empty_unitl @empty_unitr @union_idemp @union_assoc : set_db.
+Hint Unfold are_disjoint : set_db.
 
 (** We denote [\{ x, y, ..., z \}] for finite sets *)
 Notation "\{ \}" := empty_set.
@@ -255,11 +267,13 @@ Module SetComputationalInstances.
     Parameter lt_compat : Proper (eq ==> eq ==> iff) lt.
     Parameter compare : t -> t -> comparison.
     Parameter compare_spec : forall (x y : t), CompareSpec (x = y) (lt x y) (lt y x) (compare x y).
-    Parameter eq_dec : EqDec t.
+    Parameter eq_bool : EqBool t.
   End SimpleOrderedType.
 
   (** Generic instantiation of our [set] from an ordered type *)
   Module SetFromOrdered (X : SimpleOrderedType).
+    Existing Instance X.eq_bool.
+
     Module X_ <: OrderedType.
       Definition t := X.t.
       Definition eq (x y : t) := x = y.
@@ -270,7 +284,7 @@ Module SetComputationalInstances.
       Definition lt_compat := X.lt_compat.
       Definition compare := X.compare.
       Definition compare_spec := X.compare_spec.
-      Definition eq_dec := X.eq_dec.
+      Definition eq_dec := eq_dec_from_eq_bool X.t.
     End X_.
 
     Module SetOfX_ := MSetAVL.Make X_.
@@ -326,11 +340,29 @@ Module SetComputationalInstances.
       intros; rewrite SetOfX_.singleton_spec. reflexivity.
     Qed.
 
+    Lemma SetOfX_equal_eq :
+      forall x y : SetOfX_.t, SetOfX_.equal x y = true <-> x = y.
+    Proof.
+      intros; split.
+      - intro heq. apply SetOfXFacts.equal_2 in heq. now rewrite set_equal_is_eq in heq.
+      - intros []. apply SetOfXFacts.equal_1. apply SetOfXProps.equal_refl.
+    Qed.
+
+    Instance SetOfX_EqBool : EqBool SetOfX_.t.
+    Proof.
+      unshelve econstructor.
+      - exact SetOfX_.equal.
+      - exact SetOfX_equal_eq.
+    Defined.
+
     #[global] Instance set_of_ordered : set X.t :=
       {| car := SetOfX_.t
 
+      ;  set_eqb := ltac:(typeclasses eauto)
+
       ;  empty_set := SetOfX_.empty
-      ;  mem := SetOfX_.In
+      ;  mem := SetOfX_.mem
+      ;  set_in := SetOfX_.In
       ;  union := SetOfX_.union
       ;  inter := SetOfX_.inter
       ;  singleton := SetOfX_.singleton
@@ -339,6 +371,7 @@ Module SetComputationalInstances.
 
       ;  empty_spec := SetOfX_empty_spec
       ;  singleton_spec := SetOfX_singleton_spec
+      ;  mem_spec x s := SetOfX_.mem_spec s x
       ;  union_spec x s1 s2 := SetOfX_.union_spec s1 s2 x
       ;  inter_spec x s1 s2 := SetOfX_.inter_spec s1 s2 x |}.
   End SetFromOrdered.
@@ -351,7 +384,7 @@ Module SetComputationalInstances.
     Definition lt_compat := PeanoNat.Nat.lt_compat.
     Definition compare := PeanoNat.Nat.compare.
     Definition compare_spec := PeanoNat.Nat.compare_spec.
-    Definition eq_dec := @eqDec nat _.
+    Definition eq_bool : EqBool nat := ltac:(typeclasses eauto).
   End OrderedNat.
 
   Module SetOfNat_ := SetFromOrdered OrderedNat.
@@ -404,7 +437,7 @@ Module SetComputationalInstances.
         + inversion e.
         + left. rewrite /Ascii.compare BinNat.N.compare_gt_iff // in ea.
     Qed.
-    Definition eq_dec := @eqDec string _.
+    Definition eq_bool : EqBool string := ltac:(typeclasses eauto).
   End OrderedString.
 
   Module SetOfString_ := SetFromOrdered OrderedString.

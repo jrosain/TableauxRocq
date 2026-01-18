@@ -60,50 +60,51 @@ End TermInd.
 (** *** Decidable equality for terms *)
 Section DecEqTerms.
   Context {func var : Atom}.
-  Existing Instance eq_dec_atom.
+  Existing Instance eqb_atom.
+
+  Fixpoint eqb_term (t u : Term_ func var) : bool :=
+    match t, u with
+    | Bound n, Bound m | Free n, Free m => eqb n m
+    | Fun f l, Fun g l' =>
+        eqb f g && forallb2 eqb_term l l'
+    | _, _ => false
+    end.
+
+  Lemma eqb_term_eq :
+    forall t u : Term_ func var, eqb_term t u = true <-> t = u.
+  Proof.
+    intros t; induction t as [n | x | f xs IHxs] using term_rect';
+      intro u; destruct u as [m | y | g ys]; split; cbn.
+    all: try (now intro).
+    - intro heqb. rewrite eqbIsEq in heqb. rewrite heqb //.
+    - intro e. injection e => ->. rewrite eqbIsEq //.
+    - rewrite eqbIsEq. now intros ->.
+    - intros e; injection e => ->. rewrite eqbIsEq //.
+    - admit. (* easy, todo *)
+    - intros e; injection e => -> ->. admit. (* easy *)
+  Admitted.
+
+  #[global] Instance EqBool_term : EqBool (Term_ func var).
+  Proof.
+    unshelve econstructor.
+    - exact eqb_term.
+    - exact eqb_term_eq.
+  Defined.
 
   #[global] Instance eqDec_Term : EqDec (Term_ func var).
-  Proof using Type.
-    intros t; induction t as [n | x | f xs IHxs] using term_rect';
-      intro u; destruct u as [m | y | g ys].
-    all: try (right; intro contra; inversion contra; fail).
-    - destruct (n == m).
-      + left; now f_equal.
-      + right; intro e. injection e => e'. now apply n0.
-    - destruct (x == y).
-      + left; now f_equal.
-      + right; intro e. injection e => e'. now apply n.
-    - destruct (f == g).
-      2: right; intro e; injection e => e0 e1; now apply n.
-      generalize dependent xs. induction ys as [|y ys IHys]; destruct xs as [|x xs].
-      2,3: right; intro e0; injection e0 => e0' e1; inversion e0'.
-      + left; now rewrite e.
-      + intros IHxs. specialize (IHys xs).
-        have H : (forall t : Term_ func var, In t xs -> forall y : Term_ func var, {t = y} + {t <> y}).
-        { intros t Hin z. apply IHxs. now left. }
-        specialize (IHxs x (inright eq_refl)).
-        destruct (IHxs y).
-        2: right; intro e0; injection e0 => e1 e2 e3; now apply n.
-        specialize (IHys H). destruct IHys as [e1 | ne1].
-        * left. rewrite e0. injection e1 => e1' e1''. now rewrite e1' e1''.
-        * right; intro e1. injection e1 => e2 e3 e4. apply ne1.
-          rewrite e e2 //.
-  Qed.
+  Proof using Type. typeclasses eauto. Defined.
 End DecEqTerms.
 
 (** *** Opening and substitution for terms *)
 Section OpeningSubstTerms.
   Context {func var : Atom} `{set_nat : set nat}.
-  Existing Instance eq_dec_atom.
+  Existing Instance eqb_atom.
 
   #[global] Instance opening_term : Opening (Term_ func var) (Term_ func var) :=
     fun n u =>
       fix F (t : Term_ func var) : Term_ func var :=
       match t with
-      | Bound m => match n == m with
-                  | left _ => u
-                  | right _ => t
-                  end
+      | Bound m => if eqb n m then u else t
       | Free  _ => t
       | Fun f l => Fun f (map F l)
       end.
@@ -154,7 +155,7 @@ Arguments Form_ : clear implicits.
 (** *** Decidable equality for formulas *)
 Section DecEqForms.
   Context {pred func var : Atom}.
-  Existing Instance eq_dec_atom.
+  Existing Instance eqb_atom.
   Existing Instance eq_dec_list.
 
   #[global] Instance eq_dec_form : EqDec (Form_ pred func var).
@@ -223,8 +224,8 @@ Section SubstOpeningLemmas.
       Forall isLocallyClosed l.
   Proof using Type.
     intros; apply In_Forall; intros t hin.
-    red in H; cbn in H. red. apply is_empty_spec'. intros n hin'.
-    apply (is_empty_spec n) in H; auto.
+    red in H; cbn in H. red. apply is_empty_spec'.
+    intros n hin'. apply (is_empty_spec n) in H; auto.
     induction l; inversion hin; auto; cbn; rewrite union_spec.
     - right. apply IHl; auto. cbn in H.
       now apply is_empty_union2 in H.
@@ -265,7 +266,8 @@ Section SubstOpeningLemmas.
         - red. cbn. apply is_empty_spec'.
           + intros x; rewrite union_spec; intros [].
             * apply Forall_inv in X, H.
-              apply X in H. red in H. apply is_empty_spec with (x := x) in H; auto.
+              apply X in H. red in H.
+              apply is_empty_spec with (x := x) in H; auto.
             * apply Forall_tail in X, H. specialize (IHts H X).
               red in IHts. apply is_empty_spec with (x := x) in IHts; auto. }
       red; now cbn.
@@ -276,7 +278,8 @@ Section SubstOpeningLemmas.
       (t { x \to u })@[sigma] = t@[sigma] { x \to u@[sigma] }.
   Proof using Type.
     intros t; induction t using term_ind; intros; cbn.
-    - destruct (x == n); cbn; auto.
+    - rewrite -!match_eq_dec_eq_bool.
+      destruct (x == n); cbn; auto.
     - destruct sigma as [sigma Hsigma]; cbn.
       rewrite term_locally_closed_inst; auto.
     - rewrite !map_map; cbn.
@@ -515,7 +518,7 @@ Module ConcreteSyntaxInstances.
         + now do 2 constructor.
     Admitted.
 
-    Definition eq_dec := @eqDec Term _.
+    Definition eq_bool : EqBool Term := ltac:(typeclasses eauto).
   End OrderedTerm.
 
   Module SetOfTerm_ := SetFromOrdered OrderedTerm.

@@ -28,7 +28,7 @@ Proof.
   (** We start by creating a new free variable *)
   eapply hasTableauNegEx with (i := 0).
   1: reflexivity.
-  1: set_decide.
+  1: now esimpl.
 
   (** Then, the proof progresses as expected. *)
   eapply hasTableauNegImp with (i := 0).
@@ -52,8 +52,10 @@ Proof.
   (** The first goal is, as always, [reflexivity]. *)
   1: reflexivity.
 
-  (** The last three goals should always be automatically solved by [set_decide]. *)
-  3-5: set_decide.
+  (** The last three goals should always be automatically solved by [now esimpl]. *)
+  3: { now esimpl. }
+  3: { now esimpl. }
+  3: { now esimpl. }
 
   (** Then, we can go into the different branches. First, let's do the left one. *)
   { (** This is the branch where we have [Neg P a], hence we can directly conclude with the
@@ -61,14 +63,14 @@ Proof.
     eapply hasTableauContr with (i := 2) (j := 0).
     1: reflexivity.
     1: reflexivity.
-    now esimpl. }
+    reflexivity. }
 
   (** Next, let's do the right branch. *)
   { (** Here, we have to create another metavariable [X2] to conclude using [Neg P b].
         This is what we do with the first two rules. *)
     eapply hasTableauNegEx with (i := 7).
     1: reflexivity.
-    1: set_decide.
+    1: now esimpl.
 
     eapply hasTableauNegImp with (i := 0).
     1: reflexivity.
@@ -77,7 +79,7 @@ Proof.
     eapply hasTableauContr with (i := 0) (j := 5).
     1: reflexivity.
     1: reflexivity.
-    now esimpl. }
+    reflexivity. }
 Qed.
 
 (** The proof in inner Skolemization is the same, as we have no Skolem symbol here. *)
@@ -87,7 +89,7 @@ Proof.
   exists \{ "X", "X2" \}, \{\}.
   eapply hasTableauNegEx with (i := 0).
   1: reflexivity.
-  1: set_decide.
+  1: now esimpl.
 
   eapply hasTableauNegImp with (i := 0).
   1: reflexivity.
@@ -95,14 +97,14 @@ Proof.
   eapply hasTableauNegAnd with (S1 := @empty_set string _) (S2 := \{ "X2" \})
                                (Sf1 := empty_record) (Sf2 := empty_record) (i := 1).
   1: reflexivity.
-  3-5: set_decide.
+  3-5: now esimpl.
   { eapply hasTableauContr with (i := 2) (j := 0).
     1: reflexivity.
     1: reflexivity.
-    now esimpl. }
+    reflexivity. }
   { eapply hasTableauNegEx with (i := 7).
     1: reflexivity.
-    1: set_decide.
+    1: now esimpl.
 
     eapply hasTableauNegImp with (i := 0).
     1: reflexivity.
@@ -110,5 +112,5 @@ Proof.
     eapply hasTableauContr with (i := 0) (j := 5).
     1: reflexivity.
     1: reflexivity.
-    now esimpl. }
+    reflexivity. }
 Qed.
