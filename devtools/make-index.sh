@@ -12,10 +12,15 @@ footer=$(cat devtools/extra/footer.html)
 index=$(cat devtools/extra/index.html | awk '/<\/head>/ {seen = 1} seen {print}')
 index=$(echo $index | tail -n +1 | head -n +2)
 
+declare -A theories
+theories["theories"]="Tableaux\\."
+theories["examples"]=""
+
 # Replace '/' by '.' in the hrefs
-for prefix in "theories" "examples"; do
-	for link in $(echo "$index" | grep -o "$prefix/[^\\.]*\.v"); do
-		new_link=$(echo $link | sed -e 's#/#.#g' | sed -e 's/\.v/\.html/g')
+for key in ${!theories[@]}; do
+	for link in $(echo "$index" | grep -o "${key}/[^\\.]*\.v"); do
+		new_link=$(echo $link | sed -e "s#${key}/#${theories[${key}]}#g" \
+					   | sed -e 's/\.v/\.html/g')
 		index=$(echo "$index" | sed -e "s#${link}#${new_link}#g")
 	done
 done

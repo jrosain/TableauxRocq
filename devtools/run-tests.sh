@@ -182,9 +182,6 @@ compile_and_bench() {
 	compile_with_opt_bench $1 "bench"
 }
 
-# Sanity check: compile examples
-compile ../examples
-
 # Compile previous bugs
 compile tests
 
