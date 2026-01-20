@@ -4,6 +4,10 @@
 _opam
 .direnv
 
+# doc
+html
+devtools/extra/index.html
+
 ### Coq ###
 .*.aux
 .*.d
@@ -52,6 +56,7 @@ time-of-build-both.log
 time-of-build-pretty.log
 
 RocqMakefile
+RocqMakefile.local
 RocqMakefile.conf
 .RocqMakefile.d
 .Makefile.d

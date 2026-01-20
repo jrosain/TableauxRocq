@@ -21,7 +21,7 @@ jobs:
         with:
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-      - run: nix-shell --run "sh configure.sh; make -f RocqMakefile"
+      - run: nix-shell --run "make"
 
   Bench:
     runs-on: ubuntu-latest
@@ -34,6 +34,6 @@ jobs:
         with:
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-      - run: nix-shell --run "sh configure.sh; make -f RocqMakefile; cd devtools; sh run-tests.sh $REPO_TOKEN"
+      - run: nix-shell --run "make; cd devtools; sh run-tests.sh $REPO_TOKEN"
         env:
           REPO_TOKEN: ${{ secrets.CLONE_REPO_TOKEN }}

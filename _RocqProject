@@ -16,3 +16,6 @@ theories/Proofs.v
 theories/Semantics.v
 theories/Skolemization.v
 theories/Syntax.v
+
+examples/drinker.v
+examples/branching.v

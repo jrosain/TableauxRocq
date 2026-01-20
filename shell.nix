@@ -1,4 +1,4 @@
-{ pkgs ? import ./nixpkgs.nix {} }:
+{ pkgs ? import ./devtools/nixpkgs.nix {} }:
 
 pkgs.mkShell {
   nativeBuildInputs = with pkgs.buildPackages; [
@@ -6,5 +6,6 @@ pkgs.mkShell {
     rocq-core
     rocqPackages.stdlib
     ocamlPackages.findlib
+    pandoc
   ];
 }

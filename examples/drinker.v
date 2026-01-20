@@ -85,7 +85,6 @@ Proof.
       further elaboration. *)
   unshelve eapply hasTableauNegAll with (sko := OuterSkolemization) (i := 1).
 
-  (* TODO: here *)
   (** As we are only interested in the 4th goal to continue, we can always shelve (i.e., let Rocq
       infer the terms with what we give for the other goals) the first three goals after a
       Skolemization rule. *)
