@@ -31,7 +31,7 @@ if $ROCQ_compile test_compile.v; then
 	rm -rf test_compile.glob
 else
 	info "TableauxRocq has not been compiled. Compiling now..."
-	if cd .. && make -f RocqMakefile; then
+	if cd .. && make; then
 		ok "Succesfully compiled TableauxRocq."
 		cd devtools
 	else
@@ -71,8 +71,7 @@ clone_and_make() {
 		git checkout $old_commit
 
 		action "Compiling old TableauxRocq"
-		sh configure.sh
-		make -f RocqMakefile
+		make
 		cd devtools
 	else
 		error "Could not clone TableauxRocq"
