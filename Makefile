@@ -1,5 +1,8 @@
-all: config
+all: RocqMakefile
 	make -f RocqMakefile
+
+RocqMakefile:
+	sh devtools/configure.sh
 
 config:
 	sh devtools/configure.sh
