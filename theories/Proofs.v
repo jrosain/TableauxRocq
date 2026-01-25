@@ -1,5 +1,7 @@
 (** * Proofs: definition of free-variable tableaux proofs. *)
 
+From Stdlib Require Import Classical.
+
 From Tableaux Require Import Semantics.
 From Tableaux Require Import Skolemization.
 From Tableaux Require Import Syntax.
@@ -52,7 +54,7 @@ Section Contexts.
     ;  con_sko_record := record |}.
 End Contexts.
 
-Arguments Con_ : clear implicits.
+Arguments Con_ {_} _ _ _.
 
 Notation "Gamma ,, A" := (extend_ctx Gamma A) (at level 20).
 Notation "A \in Gamma" := (in_ctx A Gamma) (at level 30).
@@ -150,7 +152,7 @@ Section TableauxSoundness.
   Theorem hasTableau_sound :
     forall (sigma : Substitution var Term) (Gamma : Con) (F : Form),
       hasTableau sko (Gamma ,, Neg F) sigma -> ((forms Gamma)@[sigma] \models F@[sigma]).
-  Proof.
+  Proof using Type.
     intros ??? (S & Sf & htab).
     rewrite models_iff. replace (Neg F@[sigma] :: (forms Gamma)@[sigma]) with (forms (Gamma ,, Neg F)@[sigma]).
     2: { rewrite subst_ctx_subst_list. now cbn. }
@@ -175,12 +177,34 @@ Section TableauxSoundness.
         auto.
       + reflexivity.
       + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
-    - apply extend_with_equiv_form' with (F := F0 {0 \to Free x}@[sigma]) (G := (All F0)@[sigma]); auto.
+    - apply extend_with_implied_form with (F := F0 {0 \to Free x}@[sigma]) (G := (All F0)@[sigma]); auto.
       + cbn. rewrite form_subst_opening.
         apply instantiate_imply_all, isLocallyClosed_isLocallyClosed_subst.
         red. now cbn.
       + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
-  Admitted.
+    - apply extend_with_implied_form' with (F := Neg (F0 {0 \to t})@[sigma]) (G := (Neg (All F0))@[sigma]); auto.
+      + rewrite form_subst_opening. intros M hinterp. cbn in hinterp.
+        apply NNPP => save. apply hinterp. intros c.
+        change (interpret_form_ M [c] (empty_env M var) F0@[sigma]).
+        apply NNPP => save'. apply save.
+        set c' := [[ M # [] # empty_env M var |- t@[sigma] ]].
+        exists (ReplacementModel c' c); split.
+        * set M' := ReplacementModel _ _.
+          intro hinterp'.
+          have hinterp'' : interpret_form_ M' [c] (empty_env M' var) (F0@[sigma]).
+          { rewrite form_env_inst_commutes in hinterp'.
+            - apply isLocallyClosed_isLocallyClosed_subst.
+              apply (locally_closed Hsko).
+            - rewrite app_nil_l in hinterp'.
+              have e : interpret_term M' [] (empty_env M' var) t@[sigma] = c.
+              { admit. }
+              rewrite -e. assumption. }
+          apply save'. (* as M and M' coincide on the values that are not t@[sigma], this holds *)
+          admit.
+        * intro. (* as M and M' coincide on the values that are not t@[sigma], this holds *)
+          admit.
+      + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
+  Qed.
 End TableauxSoundness.
 
 Module ConcreteProofInstances.

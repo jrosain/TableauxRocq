@@ -151,3 +151,12 @@ Defined.
 #[global] Instance eq_dec_string : EqDec string.
 Proof. apply eq_dec_from_eq_bool; exact eq_bool_string. Defined.
 
+Fixpoint list_replace {A : Type} `{EqDec A} (l : list A) (x y : A) : list A :=
+  match l with
+  | [] => []
+  | z :: zs =>
+      (match z == x with
+       | left _ => y
+       | right _ => z
+       end) :: list_replace zs x y
+  end.
