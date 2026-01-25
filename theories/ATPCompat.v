@@ -502,7 +502,21 @@ Section ESyntaxTranslation.
       + rewrite IHF2 //. eapply closed_in_union_closed_in_right; eauto.
     - specialize (IHF (s :: rho)). do 3 apply f_equal.
       have h : closed_in mem_list (s :: rho) t. {
-        admit. }
+        clear hin IHF. induction t using eterm_ind'; cbn in *.
+        - unfold mem_list in *; cbn.
+          rewrite -match_eq_dec_eq_bool. destruct (x0 == s).
+          + exfalso. apply hclosed'. rewrite union_spec. left.
+            subst. rewrite singleton_spec //.
+          + rewrite hclosed. now cbn.
+        - induction l as [|t ts IHts]; cbn in *; auto. split.
+          + apply H.
+            * now right.
+            * apply hclosed.
+            * apply hclosed'.
+          + apply IHts.
+            * intros. apply H; auto.
+            * apply hclosed.
+            * apply hclosed'. }
       have e : translate_ETerm rho t = translate_ETerm (s :: rho) t.
       { apply closed_in_translate_ETerm; auto. }
       rewrite -!match_eq_dec_eq_bool.
@@ -512,7 +526,32 @@ Section ESyntaxTranslation.
       + cbn in IHF. rewrite e PeanoNat.Nat.add_1_r IHF; auto.
         intros [e' | hin']; try congruence.
         eapply closed_in_union_closed_in_right; eauto.
-    - (* this is the same strategy as above. *)
+    - specialize (IHF (s :: rho)). apply f_equal; cbn.
+      have h : closed_in mem_list (s :: rho) t. {
+        clear hin IHF. induction t using eterm_ind'; cbn in *.
+        - unfold mem_list in *; cbn.
+          rewrite -match_eq_dec_eq_bool. destruct (x0 == s).
+          + exfalso. apply hclosed'. rewrite union_spec. left.
+            subst. rewrite singleton_spec //.
+          + rewrite hclosed. now cbn.
+        - induction l as [|t ts IHts]; cbn in *; auto. split.
+          + apply H.
+            * now right.
+            * apply hclosed.
+            * apply hclosed'.
+          + apply IHts.
+            * intros. apply H; auto.
+            * apply hclosed.
+            * apply hclosed'. }
+      have e : translate_ETerm rho t = translate_ETerm (s :: rho) t.
+      { apply closed_in_translate_ETerm; auto. }
+      rewrite -!match_eq_dec_eq_bool.
+      destruct (x == s).
+      + (* have to show that if [x = s], then [x] will never
+           be replaced by [#|rho| + 1] (as it will be replaced by 0). *) admit.
+      + cbn in IHF. rewrite e PeanoNat.Nat.add_1_r IHF; auto.
+        intros [e' | hin']; try congruence.
+        eapply closed_in_union_closed_in_right; eauto.
   Admitted.
 End ESyntaxTranslation.
 
