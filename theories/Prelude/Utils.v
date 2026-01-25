@@ -50,3 +50,10 @@ Proof.
   - exact (forallb2 eqb).
   - apply eqb_list_is_eq.
 Defined.
+
+Lemma nth_error_Some' :
+  forall {A : Type} (l : list A) (n : nat) (x : A),
+    l.(n) = Some x -> n < #|l|.
+Proof.
+  intros ???? e. rewrite -nth_error_Some. intro. congruence.
+Qed.

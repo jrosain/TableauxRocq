@@ -98,12 +98,12 @@ Section ESemantics.
       | EAnd F G  => rec rho F /\ rec rho G
       | EImp F G  => rec rho F -> rec rho G
       | EEqu F G  => rec rho F <-> rec rho G
-      | EEx x F   => exists (v : M), rec (fun y => if eqb  x y
-                                          then Some v
-                                          else rho y) F
-      | EAll x F   => forall (v : M), rec (fun y => if eqb x y
-                                           then Some v
-                                           else rho y) F
+      | EEx x F   =>
+          exists (v : M),
+            rec (fun y => if eqb x y then Some v else rho y) F
+      | EAll x F   =>
+          forall (v : M),
+            rec (fun y => if eqb x y then Some v else rho y) F
       end.
 
   Definition is_evalid (F : EForm) : Prop :=
@@ -118,28 +118,6 @@ Section ESyntaxTranslation.
     | EFun f l => fold_left (fun s t => s \union (fv_eterm t)) l empty_set
     end.
 
-  Lemma fv_efun :
-    forall (f : string) (l : list ETerm) (t : ETerm) (x : string),
-      In t l -> set_in x (fv_eterm t) -> set_in x (fv_eterm (EFun f l)).
-  Proof.
-    intros ???? hin hmem. cbn[fv_eterm] in hmem |- *.
-    induction l as [|y ys IHys].
-    - inversion hin.
-    - admit.
-(* rewrite mem_fold_left_cons_unionl. apply union_spec. destruct hin as [hin | e]. *)
-(*       + left. now apply IHys. *)
-(*       + right. rewrite -e //. *)
-  Admitted.
-
-  (* Fixpoint fv_eform (F : EForm) : SetOfString := *)
-  (*   match F with *)
-  (*   | EBot | ETop => empty_set string *)
-  (*   | EPred p l => fold_left (fun s t => s \union (fv_eterm t)) l (empty_set string) *)
-  (*   | ENeg F => fv_eform F *)
-  (*   | EOr F G | EAnd F G | EImp F G | EEqu F G => (fv_eform F) \union (fv_eform G) *)
-  (*   | EEx x F | EAll x F => remove x (fv_eform F) *)
-  (*   end. *)
-
   Fixpoint bv_eform (F : EForm) : SetOfString :=
     match F with
     | EBot | ETop | EPred _ _ => empty_set
@@ -147,8 +125,6 @@ Section ESyntaxTranslation.
     | EOr F G | EAnd F G | EImp F G | EEqu F G => (bv_eform F) \union (bv_eform G)
     | EEx x F | EAll x F => add x (bv_eform F)
     end.
-
-  (* Definition WellScoped (F : EForm) := is_empty (fv_eform F). *)
 
   Section IndexOf.
     Context {A : Type} `{EqBool A}.
@@ -332,254 +308,6 @@ Section ESyntaxTranslation.
     | EAll y F => EAll (if eqb x y then x else y)
                    (if eqb x y then F else instantiate_eform x u F)
     end.
-
-  (* Lemma WellScoped_no_fv_eterm : *)
-  (*   forall (t : ETerm), is_empty (fv_eterm t) -> is_empty (@fv string _ _ (translate_ETerm [] t)). *)
-  (* Proof. *)
-  (*   intros t hscope; induction t using eterm_rect'; cbn in *. *)
-  (*   - assumption. *)
-  (*   - induction l. *)
-  (*     + now cbn in *. *)
-  (*     + cbn in *. Admitted. *)
-
-  (* Lemma WellScoped_no_fv : *)
-  (*   forall (F : EForm), WellScoped F -> is_empty (@fv string _ _ (translate_EForm F)). *)
-  (* Proof. *)
-  (*   intros F hscope; induction F. *)
-  (*   - cbn. rewrite is_empty_spec //. *)
-  (*   - cbn; rewrite is_empty_spec //. *)
-  (*   - cbn in *. admit. *)
-  (*   - cbn in *. now apply IHF. *)
-  (*   - admit. *)
-  (*   - admit. *)
-  (*   - admit. *)
-  (*   - admit. *)
-  (*   - admit. *)
-  (*   - admit. *)
-  (* Admitted. *)
-
-  (* Definition LocallyClosedETerm (t : ETerm) (rho : list string) := *)
-  (*   forall (x : string), mem x (fv_eterm t) -> (In x rho -> False). *)
-
-  (* Lemma LocallyClosed_tail : *)
-  (*   forall (t : ETerm) (x : string) (rho : list string), *)
-  (*     LocallyClosedETerm t (x :: rho) -> LocallyClosedETerm t rho. *)
-  (* Proof. intros ??? hclosed y hmem hin. eapply hclosed; eauto. now left. Qed. *)
-
-  (* Lemma LocallyClosedETerm_translate_all : *)
-  (*   forall (t : ETerm) (rho sigma : list string), *)
-  (*     LocallyClosedETerm t rho -> LocallyClosedETerm t sigma -> *)
-  (*     translate_ETerm rho t = translate_ETerm sigma t. *)
-  (* Proof. *)
-  (*   intros ??? closedr closeds. induction t using eterm_ind. *)
-  (*   - red in closedr, closeds. cbn[fv_eterm] in closedr, closeds. *)
-  (*     specialize (closedr x (singleton_spec x)). *)
-  (*     specialize (closeds x (singleton_spec x)). *)
-  (*     cbn. destruct (index_of x rho) eqn:xrho, (index_of x sigma) eqn:xsig. *)
-  (*     + now apply index_of_In, closedr in xrho. *)
-  (*     + now apply index_of_In, closedr in xrho. *)
-  (*     + now apply index_of_In, closeds in xsig. *)
-  (*     + reflexivity. *)
-  (*   - cbn. f_equal. *)
-  (*     have hr : forall (t : ETerm), In t l -> LocallyClosedETerm t rho. { *)
-  (*       clear H closeds. intros t hin x hmem hin'. *)
-  (*       specialize (closedr x). cbn[fv_eterm] in closedr. *)
-  (*       apply fv_efun with (f := f) (l := l) in hmem; auto. *)
-  (*     } *)
-  (*     have hs : forall (t : ETerm), In t l -> LocallyClosedETerm t sigma. { *)
-  (*       clear H closedr. intros t hin x hmem hin'. *)
-  (*       specialize (closeds x). cbn[fv_eterm] in closeds. *)
-  (*       apply fv_efun with (f := f) (l := l) in hmem; auto. *)
-  (*     } *)
-  (*     have H' : forall (t : ETerm), In t l -> translate_ETerm rho t = translate_ETerm sigma t. { *)
-  (*       intros. apply Forall_In with (x := t) in H; auto. *)
-  (*     } *)
-  (*     clear closedr closeds H. *)
-  (*     induction l as [|x xs IHxs]; auto. *)
-  (*     cbn. rewrite H'. *)
-  (*     + now right. *)
-  (*     + rewrite IHxs; auto. *)
-  (*       * intros; apply hr. now left. *)
-  (*       * intros; apply hs. now left. *)
-  (*       * intros; apply H'. now left. *)
-  (* Qed. *)
-
-  (* Lemma instantiate_commutes_term : *)
-  (*   forall (t : ETerm) (x : string) (u : ETerm) (rho sigma : list string) (n : nat), *)
-  (*     (LocallyClosedETerm u rho /\ LocallyClosedETerm u sigma) -> *)
-  (*     index_of x rho = Some n  -> *)
-  (*     translate_ETerm rho (instantiate_eterm x u t) = *)
-  (*       (translate_ETerm rho t){n \to translate_ETerm sigma u}. *)
-  (* Proof. *)
-  (*   intros t; induction t using eterm_ind. *)
-  (*   - intros y ???? [closedr closeds] e; cbn. destruct eqDec; cbn. *)
-  (*     + destruct (index_of x rho) eqn:index; cbn. *)
-  (*       * destruct (eq_dec_nat n n0) eqn:enat; auto. *)
-  (*         subst. rewrite e in index. *)
-  (*         2: congruence. *)
-  (*         apply LocallyClosedETerm_translate_all; auto. *)
-  (*       * subst. rewrite e in index. inversion index. *)
-  (*     + destruct (index_of x rho) eqn:index; cbn; auto. *)
-  (*       destruct (eq_dec_nat n n1) eqn:enat; auto. *)
-  (*       rewrite -e0 in index. *)
-  (*       have ex : x = y. { eapply index_of_inj; eauto. } *)
-  (*       congruence. *)
-  (*   - intros; cbn. rewrite !map_map. *)
-  (*     have hmap : map (fun t => translate_ETerm rho (instantiate_eterm x u t)) l = *)
-  (*                   map (fun t => (translate_ETerm rho t){n \to translate_ETerm sigma u}) l. *)
-  (*     { induction l as [|y ys IHys]; auto. *)
-  (*       cbn. rewrite IHys. *)
-  (*       - now apply Forall_tail in H. *)
-  (*       - apply Forall_In with (x := y) in H. *)
-  (*         + erewrite H. *)
-  (*           2,3: eassumption. *)
-  (*           reflexivity. *)
-  (*         + now right. } *)
-  (*     rewrite hmap //. *)
-  (* Qed. *)
-
-  (* Lemma WellScoped_instantiate_commutes : *)
-  (*   forall (F : EForm) (x : string) (rho : list string) (sigma : list string) (t : ETerm) (n : nat), *)
-  (*     (forall (y : string), mem y (fv_eterm t) -> ~(mem y (bv_eform F))) -> *)
-  (*     LocallyClosedETerm t (x :: rho) -> LocallyClosedETerm t sigma -> index_of x rho = Some n -> *)
-  (*     translate_EForm_ rho (instantiate_eform x t F) = *)
-  (*       (translate_EForm_ rho F){n \to translate_ETerm sigma t}. *)
-  (* Proof. *)
-  (*   intros F x rho sigma t. revert rho sigma. induction F; auto; intros rho sigma n hclosedF hclosedr hcloseds e; *)
-  (*     cbn. *)
-  (*   - rewrite !map_map. *)
-  (*     have hmap : map (fun u => translate_ETerm rho (instantiate_eterm x t u)) l = *)
-  (*                   map (fun u => (translate_ETerm rho u){n \to translate_ETerm sigma t}) l. *)
-  (*     { induction l as [|y ys IHys]; auto. *)
-  (*       cbn. erewrite instantiate_commutes_term. *)
-  (*       3: eassumption. *)
-  (*       2: { apply LocallyClosed_tail in hclosedr; split; eauto. } *)
-  (*       rewrite IHys //. } *)
-  (*     rewrite hmap //. *)
-  (*   - erewrite IHF; eauto. *)
-  (*   - erewrite IHF1, IHF2; eauto. *)
-  (*     + intros y hmem hmem'.  apply (hclosedF y); auto. *)
-  (*       rewrite mem_union; now right. *)
-  (*     + intros y hmem hmem'.  apply (hclosedF y); auto. *)
-  (*       rewrite mem_union; now left. *)
-  (*   - erewrite IHF1, IHF2; eauto. *)
-  (*     + intros y hmem hmem'.  apply (hclosedF y); auto. *)
-  (*       rewrite mem_union; now right. *)
-  (*     + intros y hmem hmem'.  apply (hclosedF y); auto. *)
-  (*       rewrite mem_union; now left. *)
-  (*   - erewrite IHF1, IHF2; eauto. *)
-  (*     + intros y hmem hmem'.  apply (hclosedF y); auto. *)
-  (*       rewrite mem_union; now right. *)
-  (*     + intros y hmem hmem'.  apply (hclosedF y); auto. *)
-  (*       rewrite mem_union; now left. *)
-  (*   - erewrite IHF1, IHF2; eauto. *)
-  (*     + intros y hmem hmem'.  apply (hclosedF y); auto. *)
-  (*       rewrite mem_union; now right. *)
-  (*     + intros y hmem hmem'.  apply (hclosedF y); auto. *)
-  (*       rewrite mem_union; now left. *)
-  (*   - destruct (x == s); cbn. *)
-  (*     + rewrite e0. *)
-  (*       have en : n = 0. { admit. } (* todo: easy *) *)
-  (*       rewrite !en in e |- *. admit. (* yes: overshadowed *) *)
-  (*     + rewrite -(IHF (s :: rho) sigma (n + 1)); auto. *)
-  (*       * intros y hmem hmem'. apply (hclosedF y); auto. *)
-  (*         (* todo: mem_add *) admit. *)
-  (*       * intros y hmem hin. repeat destruct hin as [hin | e0]. *)
-  (*         -- apply (hclosedr y); auto. now left. *)
-  (*         -- apply (hclosedF y); auto. *)
-  (*            (* todo: mem_add *) admit. *)
-  (*         -- apply (hclosedr y); auto. now right. *)
-  (*       * rewrite PeanoNat.Nat.add_1_r; apply index_of_cons'; auto. *)
-  (*   - destruct (x == s); cbn. *)
-  (*     + rewrite e0. *)
-  (*       have en : n = 0. { admit. } (* todo: easy *) *)
-  (*       rewrite !en in e |- *. admit. (* yes: overshadowed *) *)
-  (*     + rewrite -(IHF (s :: rho) sigma (n + 1)); auto. *)
-  (*       * intros y hmem hmem'. apply (hclosedF y); auto. *)
-  (*         (* todo: mem_add *) admit. *)
-  (*       * intros y hmem hin. repeat destruct hin as [hin | e0]. *)
-  (*         -- apply (hclosedr y); auto. now left. *)
-  (*         -- apply (hclosedF y); auto. *)
-  (*            (* todo: mem_add *) admit. *)
-  (*         -- apply (hclosedr y); auto. now right. *)
-  (*       * rewrite PeanoNat.Nat.add_1_r; apply index_of_cons'; auto. *)
-  (*   Admitted. *)
-
-(* Pred s *)
-(*     (map (fun t : Term_ string string => t {#| rho | - 1 \to Free x}) (map (translate_ETerm rho) l)) = *)
-  (*   Pred s (map (translate_ETerm sigma) l) *)
-  Lemma instantiate_var_as_free_in_term :
-    forall (t : ETerm) (rho sigma : list string) (s : string) (n : nat),
-      index_of s rho = Some n ->
-      (forall m, m < n -> nth_error rho m = nth_error sigma m) ->
-      nth_error sigma n = None ->
-      (translate_ETerm rho t) {n \to Free s} = translate_ETerm sigma t.
-  Proof.
-    intros t; induction t using eterm_ind'; intros rho sigma s n es erho hnone.
-    - cbn; destruct (index_of x rho) eqn:ex.
-      + destruct (index_of x sigma) eqn:ex'.
-        * cbn. rewrite -match_eq_dec_eq_bool. destruct (n == n0).
-          -- subst. apply index_of_inj with (x := x) in es; auto.
-             subst. have h : index_of s rho = index_of s sigma.
-             { apply index_of_nth.
-               - intros. apply erho.
-                 have hlt : #|sigma| <= n0 by now rewrite nth_error_None in hnone.
-                 lia.
-               - now apply index_of_In in ex.
-               - now apply index_of_In in ex'. }
-             have e : n0 = n1 by congruence.
-             rewrite e in hnone. apply index_of_spec in ex'. congruence.
-          -- have h : index_of x rho = index_of x sigma.
-             { apply index_of_nth.
-               - intros. apply erho.
-                 have hlt : #|sigma| <= n by now rewrite nth_error_None in hnone. lia.
-               - now apply index_of_In in ex.
-               - now apply index_of_In in ex'. }
-             congruence.
-        * cbn. Admitted.
-
-  Lemma instantiate_var_as_free_in_form :
-    forall (F : EForm) (rho sigma : list string) (s : string) (n : nat),
-      index_of s rho = Some n ->
-      (forall m, m < n -> nth_error rho m = nth_error sigma m) ->
-      nth_error sigma n = None ->
-      (translate_EForm_ rho F) {n \to Free s} = translate_EForm_ sigma F.
-  Proof.
-    intros F; induction F; intros rho sigma x n ex erho hnone; cbn; auto.
-    - rewrite map_map. f_equal. induction l as [|t ts IHts]; auto.
-      cbn. erewrite IHts, instantiate_var_as_free_in_term; eauto.
-    - rewrite (IHF _ sigma); auto.
-    - rewrite (IHF1 _ sigma); auto. rewrite (IHF2 _ sigma); auto.
-    - rewrite (IHF1 _ sigma); auto. rewrite (IHF2 _ sigma); auto.
-    - rewrite (IHF1 _ sigma); auto. rewrite (IHF2 _ sigma); auto.
-    - rewrite (IHF1 _ sigma); auto. rewrite (IHF2 _ sigma); auto.
-    - destruct (x == s).
-      + (* in this case, [n + 1] does not appear in the FVs of F so the opening does nothing.
-           Also, it makes the translations equal (as [rho] and [sigma] are equal in all the other
-           values *) admit.
-      + rewrite (IHF (s :: rho) (s :: sigma) x (n + 1)).
-        * cbn. rewrite -match_eq_dec_eq_bool. destruct (x == s); try congruence.
-          destruct (index_of x rho); cbn.
-          -- rewrite PeanoNat.Nat.add_1_r. injection ex => -> //.
-          -- inversion ex.
-        * intros; destruct m; cbn; auto.
-          apply erho. rewrite PeanoNat.Nat.add_1_r in H; lia.
-        * rewrite PeanoNat.Nat.add_1_r nth_error_cons_succ //.
-        * reflexivity.
-    - destruct (x == s).
-      + (* in this case, [n + 1] does not appear in the FVs of F so the opening does nothing.
-           Also, it makes the translations equal (as [rho] and [sigma] are equal in all the other
-           values *) admit.
-      + rewrite (IHF (s :: rho) (s :: sigma) x (n + 1)).
-        * cbn. rewrite -match_eq_dec_eq_bool. destruct (x == s); try congruence.
-          destruct (index_of x rho); cbn.
-          -- rewrite PeanoNat.Nat.add_1_r. injection ex => -> //.
-          -- inversion ex.
-        * intros; destruct m; cbn; auto.
-          apply erho. rewrite PeanoNat.Nat.add_1_r in H; lia.
-        * rewrite PeanoNat.Nat.add_1_r nth_error_cons_succ //.
-        * reflexivity.
-  Admitted.
 End ESyntaxTranslation.
 
 Class ETranslation (A B : Type) :=
@@ -595,121 +323,158 @@ Notation "[[ M ]]" := (translate M).
 
 Coercion translate_EForm : EForm >-> Form.
 
-(** ** 4. Correspondance of the syntax *)
+(** ** 4. Correspondance of the semantics *)
 
 Section ValidityEquivalence.
-  Lemma interp_term_interp_eterm :
-    forall (M : Model string string) (t : ETerm) (rho : list M) (sigma : env M string),
-      interpret_term rho sigma [[ t ]] = interpret_eterm sigma t.
+
+  (** Given [sigma] a list of valuation for bound variables in [l] and an environment [rho],
+      we provide a new environment suitable for the extended semantics, and prove its
+      required properties. *)
+  Section ExtendedEnvironment.
+    Context {M : Model string string} (bvs : list string) (rho : list M) (sigma : env M string).
+
+    Definition extended_environment : env M string :=
+      fun (x : string) =>
+        match index_of x bvs with
+        | None => sigma x
+        | Some n => rho.(n)
+        end.
+
+    Lemma extended_environment_comp_None :
+      forall (x : string),
+        index_of x bvs = None ->
+        extended_environment x = sigma x.
+    Proof using Type.
+      intros. unfold extended_environment.
+      destruct (index_of x bvs); auto.
+      congruence.
+    Qed.
+
+    Lemma extended_environment_comp_Some :
+      forall (x : string) (n : nat),
+        index_of x bvs = Some n ->
+        extended_environment x = rho.(n).
+    Proof using Type.
+      intros; cbn. unfold extended_environment.
+      now rewrite H.
+    Qed.
+  End ExtendedEnvironment.
+
+  Lemma extend_extended_environment :
+    forall {M : Model string string} (bvs : list string) (rho : list M) (sigma : env M string) (s : string)
+      (x : M),
+      extended_environment (s :: bvs) (x :: rho) sigma =
+        fun y : string => if eqb s y then Some x else extended_environment bvs rho sigma y.
   Proof.
-    intros ????. induction t using eterm_ind; cbn; auto.
-    rewrite map_map.
-    have Hmap : map (fun u => interpret_term rho sigma [[ u ]]) l = map (interpret_eterm sigma) l.
-    { induction l as [|x xs IHxs]; auto.
-      cbn. rewrite IHxs.
-      - now apply Forall_tail in H.
-      - apply Forall_In with (x := x) in H.
-        + rewrite H //.
-        + now right. }
-    rewrite Hmap //.
+    intros. apply funext=>y. unfold extended_environment. cbn.
+    rewrite -!match_eq_dec_eq_bool. destruct (s == y), (y == s); try congruence.
+    - reflexivity.
+    - destruct (index_of y bvs); now cbn.
   Qed.
 
-  Lemma interpret_eterm_map_interpret_term :
-    forall (M : Model string string) (l : list ETerm),
-      map (interpret_eterm (empty_env M string)) l =
-        map (fun u => interpret_term [] (empty_env M string) [[ u ]]) l.
-  Proof.
-    intros ??. induction l as [|x xs IHxs]; auto.
-    cbn; rewrite interp_term_interp_eterm IHxs //.
-  Qed.
+  (** A general version of the equivalidity theorem: we give [l] a list of bound variables
+      and [sigma] their valuation. We have to ensure that both lists have the same size. *)
+  Section GenTranslationEquivalidity.
+    Lemma gen_interp_term_interp_eterm :
+      forall (M : Model string string) (t : ETerm) (bvs : list string) (rho : list M) (sigma : env M string),
+      interpret_term rho sigma (translate_ETerm bvs t) =
+        interpret_eterm (extended_environment bvs rho sigma) t.
+    Proof.
+      intros ?????. induction t using eterm_ind; cbn.
+      - destruct (index_of x bvs) eqn:hindex_of_bvs.
+        + cbn. now erewrite extended_environment_comp_Some.
+        + now rewrite extended_environment_comp_None.
+      - apply f_equal. induction l as [|x xs IHxs]; auto.
+        cbn. rewrite IHxs.
+        + now apply Forall_tail in H.
+        + apply Forall_inv in H. now rewrite H.
+    Qed.
 
-  Lemma is_valid_translation_is_valid_ :
+    Lemma gen_translation_equivalidity :
+      forall (M : Model string string) (F : EForm) (bvs : list string) (rho : list M) (sigma : env M string),
+        [[ M # rho # sigma |- translate_EForm_ bvs F ]] <->
+          interpret_eform M (extended_environment bvs rho sigma) F.
+    Proof.
+      intros M F; induction F.
+
+      (* Cases: top/bottom *)
+      - intros; cbn; split; auto.
+      - intros; cbn; split; auto.
+
+      (* Cases: predicates *)
+      - intros; cbn.
+        have e : map (interpret_term rho sigma) (map (translate_ETerm bvs) l) =
+                   map (interpret_eterm (extended_environment bvs rho sigma)) l.
+        { induction l as [|x xs IHxs]; auto. cbn.
+          rewrite IHxs gen_interp_term_interp_eterm; auto. }
+        rewrite e //.
+
+      (* Cases: negation *)
+      - intros; cbn. now rewrite IHF.
+
+      (* Cases: disjunction *)
+      - intros; cbn. now rewrite IHF1 IHF2.
+
+      (* Cases: conjunction *)
+      - intros; cbn. rewrite IHF1 IHF2. split; intro h.
+        + split; apply NNPP=>save.
+          * apply h. now left.
+          * apply h. now right.
+        + intros [hf1 | hf2]; [now apply hf1|now apply hf2].
+
+      (* Cases: implication *)
+      - intros; cbn. rewrite IHF1 IHF2. split; intro h.
+        + intro h'. destruct h as [hnf1 | hf2]; auto. exfalso. now apply hnf1.
+        + apply NNPP=>save. apply save. left. intro hf1.
+          apply save. right. now apply h.
+
+      (* Cases: equivalence *)
+      - intros; cbn. rewrite !IHF1 !IHF2. split; intro h.
+        + split; intro h'.
+          * apply NNPP => save. apply h. left; intros [hnf1 | hf2]; auto.
+          * apply NNPP => save. apply h. right; intros [hnf2 | hf1]; auto.
+        + intros [h' | h']; apply h'.
+          all: rewrite h; apply NNPP => save; apply save; left; intro hf2;
+                                       apply save; now right.
+
+      (* Cases: existential *)
+      - intros; cbn. split; intros h.
+        + apply NNPP => save. apply h. intros x hinterp. apply save.
+          exists x. specialize (IHF (s :: bvs) (x :: rho) sigma).
+          rewrite -extend_extended_environment. now rewrite -IHF.
+        + intros hinterp. destruct h as (v & hinterp'). specialize (hinterp v).
+          apply hinterp. rewrite -extend_extended_environment in hinterp'.
+          now rewrite IHF.
+
+      (* Cases: universal *)
+      - intros; cbn. split; intros h v.
+        + rewrite -extend_extended_environment -IHF //.
+        + specialize (h v); rewrite -extend_extended_environment in h.
+          rewrite IHF //.
+    Qed.
+  End GenTranslationEquivalidity.
+
+  (** We can use the lemma we just proved to yield the result on closed formulas. *)
+  Lemma translation_equivalidity :
     forall (F : EForm) (M : Model string string),
       ([[ M # [] # (empty_env M string) |- [[F]]]]) <->
         (interpret_eform M (empty_env M string) F).
-  Proof.
-    intros F; induction F;
-      intros M; split; intros hvalid.
-    all: try (cbn in *; auto; fail).
+  Proof. intros. apply gen_translation_equivalidity. Qed.
 
-    (** Cases: pred *)
-    - cbn in *; rewrite map_map in hvalid; rewrite interpret_eterm_map_interpret_term //.
-    - cbn in *; rewrite map_map -interpret_eterm_map_interpret_term //.
-
-    (** Cases: neg *)
-    - cbn in *; intro hvalid'; apply hvalid. now rewrite IHF.
-    - cbn in *; intro hvalid'; apply hvalid. now rewrite -IHF.
-
-    (** Cases: or *)
-    - cbn in *; destruct hvalid as [hvalid1 | hvalid2].
-      + left; now rewrite -IHF1.
-      + right; now rewrite -IHF2.
-    - cbn in *; destruct hvalid as [hvalid1 | hvalid2].
-      + left; now rewrite IHF1.
-      + right; now rewrite IHF2.
-
-    (** Cases: and *)
-    - cbn in *; split.
-      + apply NNPP => hnf1. apply hvalid. left. intro hf1. apply hnf1.
-        rewrite -IHF1 //.
-      + apply NNPP => hnf2. apply hvalid. right. intro hf2. apply hnf2.
-        rewrite -IHF2 //.
-    - cbn in *; intros [hf1 | hf2].
-      + apply hf1. rewrite IHF1. apply hvalid.
-      + apply hf2. rewrite IHF2. apply hvalid.
-
-    (** Cases: imp *)
-    - cbn in *; intro hf1. destruct hvalid as [hnf1 | hf2].
-      + exfalso. apply hnf1. rewrite IHF1 //.
-      + rewrite -IHF2 //.
-    - cbn in *; apply NNPP => save. apply save. right.
-      rewrite IHF2. apply hvalid. apply NNPP => hnf1. apply save. left. rewrite IHF1 //.
-
-    (** Cases: equ *)
-    - cbn in *; split.
-      + intros hf1. apply NNPP => hnf2. apply hvalid. left. intros [hnf1 | hf2].
-        * apply hnf1. rewrite IHF1 //.
-        * apply hnf2. rewrite -IHF2 //.
-      + intros hf2. apply NNPP => hnf1. apply hvalid. right. intros [hnf2 | hf1].
-        * apply hnf2. rewrite IHF2 //.
-        * apply hnf1. rewrite -IHF1 //.
-    - cbn in *; intros [himp | himp]; apply himp;
-        rewrite IHF2 IHF1 hvalid; apply imply_to_or; tauto.
-
-    (** Cases: ex *)
-    - cbn in *.
-      apply NNPP => save. apply hvalid => x hF.
-      apply save. exists x.
-
-      (* TODO: show this: *)
-      have H : forall M x rho (F : Form) s,
-          [[ M # [x] # rho |- F ]] =
-            [[ M # [] # (fun y => match s == y with
-                               | left _ => Some x
-                               | right _ => rho y
-                               end) |- (F{0 \to Free s}) ]].
-      { admit. }
-      rewrite (H _ _ _ _ s) in hF.
-      rewrite (instantiate_var_as_free_in_form _ _ []) in hF.
-      + cbn. rewrite -match_eq_dec_eq_bool. destruct (s == s); auto. exfalso; now apply n.
-      + intros m contra; inversion contra.
-      + reflexivity.
-      + admit. (* TODO: generalize IHF and this is free *)
-  Admitted.
-
+  (* TODO *)
   (* Lemma is_valid_translation_is_valid : *)
   (*   forall (F : EForm), \models (translate_EForm F) <-> is_evalid F. *)
   (* Proof. *)
   (*   intros F; split; intros H M; specialize (H M); *)
-  (*     now apply is_valid_translation_is_valid_. *)
+  (*     now apply translation_equivalidity. *)
   (* Qed. *)
 
   (* Lemma hasTableau_is_evalid : *)
-  (*   forall (F : EForm) (sko : Skolemization) (sigma : Substitution string Term), *)
-  (*     hasTableau sko {{ Neg [[ F ]] }} sigma -> is_evalid F. *)
+  (*   forall (F : EForm) (sko : Skolemization) (Gamma : Con sko) (sigma : Substitution string Term), *)
+  (*     hasTableau sko ([[ Gamma ]] ,, Neg [[ F ]]) sigma -> is_evalid (EAnd (ls_to_form (forms Gamma)) F). *)
   (* Proof. *)
-  (*   intros ??? htab. apply (hasTableau_sound sko [[ F ]] sigma) in htab. *)
-  (*   now rewrite -is_valid_translation_is_valid. *)
+  (*   intros ???? htab. apply (hasTableau_sound sko sigma Gamma [[ F ]]) in htab. *)
+  (*   rewrite -is_valid_translation_is_valid. *)
   (* Qed. *)
 End ValidityEquivalence.
 

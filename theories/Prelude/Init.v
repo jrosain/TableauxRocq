@@ -9,6 +9,7 @@ Export ListNotations.
 Open Scope string_scope.
 
 Notation "#| l |" := (List.length l).
+Notation "l .( i )" := (List.nth_error l i).
 
 Axiom funext :
   forall {A : Type} {B : A -> Type} {f g : forall (x : A), B x},
