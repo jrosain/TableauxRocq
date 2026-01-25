@@ -263,17 +263,101 @@ Section ESyntaxTranslation.
             -- destruct hin; congruence.
             -- destruct hin'; congruence.
     Qed.
+
+    Lemma index_of_rapp :
+      forall (x : A) (l : list A),
+        ~(List.In x l) -> index_of x (l ++ [x]) = Some #|l|.
+    Proof using Type.
+      intros ?? hnin. induction l as [|y ys IHys]; cbn.
+      - rewrite EqBool_refl //.
+      - cbn in hnin. destruct (y == x).
+        + exfalso. apply hnin. now left.
+        + have hnin' : ~(List.In x ys).
+          { intro hin. apply hnin. now right. }
+          specialize (IHys hnin'). rewrite -match_eq_dec_eq_bool.
+          destruct (x == y); try congruence.
+          rewrite IHys; now cbn.
+    Qed.
+
+    Lemma index_of_rapp' :
+      forall (x y : A) (l : list A) (n : nat),
+        ~(List.In x l) -> x <> y -> index_of y (l ++ [x]) = Some n -> n < #|l|.
+    Proof using Type.
+      intros ???? hnin e e'. generalize dependent n. induction l as [|z zs IHzs]; cbn;
+        intros n e'.
+      - cbn in e'. rewrite -match_eq_dec_eq_bool in e'. destruct (y == x); congruence. 
+      - cbn in hnin, e, e'.
+        rewrite -match_eq_dec_eq_bool in e'. destruct (y == z).
+        + injection e' => <-; lia.
+        + have h0 : ~List.In x zs.
+          { intro hnin'. apply hnin; now right. }
+          specialize (IHzs h0). destruct (index_of y (zs ++ [x])) eqn:eindex; cbn in *.
+          * specialize (IHzs (Nat.pred n)).
+            have e0 : Some n1 = Some (Nat.pred n).
+            { injection e' => <-. rewrite PeanoNat.Nat.pred_succ //. }
+            specialize (IHzs e0). lia.
+          * inversion e'.
+    Qed.
+
+    Lemma index_of_rapp'' :
+      forall (x y : A) (l : list A) (n : nat),
+        ~(List.In x l) -> x <> y -> index_of y (l ++ [x]) = index_of y l.
+    Proof using Type.
+      intros ??? hnin e e'. induction l as [|z zs IHzs]; cbn.
+      - rewrite -match_eq_dec_eq_bool. destruct (y == x); congruence.
+      - rewrite -!match_eq_dec_eq_bool. destruct (y == z); auto.
+        rewrite IHzs; auto.
+        intro hin; apply e. now right.
+    Qed.
   End IndexOf.
 
   Fixpoint translate_ETerm (m : list string) (t : ETerm) : Term :=
     match t with
-    | EVar x   =>
+    | EVar x =>
         match index_of x m with
         | None => Free x
         | Some n => Bound n
         end
     | EFun f l => Fun f (map (translate_ETerm m) l)
     end.
+
+  Fixpoint closed_in (m : list string) (t : ETerm) : Prop :=
+    let fix closed_in_list (l : list ETerm) : Prop :=
+      match l with
+      | [] => True
+      | u :: us => closed_in m u /\ closed_in_list us
+      end in
+    match t with
+    | EVar x => index_of x m = None
+    | EFun f l => closed_in_list l
+    end.
+
+  Lemma closed_in_nil :
+    forall (t : ETerm), closed_in [] t.
+  Proof.
+    intros t; induction t using eterm_ind; cbn; auto.
+    induction l as [|u us IHus]; cbn; auto.
+    split.
+    - now apply Forall_inv in H.
+    - apply IHus. now apply Forall_tail in H.
+  Qed.
+
+  Lemma closed_in_translate_ETerm :
+    forall (t : ETerm) (m m' : list string),
+      closed_in m t -> closed_in m' t ->
+      translate_ETerm m t = translate_ETerm m' t.
+  Proof.
+    intros ??? hclosed hclosed'; induction t using eterm_ind; cbn in *.
+    - rewrite hclosed hclosed' //.
+    - apply f_equal. induction l as [|u us IHus]; cbn; auto.
+      rewrite IHus.
+      + now apply Forall_tail in H.
+      + apply hclosed.
+      + apply hclosed'.
+      + apply Forall_inv in H. rewrite H //.
+        * apply hclosed.
+        * apply hclosed'.
+  Qed.
 
   Fixpoint translate_EForm_ (m : list string) (F : EForm) : Form :=
     match F with
@@ -317,6 +401,77 @@ Section ESyntaxTranslation.
     | EAll y F => EAll (if eqb x y then x else y)
                    (if eqb x y then F else instantiate_eform x u F)
     end.
+
+  Lemma instantiate_eterm_commutes_instantiate_term :
+    forall (x : string) (t u : ETerm) (rho : list string),
+      ~(List.In x rho) ->
+      (translate_ETerm (rho ++ [x]) t) {#|rho| \to translate_ETerm rho u} =
+        translate_ETerm rho (instantiate_eterm x u t).
+  Proof.
+    intros ?????. induction t using eterm_ind; cbn.
+    - rewrite -match_eq_dec_eq_bool.
+      destruct (x0 == x); cbn.
+      + destruct (x == x0); try congruence.
+        destruct (index_of x0 (rho ++ [x])) eqn:eindex; cbn; subst.
+        * have e : #|rho| = n.
+          { have eindex' := index_of_rapp x rho H.
+            specialize (eindex' ltac:(typeclasses eauto)).
+            rewrite eindex in eindex'. injection eindex' => -> //. }
+          rewrite -match_eq_dec_eq_bool. destruct (#|rho| == n); congruence.
+        * have hin : In x (rho ++ [x]).
+          { clear; induction rho; cbn.
+            - now right.
+            - now left. }
+          apply In_index_of in hin. destruct hin as (k & contra). congruence.
+      + destruct (x == x0); try congruence.
+        destruct (index_of x0 (rho ++ [x])) eqn:eindex; cbn; subst.
+        * have hlt := index_of_rapp' x x0 rho n1 H n0 eindex.
+          have hneq : n1 <> #|rho|. { lia. }
+          rewrite -match_eq_dec_eq_bool. destruct (#|rho| == n1); try congruence.
+          destruct (index_of x0 rho) eqn:index'; cbn in *.
+          -- rewrite index_of_rapp'' in eindex; auto.
+             rewrite index' in eindex. injection eindex => -> //.
+          -- rewrite index_of_rapp'' in eindex; auto.
+             rewrite index' in eindex. inversion eindex.
+        * destruct (index_of x0 rho) eqn:eindex'; cbn in *; auto.
+          rewrite index_of_rapp'' in eindex; auto.
+          rewrite eindex in eindex'. inversion eindex'.
+    - apply f_equal. induction l as [|v vs IHvs]; cbn; auto.
+      rewrite IHvs.
+      + now apply Forall_tail in H0.
+      + apply Forall_inv in H0. rewrite H0 //.
+  Qed.
+
+  Lemma instantiate_eform_commutes_instantiate_form :
+    forall (x : string) (t : ETerm) (F : EForm) (rho : list string),
+      ~(List.In x rho) -> closed_in rho t ->
+      (translate_EForm_ (rho ++ [x]) F) {#|rho| \to translate_ETerm rho t} =
+        translate_EForm_ rho (instantiate_eform x t F).
+  Proof.
+    intros ???. induction F; intros rho hin hclosed; cbn in *; try reflexivity.
+    - intros. rewrite !map_map.
+      apply f_equal. induction l as [|u us IHus]; cbn; auto.
+      rewrite IHus instantiate_eterm_commutes_instantiate_term //.
+    - rewrite IHF //.
+    - rewrite IHF1 // IHF2 //.
+    - rewrite IHF1 // IHF2 //.
+    - rewrite IHF1 // IHF2 //.
+    - rewrite IHF1 // IHF2 //.
+    - specialize (IHF (s :: rho)). do 3 apply f_equal.
+      (* TODO: need 1 more conditions: no bound vars of [F] appears
+         in [t] (gives closed_in (s :: rho) t).
+         Also . *)
+      have h : closed_in (s :: rho) t. { admit. }
+      have e : translate_ETerm rho t = translate_ETerm (s :: rho) t.
+      { apply closed_in_translate_ETerm; auto. }
+      rewrite -!match_eq_dec_eq_bool.
+      destruct (x == s).
+      + (* have to show that if [x = s], then [x] will never
+           be replaced by [#|rho| + 1] (as it will be replaced by 0). *) admit.
+      + cbn in IHF. rewrite e PeanoNat.Nat.add_1_r IHF; auto.
+        intros [e' | hin']; try congruence.
+    - (* this is the same strategy as above. *)
+  Admitted.
 End ESyntaxTranslation.
 
 Class ETranslation (A B : Type) :=
@@ -859,7 +1014,7 @@ Section HasTableauLemmas.
       S0 = rem y S -> mem y S = true ->
       hasTableau_ sko (Gamma ,, [[ instantiate_eform x (EVar y) F ]]) S0 Sf sigma ->
       hasTableau_ sko Gamma S Sf sigma.
-  Proof.
+  Proof using Type.
     intros ????????? e hfresh eS hmem htab.
     have eS0 : S = add y S0.
     { rewrite eS add_rem; auto.
@@ -867,9 +1022,11 @@ Section HasTableauLemmas.
     rewrite eS0. eapply hasTableauAll.
     - cbn in e. eapply con_nth_in; eauto.
     - assumption.
-    - admit. (* TODO: [isFresh y S -> ~(y \in fv F) -> F{0 \to Free y} = instantiate_eform x (EVar y) F]
-              *)
-  Admitted.
+    - replace [x] with (List.app [] [x]).
+      2: now cbn.
+      rewrite (instantiate_eform_commutes_instantiate_form x (EVar y) F []); auto.
+      now cbn.
+  Qed.
 
   Existing Instance fv_ctx.
 
