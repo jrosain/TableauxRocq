@@ -39,6 +39,12 @@ Section ESyntax.
   | EEqu  : EForm -> EForm -> EForm
   | EEx   : string -> EForm -> EForm
   | EAll  : string -> EForm -> EForm.
+
+  Fixpoint ls_to_eform (l : list EForm) : EForm :=
+    match l with
+    | [] => ETop
+    | F :: Fs => EAnd F (ls_to_eform Fs)
+    end.
 End ESyntax.
 
 Section ETermInd.
@@ -292,8 +298,11 @@ Section ESyntaxTranslation.
     | EFun f l => EFun f (map (instantiate_eterm x u) l)
     end.
 
-  (* As I don't want to bother with freshness stuff, please make sure that the term [u]
-     has no variable appearing in F. *)
+  (** Warning: this function is not correct _in general_. Indeed, if [u] has free variables
+      in the bound variables of [F], the formula will be changed.
+
+      When using this function, one should probably presuppose that no free variable of [u]
+      can be bound by [F]. *)
   Fixpoint instantiate_eform (x : string) (u : ETerm) (F : EForm) : EForm :=
     match F with
     | EBot | ETop => F
@@ -312,6 +321,9 @@ End ESyntaxTranslation.
 
 Class ETranslation (A B : Type) :=
   translate : A -> B.
+
+#[global] Instance translate_list {A B : Type} `{ETranslation A B} :
+  ETranslation (list A) (list B) := map translate.
 
 Notation "[[ M ]]" := (translate M).
 
@@ -461,21 +473,64 @@ Section ValidityEquivalence.
         (interpret_eform M (empty_env M string) F).
   Proof. intros. apply gen_translation_equivalidity. Qed.
 
-  (* TODO *)
-  (* Lemma is_valid_translation_is_valid : *)
-  (*   forall (F : EForm), \models (translate_EForm F) <-> is_evalid F. *)
-  (* Proof. *)
-  (*   intros F; split; intros H M; specialize (H M); *)
-  (*     now apply translation_equivalidity. *)
-  (* Qed. *)
+  Lemma ls_to_eform_ls_to_form :
+    forall (Gamma : list EForm) (M : Model string string) (rho : list M) (sigma : env M string),
+      ([[ M # rho # sigma |- [[ls_to_eform Gamma]]]]) <->
+        (interpret_form_ M rho sigma (ls_to_form [[Gamma]])).
+  Proof.
+    intros. induction Gamma as [|F Fs IHFs]; cbn.
+    - reflexivity.
+    - split; intros h h'; apply h; destruct h'.
+      + now left.
+      + right. now rewrite IHFs.
+      + now left.
+      + right. now rewrite -IHFs.
+  Qed.
 
-  (* Lemma hasTableau_is_evalid : *)
-  (*   forall (F : EForm) (sko : Skolemization) (Gamma : Con sko) (sigma : Substitution string Term), *)
-  (*     hasTableau sko ([[ Gamma ]] ,, Neg [[ F ]]) sigma -> is_evalid (EAnd (ls_to_form (forms Gamma)) F). *)
-  (* Proof. *)
-  (*   intros ???? htab. apply (hasTableau_sound sko sigma Gamma [[ F ]]) in htab. *)
-  (*   rewrite -is_valid_translation_is_valid. *)
-  (* Qed. *)
+  Lemma is_valid_translation_is_valid :
+    forall (Gamma : list EForm) (F : EForm),
+      @translate _ (list Form) _ Gamma \models [[ F ]]  <->
+        is_evalid (EImp (ls_to_eform Gamma) F).
+  Proof.
+    intros Gamma F; split; intros H M; specialize (H M).
+    - rewrite -translation_equivalidity. cbn in *.
+      destruct H as [hGamma | hF]; auto.
+      left. rewrite ls_to_eform_ls_to_form //.
+    - rewrite -translation_equivalidity in H. cbn in *.
+      destruct H as [hGamma | hF]; auto.
+      left. rewrite -ls_to_eform_ls_to_form //.
+  Qed.
+
+  Fixpoint ls_to_econtext (sko : Skolemization) (Gamma : list EForm) : Con sko :=
+    match Gamma with
+    | [] => {{ }}
+    | F :: Fs => ls_to_econtext sko Fs ,, [[ F ]]
+    end.
+
+  (** As we want to avoid defining substitutions for [EForm]s, this theorem is the closest
+      one we can have to a soundness result for the extended syntax. *)
+  Theorem hasTableau_is_evalid :
+    forall (F : EForm) (sko : Skolemization) (Gamma : list EForm) (sigma : Substitution string Term),
+      hasTableau sko (ls_to_econtext sko Gamma ,, Neg [[ F ]]) sigma ->
+      forall M : Model string string,
+        interpret_eform M (subst_to_env M sigma) (EImp (ls_to_eform Gamma) F).
+  Proof.
+    intros ???? htab. apply (hasTableau_sound sko sigma (ls_to_econtext sko Gamma) [[ F ]]) in htab.
+    unfold is_valid in htab. intros M.
+    specialize (htab M).
+    have e : subst_to_env M sigma = extended_environment [] [] (subst_to_env M sigma).
+    { now apply funext=>x. }
+    rewrite e -gen_translation_equivalidity. cbn.
+    cbn in htab. destruct htab as [hGamma | hF].
+    - left. rewrite -subst_commutes_with_env_forms. intro h. apply hGamma.
+      have e' : (translate_EForm_ [] (ls_to_eform Gamma))@[sigma] =
+                  (ls_to_form (@subst_list string Form _ _ _ _ _ _ _
+                                 (forms (ls_to_econtext sko Gamma)) sigma)).
+      { clear. induction Gamma as [|G Gs IHGs]; cbn in *; try reflexivity.
+        now rewrite -IHGs. }
+      rewrite -e' //.
+    - right. rewrite -subst_commutes_with_env_forms. exact hF.
+  Qed.
 End ValidityEquivalence.
 
 (** ** 5. Helper to transform substitution into internal substitution *)
