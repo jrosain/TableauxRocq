@@ -321,21 +321,28 @@ Section ESyntaxTranslation.
     | EFun f l => Fun f (map (translate_ETerm m) l)
     end.
 
-  Fixpoint closed_in (m : list string) (t : ETerm) : Prop :=
-    let fix closed_in_list (l : list ETerm) : Prop :=
-      match l with
-      | [] => True
-      | u :: us => closed_in m u /\ closed_in_list us
-      end in
-    match t with
-    | EVar x => index_of x m = None
-    | EFun f l => closed_in_list l
-    end.
+  Section ClosedIn.
+    Context {Container : Type} (mem : string -> Container -> Prop).
+
+    Fixpoint closed_in (m : Container) (t : ETerm) : Prop :=
+      let fix closed_in_list (l : list ETerm) : Prop :=
+        match l with
+        | [] => True
+        | u :: us => closed_in m u /\ closed_in_list us
+        end in
+      match t with
+      | EVar x => mem x m
+      | EFun f l => closed_in_list l
+      end.
+  End ClosedIn.
+
+  Definition mem_list (x : string) (l : list string) :=
+    index_of x l = None.
 
   Lemma closed_in_nil :
-    forall (t : ETerm), closed_in [] t.
+    forall (t : ETerm), closed_in mem_list [] t.
   Proof.
-    intros t; induction t using eterm_ind; cbn; auto.
+    intros t; induction t using eterm_ind; cbn; unfold mem_list; auto.
     induction l as [|u us IHus]; cbn; auto.
     split.
     - now apply Forall_inv in H.
@@ -344,10 +351,11 @@ Section ESyntaxTranslation.
 
   Lemma closed_in_translate_ETerm :
     forall (t : ETerm) (m m' : list string),
-      closed_in m t -> closed_in m' t ->
+      closed_in mem_list m t ->
+      closed_in mem_list m' t ->
       translate_ETerm m t = translate_ETerm m' t.
   Proof.
-    intros ??? hclosed hclosed'; induction t using eterm_ind; cbn in *.
+    intros ??? hclosed hclosed'; induction t using eterm_ind; unfold mem_list; cbn in *.
     - rewrite hclosed hclosed' //.
     - apply f_equal. induction l as [|u us IHus]; cbn; auto.
       rewrite IHus.
@@ -357,6 +365,32 @@ Section ESyntaxTranslation.
       + apply Forall_inv in H. rewrite H //.
         * apply hclosed.
         * apply hclosed'.
+  Qed.
+
+  Lemma closed_in_union_closed_in_left :
+    forall (t : ETerm) (s s' : SetOfString_.SetOfX_.t),
+      closed_in (fun x s => ~set_in x s) (s \union s') t -> closed_in (fun x s => ~set_in x s) s t.
+  Proof.
+    intros. destruct t using eterm_ind; cbn in *.
+    - intro hin. apply H. rewrite union_spec. now left.
+    - induction l as [|t ts IHts]; cbn; auto. split.
+      + apply Forall_inv in H0. apply H0. apply H.
+      + apply IHts.
+        * now apply Forall_tail in H0.
+        * apply H.
+  Qed.
+
+  Lemma closed_in_union_closed_in_right :
+    forall (t : ETerm) (s s' : SetOfString_.SetOfX_.t),
+      closed_in (fun x s => ~set_in x s) (s \union s') t -> closed_in (fun x s => ~set_in x s) s' t.
+  Proof.
+    intros. destruct t using eterm_ind; cbn in *.
+    - intro hin. apply H. rewrite union_spec. now right.
+    - induction l as [|t ts IHts]; cbn; auto. split.
+      + apply Forall_inv in H0. apply H0. apply H.
+      + apply IHts.
+        * now apply Forall_tail in H0.
+        * apply H.
   Qed.
 
   Fixpoint translate_EForm_ (m : list string) (F : EForm) : Form :=
@@ -444,24 +478,31 @@ Section ESyntaxTranslation.
 
   Lemma instantiate_eform_commutes_instantiate_form :
     forall (x : string) (t : ETerm) (F : EForm) (rho : list string),
-      ~(List.In x rho) -> closed_in rho t ->
+      ~(List.In x rho) -> closed_in mem_list rho t ->
+      closed_in (fun x s => ~ set_in x s) (bv_eform F) t ->
       (translate_EForm_ (rho ++ [x]) F) {#|rho| \to translate_ETerm rho t} =
         translate_EForm_ rho (instantiate_eform x t F).
   Proof.
-    intros ???. induction F; intros rho hin hclosed; cbn in *; try reflexivity.
+    intros ???. induction F; intros rho hin hclosed hclosed'; cbn in *; try reflexivity.
     - intros. rewrite !map_map.
       apply f_equal. induction l as [|u us IHus]; cbn; auto.
       rewrite IHus instantiate_eterm_commutes_instantiate_term //.
     - rewrite IHF //.
-    - rewrite IHF1 // IHF2 //.
-    - rewrite IHF1 // IHF2 //.
-    - rewrite IHF1 // IHF2 //.
-    - rewrite IHF1 // IHF2 //.
+    - rewrite IHF1 //.
+      + eapply closed_in_union_closed_in_left; eauto.
+      + rewrite IHF2 //. eapply closed_in_union_closed_in_right; eauto.
+    - rewrite IHF1 //.
+      + eapply closed_in_union_closed_in_left; eauto.
+      + rewrite IHF2 //. eapply closed_in_union_closed_in_right; eauto.
+    - rewrite IHF1 //.
+      + eapply closed_in_union_closed_in_left; eauto.
+      + rewrite IHF2 //. eapply closed_in_union_closed_in_right; eauto.
+    - rewrite IHF1 //.
+      + eapply closed_in_union_closed_in_left; eauto.
+      + rewrite IHF2 //. eapply closed_in_union_closed_in_right; eauto.
     - specialize (IHF (s :: rho)). do 3 apply f_equal.
-      (* TODO: need 1 more conditions: no bound vars of [F] appears
-         in [t] (gives closed_in (s :: rho) t).
-         Also . *)
-      have h : closed_in (s :: rho) t. { admit. }
+      have h : closed_in mem_list (s :: rho) t. {
+        admit. }
       have e : translate_ETerm rho t = translate_ETerm (s :: rho) t.
       { apply closed_in_translate_ETerm; auto. }
       rewrite -!match_eq_dec_eq_bool.
@@ -470,6 +511,7 @@ Section ESyntaxTranslation.
            be replaced by [#|rho| + 1] (as it will be replaced by 0). *) admit.
       + cbn in IHF. rewrite e PeanoNat.Nat.add_1_r IHF; auto.
         intros [e' | hin']; try congruence.
+        eapply closed_in_union_closed_in_right; eauto.
     - (* this is the same strategy as above. *)
   Admitted.
 End ESyntaxTranslation.
@@ -1011,11 +1053,11 @@ Section HasTableauLemmas.
     forall (Gamma : Con) (sigma : Substitution string Term) (S S0 : SetOfString) (Sf : sko_record)
       (i : nat) (F : EForm) (x : string) (y : string),
       nth_error (forms Gamma) i = Some [[ EAll x F ]] -> isFresh y (fv Gamma) = true ->
-      S0 = rem y S -> mem y S = true ->
+      mem y (bv_eform F) = false -> S0 = rem y S -> mem y S = true ->
       hasTableau_ sko (Gamma ,, [[ instantiate_eform x (EVar y) F ]]) S0 Sf sigma ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
-    intros ????????? e hfresh eS hmem htab.
+    intros ????????? e hfresh hnmem eS hmem htab.
     have eS0 : S = add y S0.
     { rewrite eS add_rem; auto.
       now rewrite -mem_spec. }
@@ -1025,7 +1067,8 @@ Section HasTableauLemmas.
     - replace [x] with (List.app [] [x]).
       2: now cbn.
       rewrite (instantiate_eform_commutes_instantiate_form x (EVar y) F []); auto.
-      now cbn.
+      + now cbn.
+      + cbn. now rewrite mem_spec' in hnmem.
   Qed.
 
   Existing Instance fv_ctx.

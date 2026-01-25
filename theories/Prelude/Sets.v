@@ -301,6 +301,14 @@ Section SetProperties.
       { apply IHys. }
       rewrite e0 union_assoc //.
   Qed.
+
+  Lemma mem_spec' :
+    forall (x : A) (s : set_A), mem x s = false <-> ~(set_in x s).
+  Proof using Type.
+    intros x s; split; intro h.
+    - intro hin. rewrite -mem_spec in hin. rewrite hin in h. inversion h.
+    - apply not_true_is_false. intro e. apply h. rewrite -mem_spec //.
+  Qed.
 End SetProperties.
 Hint Rewrite @empty_unitl @empty_unitr @union_idemp @union_assoc : set_db.
 Hint Unfold are_disjoint : set_db.
