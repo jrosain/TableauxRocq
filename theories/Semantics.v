@@ -24,6 +24,15 @@ Section SemanticsDef.
   Class Interpret (M : Model) (A B : Type) :=
     interpret : list M -> env M var -> A -> B.
 
+  #[global] Instance interpret_list {A B : Type} (M : Model) `{@Interpret M A B} :
+    Interpret M (list A) (list B) :=
+    fun rho sigma =>
+      fix F (t : list A) : list B :=
+        match t with
+        | [] => []
+        | x :: xs => interpret rho sigma x :: F xs
+        end.
+
   #[global] Instance interpret_term (M : Model) : Interpret M (Term_ func var) M :=
     fun rho sigma =>
       fix F (t : Term_ func var) : M :=
@@ -46,12 +55,13 @@ Section SemanticsDef.
   Definition is_valid (F : Form_ pred func var) :=
     forall (M : Model), interpret_form_ M [] (empty_env M var) F.
 
-  Definition is_countersat (F : Form_ pred func var) :=
-    forall (M : Model), ~(interpret_form_ M [] (empty_env M var) F).
+  Definition is_satisfiable (F : Form_ pred func var) :=
+    exists (M : Model), forall (mu : env M var),
+      interpret_form_ M [] mu F.
 
   Definition equiv (F G : Form_ pred func var) :=
-    forall (M : Model), interpret_form_ M [] (empty_env M var) F <->
-                     interpret_form_ M [] (empty_env M var) G.
+    forall (M : Model) (rho : list M) (sigma : env M var),
+      interpret_form_ M rho sigma F <-> interpret_form_ M rho sigma G.
 
   Definition imply (F G : Form_ pred func var) :=
     forall (M : Model), interpret_form_ M [] (empty_env M var) F ->
@@ -69,7 +79,7 @@ Section SemanticsDef.
 
   #[global] Instance equiv_trans : Transitive equiv.
   Proof using Type.
-    intros F G H hequ1 hequ2 M. specialize (hequ1 M); specialize (hequ2 M).
+    intros F G H hequ1 hequ2 M rho sigma. specialize (hequ1 M rho sigma); specialize (hequ2 M rho sigma).
     rewrite hequ1 hequ2 //.
   Qed.
 
@@ -141,6 +151,40 @@ Section SemanticsFacts.
   Let Form := Form_ pred func var.
   Let Term := Term_ func var.
 
+  Lemma ls_to_form_commutes :
+    forall (Gamma : list Form) (F G : Form),
+      ls_to_form (F :: G :: Gamma) \equiv ls_to_form (Neg (Or (Neg F) (Neg G)) :: Gamma).
+  Proof using Type.
+    intros. split; intros h; cbn in *.
+    - intros [hFG | hGamma].
+      + apply NNPP in hFG. destruct hFG as [hnF | hnG].
+        * apply h. now left.
+        * apply h. right. intro h'; apply h'. now left.
+      + apply h. right. intro h'; apply h'. now right.
+    - intros [hF | hG].
+      + apply h. left. intro h'; apply h'. now left.
+      + apply NNPP in hG; destruct hG as [hG | hG].
+        * apply h. left. intro h'; apply h'. now right.
+        * apply h; now right.
+  Qed.
+
+  Lemma is_satisfiable_is_not_countersat :
+    forall (F : Form),
+      is_satisfiable F -> \models Neg F -> False.
+  Proof using Type.
+    intros F hsat hfalse. destruct hsat as (M & hsat).
+    specialize (hfalse M); specialize (hsat (empty_env M var)).
+    now apply hfalse.
+  Qed.
+
+  Lemma is_satisfiable_equiv :
+    forall (F G : Form), F \equiv G -> is_satisfiable F <-> is_satisfiable G.
+  Proof using Type.
+    intros F G hequiv. split; intros (M & h); exists M; intros mu; specialize (h mu).
+    - now rewrite -(hequiv M).
+    - now rewrite (hequiv M).
+  Qed.
+
   Lemma in_form_list_models :
     forall (F : Form) (Gamma : list Form),
       List.In F Gamma -> Gamma \models F.
@@ -199,6 +243,42 @@ Section SemanticsFacts.
     apply HF. now rewrite hequiv.
   Qed.
 
+  Lemma is_satisfiable_list :
+    forall (F : Form) (Gamma : list Form),
+      is_satisfiable (ls_to_form Gamma) -> List.In F Gamma -> is_satisfiable F.
+  Proof using Type.
+    intros ?? hsat hin. induction Gamma as [|G Gs IHGs]; inversion hin.
+    - subst. cbn in hsat. destruct hsat as (M & hsat). exists M. intro.
+      specialize (hsat mu). cbn in hsat. apply NNPP => save. apply hsat.
+      now left.
+    - apply IHGs; auto. destruct hsat as (M & hsat). exists M. intro.
+      specialize (hsat mu). cbn in hsat. apply NNPP => save. apply hsat.
+      now right.
+  Qed.
+
+  Lemma add_satisfiable_in_list :
+    forall (F G : Form) (Gamma : list Form),
+      F \equiv G -> List.In G Gamma -> is_satisfiable (ls_to_form Gamma) -> is_satisfiable (ls_to_form (F :: Gamma)).
+  Proof using Type.
+    intros ??? hequiv hin hsatG. cbn in *.
+    destruct hsatG as (M & hsatG). exists M. intros.
+    cbn. intros [hnF | hnG]; auto. specialize (hsatG mu).
+    have H : interpret_form_ M [] mu G.
+    { induction Gamma as [|H Hs IHs]; inversion hin.
+      - subst. cbn in hsatG. apply NNPP => save. apply hsatG. now left.
+      - apply IHs; auto. apply NNPP => save. apply hsatG. now right. }
+    specialize (hequiv M). now rewrite hequiv in hnF.
+  Qed.
+
+  Lemma conjunction_models_false :
+    forall {F : Form} {Gamma : list Form},
+      (F :: Gamma) \models Bot -> forall (M : Model pred func), [[ M # [] # empty_env M var |- Neg F ]] \/
+                                               [[ M # [] # empty_env M var |- Neg (ls_to_form Gamma) ]].
+  Proof using Type.
+    intros F Gamma h M. apply NNPP => save.
+    specialize (h M). cbn in h. destruct h as [h | contra]; auto.
+  Qed.
+
   Lemma extend_with_implied_form :
     forall (F G : Form) (Gamma : list Form),
       (F :: Gamma) \models Bot -> (imply G F) -> List.In G Gamma -> Gamma \models Bot.
@@ -240,14 +320,14 @@ Section SemanticsFacts.
   Lemma neg_equiv :
     forall (F G : Form), F \equiv G -> Neg F \equiv Neg G.
   Proof using Type.
-    intros F G H M. specialize (H M). cbn; rewrite H //.
+    intros F G H M rho sigma. specialize (H M). cbn; rewrite H //.
   Qed.
 
   Lemma or_equiv :
     forall (F1 F2 G1 G2 : Form), F1 \equiv G1 -> F2 \equiv G2 -> Or F1 F2 \equiv Or G1 G2.
   Proof using Type.
-    intros ???? H1 H2 M.
-    specialize (H1 M); specialize (H2 M); cbn.
+    intros ???? H1 H2 M rho sigma.
+    specialize (H1 M rho sigma); specialize (H2 M rho sigma); cbn.
     rewrite H1 H2 //.
   Qed.
 

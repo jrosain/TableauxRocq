@@ -63,6 +63,7 @@ Notation "{{ F }}" := (empty_ctx ,, F).
 Notation "{{ F1 ;; F2 ;; .. ;; Fk }}" :=
   (extend_ctx .. (extend_ctx (extend_ctx empty_ctx F1) F2) .. Fk).
 
+(** ** Definition of tableaux *)
 Section TableauxProofs.
   Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
 
@@ -75,6 +76,9 @@ Section TableauxProofs.
   Let Form := Form_ pred func var.
   Let sko_record := sko_record sko.
 
+  (** We unset the automatic generation of elimination schemes to get a dependent elimination
+      for the predicate [hasTableau_]. *)
+  Unset Elimination Schemes.
   Inductive hasTableau_
     : Con -> set_var -> sko_record -> Substitution var Term -> Prop :=
 
@@ -95,7 +99,7 @@ Section TableauxProofs.
       (F1 F2 : Form),
       Neg (Or F1 F2) \in Gamma -> hasTableau_ (Gamma ,, Neg F1 ,, Neg F2) S Sf sigma -> hasTableau_ Gamma S Sf sigma
 
-  (** Beta rule *) (* TODO: JOIN CONDITION IN SKOLEMIZATION *)
+  (** Beta rule *)
   | hasTableauOr :
     forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
       (F1 F2 : Form),
@@ -117,10 +121,70 @@ Section TableauxProofs.
                                        (add_symbol (symbol sko t Hsko) F (con_sko_record Gamma))
                                        (Gamma ,, Neg F{0 \to t})) S Sf sigma ->
       hasTableau_ Gamma S (add_symbol (symbol sko t Hsko) F Sf) sigma.
+  Set Elimination Schemes.
+  Scheme hasTableau__ind := Induction for hasTableau_ Sort Prop.
 
   Definition hasTableau (Gamma : Con) (sigma : Substitution var Term) : Prop :=
     exists (S : set_var) (Sf : sko_record), hasTableau_ Gamma S Sf sigma.
+
+  (** *** Satisfiability of a tableau *)
+
+  (** A tableau is said satisfiable if there exists a branch such that all the formulas of
+      a branch are satisfiable. We can define it as an inductive predicate. *)
+  Inductive is_tableau_satisfiable (M : Model pred func) (mu : env M var) :
+    forall {Gamma : Con} {S : set_var} {Sf : sko_record} {sigma : Substitution var Term},
+      hasTableau_ Gamma S Sf sigma -> Prop :=
+
+  | satisfiable_hasTableauContr :
+    forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
+      (P P' : Form) (hin : P \in Gamma) (hin' : P' \in Gamma) (e : Neg P@[sigma] = P'@[sigma]),
+      [[ M # [] # mu |- ls_to_form (forms Gamma) ]] ->
+      is_tableau_satisfiable M mu (hasTableauContr Gamma S Sf sigma P P' hin hin' e)
+
+  | satisfiable_hasTableauNegNeg :
+    forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
+      (F : Form) (hin : Neg (Neg F) \in Gamma) (htab : hasTableau_ (Gamma ,, F) S Sf sigma),
+      is_tableau_satisfiable M mu htab ->
+      is_tableau_satisfiable M mu (hasTableauNegNeg Gamma S Sf sigma F hin htab)
+
+  | satisfiable_hasTableauNegOr :
+    forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
+      (F1 F2 : Form) (hin : Neg (Or F1 F2) \in Gamma) (htab : hasTableau_ (Gamma ,, Neg F1 ,, Neg F2) S Sf sigma),
+      is_tableau_satisfiable M mu htab ->
+      is_tableau_satisfiable M mu (hasTableauNegOr Gamma S Sf sigma F1 F2 hin htab)
+
+  | satisfiable_hasTableauOr1 :
+    forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
+      (F1 F2 : Form) (hin : (Or F1 F2) \in Gamma) (htab1 : hasTableau_ (Gamma ,, F1) S1 Sf1 sigma)
+      (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf2 sigma) (hdisj : are_disjoint S1 S2),
+      is_tableau_satisfiable M mu htab1 ->
+      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf1 Sf2 sigma F1 F2 hin htab1 htab2 hdisj)
+
+  | satisfiable_hasTableauOr2 :
+    forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
+      (F1 F2 : Form) (hin : (Or F1 F2) \in Gamma) (htab1 : hasTableau_ (Gamma ,, F1) S1 Sf1 sigma)
+      (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf2 sigma) (hdisj : are_disjoint S1 S2),
+      is_tableau_satisfiable M mu htab2 ->
+      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf1 Sf2 sigma F1 F2 hin htab1 htab2 hdisj)
+
+  | satisfiable_hasTableauAll :
+    forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
+      (x : var) (F : Form) (hin : (All F) \in Gamma) (hfresh : isFresh x (fv Gamma) = true)
+      (htab : hasTableau_ (Gamma ,, F{0 \to Free x}) S Sf sigma),
+      is_tableau_satisfiable M mu htab ->
+      is_tableau_satisfiable M mu (hasTableauAll Gamma S Sf sigma x F hin hfresh htab)
+
+  | satisfiable_hasTableauNegAll :
+    forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
+      (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) (con_sko_record Gamma) = true)
+      (hin : (Neg (All F)) \in Gamma)
+      (htab : hasTableau_ (set_con_sko_record
+                             (add_symbol (symbol sko t Hsko) F (con_sko_record Gamma))
+                             (Gamma ,, Neg F{0 \to t})) S Sf sigma),
+      is_tableau_satisfiable M mu htab ->
+      is_tableau_satisfiable M mu (hasTableauNegAll Gamma S Sf sigma F t Hsko hin htab).
 End TableauxProofs.
+Arguments is_tableau_satisfiable {_ _ _ _ _} _ _ {_ _ _ _} _.
 
 (* TODO: structural lemmas, e.g., strengthening, exchange law, (need something else?) *)
 
@@ -131,80 +195,24 @@ Section TableauxSoundness.
   Let Form := Form_ pred func var.
   Let Term := Term_ func var.
 
-  Lemma subst_ctx_subst_list :
-    forall (Gamma : Con) (sigma : Substitution var Term),
-      (forms Gamma)@[sigma] = forms (Gamma@[sigma]).
-  Proof using Type.
-    intros [l sko_] sigma; cbn. clear sko_; induction l as [|F Fs IHFs]; auto.
-    cbn. f_equal. apply IHFs.
-  Qed.
-
-  Lemma in_ctx_in_substituted_ctx :
-    forall (Gamma : Con) (F : Form) (sigma : Substitution var Term),
-      F \in Gamma -> F@[sigma] \in Gamma@[sigma].
-  Proof using Type.
-    intros ???. destruct Gamma as [l sko_]; cbn. clear sko_.
-    induction l as [|G Gs IHGs]; intros Hin; inversion Hin.
-    - rewrite H. cbn. now left.
-    - right. now apply IHGs.
-  Qed.
+  (** Of course, no tableau is satisfiable *)
+  (* TODO: subst to env *)
+  Lemma hasTableau_not_satisfiable :
+    forall (M : Model pred func)
+      {Gamma : Con} {S : set_atom var} {Sf : sko_record sko} {sigma : Substitution var Term}
+      (T : hasTableau_ sko Gamma S Sf sigma), is_tableau_satisfiable M sigma T -> False.
+  Proof.
+    intros ??????? H. induction H.
+    Admitted.
 
   Theorem hasTableau_sound :
     forall (sigma : Substitution var Term) (Gamma : Con) (F : Form),
-      hasTableau sko (Gamma ,, Neg F) sigma -> ((forms Gamma)@[sigma] \models F@[sigma]).
+      isClosed (forms (Gamma ,, Neg F)) ->
+      hasTableau sko (Gamma ,, Neg F) sigma -> (forms Gamma \models F).
   Proof using Type.
-    intros ??? (S & Sf & htab).
-    rewrite models_iff. replace (Neg F@[sigma] :: (forms Gamma)@[sigma]) with (forms (Gamma ,, Neg F)@[sigma]).
-    2: { rewrite subst_ctx_subst_list. now cbn. }
-    induction htab.
-    - apply in_form_list_models.
-      apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
-      now cbn in H.
-    - apply in_ctx_in_substituted_ctx with (sigma := sigma) in H0, H.
-      apply models_P_neg_P with (F := P@[sigma]).
-      + now apply in_form_list_models.
-      + apply in_form_list_models. now rewrite H1.
-    - apply extend_with_equiv_form with (F := F0@[sigma]) (G := Neg (Neg F0@[sigma])); auto.
-      + apply neg_neg_equiv.
-      + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
-    - apply extend_with_double_equiv_form with (F1 := Neg F2@[sigma]) (F2 := Neg F1@[sigma])
-                                               (G := Neg (Or F1 F2)@[sigma]); auto.
-      + apply neg_equiv. cbn.
-        rewrite or_comm. apply or_equiv.
-        all: symmetry; apply neg_neg_equiv.
-      + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
-    - apply double_extend_with_equiv_form with (F1 := F1@[sigma]) (F2 := F2@[sigma]) (G := (Or F1 F2)@[sigma]);
-        auto.
-      + reflexivity.
-      + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
-    - apply extend_with_implied_form with (F := F0 {0 \to Free x}@[sigma]) (G := (All F0)@[sigma]); auto.
-      + cbn. rewrite form_subst_opening.
-        apply instantiate_imply_all, isLocallyClosed_isLocallyClosed_subst.
-        red. now cbn.
-      + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
-    - apply extend_with_implied_form' with (F := Neg (F0 {0 \to t})@[sigma]) (G := (Neg (All F0))@[sigma]); auto.
-      + rewrite form_subst_opening. intros M hinterp. cbn in hinterp.
-        apply NNPP => save. apply hinterp. intros c.
-        change (interpret_form_ M [c] (empty_env M var) F0@[sigma]).
-        apply NNPP => save'. apply save.
-        set c' := [[ M # [] # empty_env M var |- t@[sigma] ]].
-        exists (ReplacementModel c' c); split.
-        * set M' := ReplacementModel _ _.
-          intro hinterp'.
-          have hinterp'' : interpret_form_ M' [c] (empty_env M' var) (F0@[sigma]).
-          { rewrite form_env_inst_commutes in hinterp'.
-            - apply isLocallyClosed_isLocallyClosed_subst.
-              apply (locally_closed Hsko).
-            - rewrite app_nil_l in hinterp'.
-              have e : interpret_term M' [] (empty_env M' var) t@[sigma] = c.
-              { admit. }
-              rewrite -e. assumption. }
-          apply save'. (* as M and M' coincide on the values that are not t@[sigma], this holds *)
-          admit.
-        * intro. (* as M and M' coincide on the values that are not t@[sigma], this holds *)
-          admit.
-      + now apply in_ctx_in_substituted_ctx with (sigma := sigma) in H.
-  Qed.
+    intros ??? hclosedGamma (S & Sf & htab).
+    rewrite models_iff. intros M. left. intro hsat.
+  Admitted.
 End TableauxSoundness.
 
 Module ConcreteProofInstances.

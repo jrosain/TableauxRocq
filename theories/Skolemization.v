@@ -218,7 +218,7 @@ End SkoSymbolLemmas.
 
 (** ** Some classic instances *)
 Section SkolemizationInstances.
-  Context {pred func var : Atom} `{set_term : set (Term_ func var)}.
+  Context {pred func var : Atom}.
 
   Let set_var := set_atom var.
   Let set_func := set_atom func.
