@@ -195,6 +195,46 @@ Section TableauxSoundness.
   Let Form := Form_ pred func var.
   Let Term := Term_ func var.
 
+  (** We start by showing that if the root formula of a tableau is satisfiable, then this
+      tableau is also satisfiable.
+
+      Note that [Gamma] must be a closed context. *)
+  Lemma hasTableau_satisfiable :
+    forall (M : Model pred func) {Gamma : Con} {S : set_atom var}
+      {Sf : sko_record sko} {sigma : Substitution var Term}
+      (T : hasTableau_ sko Gamma S Sf sigma) (mu : env M var),
+      [[ M # [] # mu |- ls_to_form (forms Gamma) ]] ->
+      is_tableau_satisfiable M mu T.
+  Proof.
+    intros ??????? hinterp. induction T.
+    - exfalso. have contra := in_form_list_interp i hinterp.
+      now cbn in contra.
+    - now apply satisfiable_hasTableauContr.
+    - constructor. apply IHT. eapply extend_with_equiv_form; eauto. apply neg_neg_equiv.
+    - constructor. apply IHT. apply interp_list_commute.
+      eapply extend_with_equiv_form; eauto.
+      apply neg_equiv. etransitivity.
+      + apply or_comm.
+      + apply or_equiv; symmetry; apply neg_neg_equiv.
+    - have hinterp' := in_form_list_interp i hinterp.
+      destruct hinterp'.
+      + apply satisfiable_hasTableauOr1. apply IHT1.
+        cbn. intros [hnF1 | hnG]; auto.
+      + apply satisfiable_hasTableauOr2. apply IHT2.
+        cbn. intros [hnF2 | hnG]; auto.
+    - constructor. apply IHT.
+      eapply extend_with_imply_form; eauto.
+      apply instantiate_imply_all. now cbn.
+    - constructor. apply IHT. eapply extend_with_imply_form'.
+      3: apply i.
+      all: auto.
+      exists M, mu. intros hF. apply NNPP in hF.
+      change ([[ M # [] # mu |- F { 0 \to t } ]]) in hF; split.
+      + intros hnAll; apply hnAll. intro c.
+        change [[M # [c] # mu |- F]]. admit.
+      + admit.
+  Admitted.
+
   (** Of course, no tableau is satisfiable *)
   (* TODO: subst to env *)
   (* Lemma hasTableau_not_satisfiable : *)
