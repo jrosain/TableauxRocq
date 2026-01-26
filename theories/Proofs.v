@@ -104,7 +104,7 @@ Section TableauxProofs.
     forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
       (F1 F2 : Form),
       (Or F1 F2) \in Gamma -> hasTableau_ (Gamma ,, F1) S1 Sf1 sigma -> hasTableau_ (Gamma ,, F2) S2 Sf2 sigma ->
-      are_disjoint S1 S2 -> hasTableau_ Gamma (S1 \union S2) (join Sf1 Sf2) sigma
+      hasTableau_ Gamma (S1 \union S2) (join Sf1 Sf2) sigma
 
   (** Gamma rule *)
   | hasTableauAll :
@@ -156,16 +156,16 @@ Section TableauxProofs.
   | satisfiable_hasTableauOr1 :
     forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
       (F1 F2 : Form) (hin : (Or F1 F2) \in Gamma) (htab1 : hasTableau_ (Gamma ,, F1) S1 Sf1 sigma)
-      (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf2 sigma) (hdisj : are_disjoint S1 S2),
+      (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf2 sigma),
       is_tableau_satisfiable M mu htab1 ->
-      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf1 Sf2 sigma F1 F2 hin htab1 htab2 hdisj)
+      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf1 Sf2 sigma F1 F2 hin htab1 htab2)
 
   | satisfiable_hasTableauOr2 :
     forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
       (F1 F2 : Form) (hin : (Or F1 F2) \in Gamma) (htab1 : hasTableau_ (Gamma ,, F1) S1 Sf1 sigma)
-      (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf2 sigma) (hdisj : are_disjoint S1 S2),
+      (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf2 sigma),
       is_tableau_satisfiable M mu htab2 ->
-      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf1 Sf2 sigma F1 F2 hin htab1 htab2 hdisj)
+      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf1 Sf2 sigma F1 F2 hin htab1 htab2)
 
   | satisfiable_hasTableauAll :
     forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
@@ -197,13 +197,13 @@ Section TableauxSoundness.
 
   (** Of course, no tableau is satisfiable *)
   (* TODO: subst to env *)
-  Lemma hasTableau_not_satisfiable :
-    forall (M : Model pred func)
-      {Gamma : Con} {S : set_atom var} {Sf : sko_record sko} {sigma : Substitution var Term}
-      (T : hasTableau_ sko Gamma S Sf sigma), is_tableau_satisfiable M sigma T -> False.
-  Proof.
-    intros ??????? H. induction H.
-    Admitted.
+  (* Lemma hasTableau_not_satisfiable : *)
+  (*   forall (M : Model pred func) *)
+  (*     {Gamma : Con} {S : set_atom var} {Sf : sko_record sko} {sigma : Substitution var Term} *)
+  (*     (T : hasTableau_ sko Gamma S Sf sigma), is_tableau_satisfiable M sigma T -> False. *)
+  (* Proof. *)
+  (*   intros ??????? H. induction H. *)
+  (*   Admitted. *)
 
   Theorem hasTableau_sound :
     forall (sigma : Substitution var Term) (Gamma : Con) (F : Form),
