@@ -158,29 +158,39 @@ Section DecEqForms.
   Existing Instance eqb_atom.
   Existing Instance eq_dec_list.
 
-  #[global] Instance eq_dec_form : EqDec (Form_ pred func var).
+  Fixpoint eqb_form (F G : Form_ pred func var) : bool :=
+    match F, G with
+    | Bot, Bot => true
+    | Pred p l, Pred p' l' => eqb p p' && eqb l l'
+    | Neg F, Neg G => eqb_form F G
+    | Or F1 F2, Or G1 G2 => eqb_form F1 G1 && eqb_form F2 G2
+    | All F, All G => eqb_form F G
+    | _, _ => false
+    end.
+
+  Lemma eqb_form_eq :
+    forall F G : Form_ pred func var, eqb_form F G = true <-> F = G.
   Proof using Type.
-    intros F; induction F as [|p l | F' IHF' | F1 IHF1 F2 IHF2 | F' IHF'];
-      intros G; destruct G as [|p' l' | G' | G1 G2 | G'].
-    all: try (right; intro contra; inversion contra; fail).
-    - now left.
-    - destruct (p == p').
-      2: right; intro e; injection e => e0 e1; now apply n.
-      destruct (l == l').
-      2: right; intro e'; injection e' => e0 e1; now apply n.
-      left; now rewrite e e0.
-    - destruct (IHF' G').
-      2: right; intro e; injection e => e0; now apply n.
-      left; now rewrite e.
-    - destruct (IHF1 G1).
-      2: right; intro e; injection e => e0 e1; now apply n.
-      destruct (IHF2 G2).
-      2: right; intro e'; injection e' => e0' e1'; now apply n.
-      left; now rewrite e e0.
-    - destruct (IHF' G').
-      2: right; intro e; injection e => e0; now apply n.
-      left; now rewrite e.
+    intros F; induction F; intros G; destruct G; split; cbn.
+    all: try now intro.
+    - intros (e & e')%andb_prop. rewrite !eqbIsEq in e, e'. rewrite e e' //.
+    - intros e; injection e => -> ->. apply andb_true_intro; split; apply EqBool_refl.
+    - intro. apply f_equal. rewrite -IHF //.
+    - intro. injection H => <-. rewrite IHF //.
+    - intros (e & e')%andb_prop. rewrite IHF1 IHF2 in e, e'. now subst.
+    - intros e; injection e => <- <-. apply andb_true_intro; split.
+      + rewrite IHF1 //.
+      + rewrite IHF2 //.
+    - intros e; apply f_equal. rewrite -IHF //.
+    - intros e; injection e => <-. rewrite IHF //.
   Qed.
+
+  #[global] Instance eqbool_form : EqBool (Form_ pred func var).
+  Proof.
+    unshelve econstructor.
+    - exact eqb_form.
+    - exact eqb_form_eq.
+  Defined.
 End DecEqForms.
 
 (** *** Opening and substitution for formulas *)
