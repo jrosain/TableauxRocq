@@ -80,7 +80,9 @@ Section DecEqTerms.
     - intro e. injection e => ->. rewrite eqbIsEq //.
     - rewrite eqbIsEq. now intros ->.
     - intros e; injection e => ->. rewrite eqbIsEq //.
-    - admit. (* easy, todo *)
+    - intros (e & e')%andb_prop. rewrite eqbIsEq in e. rewrite e.
+      
+admit. (* easy, todo *)
     - intros e; injection e => -> ->. admit. (* easy *)
   Admitted.
 

@@ -19,8 +19,7 @@ Export ConcreteProofInstances.
       3. a translation function from this syntax to the internal one,
       4. a proof that the two syntaxes are semantically equivalent,
       5. helper functions for transforming finite substitutions into internal substitutions,
-      6. helper lemmas to build a tableau more easily
-      7. tactics to simplify extended syntax stuff & solve set-related stuff *)
+      6. helper lemmas to build a tableau more easily *)
 
 (** ** 1. Extended syntax *)
 Section ESyntax.
@@ -218,6 +217,14 @@ Section ESyntaxTranslation.
           * inversion e.
     Qed.
 
+    Lemma index_of_In' :
+      forall (x : A) (l : list A) (n : nat), index_of x l = Some n -> List.In x l.
+    Proof using Type.
+      intros ??? e. have h := index_of_In x l n e.
+      clear e. induction l as [|y ys IHys]; try now cbn in *.
+      cbn in h |- *. destruct h; auto.
+    Qed.
+
     Lemma index_of_cons :
       forall (x y : A) (l : list A) (n : nat),
         index_of x (y :: l) = Some (S n) -> index_of x l = Some n.
@@ -308,6 +315,66 @@ Section ESyntaxTranslation.
       - rewrite -!match_eq_dec_eq_bool. destruct (y == z); auto.
         rewrite IHzs; auto.
         intro hin; apply e. now right.
+    Qed.
+
+    Lemma index_of_length :
+      forall (x : A) (l : list A) (n : nat),
+        index_of x l = Some n -> n < #|l|.
+    Proof using Type.
+      intros ??. induction l as [|y ys IHys]; cbn in *.
+      - now intros.
+      - intros; rewrite -match_eq_dec_eq_bool in H0.
+        destruct (x == y).
+        + injection H0 => <-. lia.
+        + destruct (index_of x ys) eqn:e; cbn in *.
+          * specialize (IHys (Nat.pred n)).
+            have e1 : Some n1 = Some (Nat.pred n).
+            { apply f_equal. injection H0 => <-. lia. }
+            specialize (IHys e1).  replace n with (S (Nat.pred n)).
+            { now apply Arith_base.lt_n_S_stt. }
+            apply PeanoNat.Nat.succ_pred_pos. injection H0 => <-. lia.
+          * inversion H0.
+    Qed.
+
+    Lemma index_of_prefix :
+      forall (x : A) (l l0 l1 : list A) (n0 n1 : nat),
+        List.In x l -> index_of x (l ++ l0) = Some n0 -> index_of x (l ++ l1) = Some n1 -> n0 = n1.
+    Proof using Type.
+      intros ?????? hin. revert n0 n1. induction l as [|y ys IHys];
+        intros ?? e0 e1.
+      - apply index_of_In' in e0. now cbn in e0.
+      - cbn in e0, e1. rewrite -!match_eq_dec_eq_bool in e0, e1.
+        destruct (x == y).
+        + injection e0 => <-; now injection e1 => <-.
+        + destruct (index_of x (ys ++ l0));
+            destruct (index_of x (ys ++ l1)); cbn in *.
+          * injection e0 => e0'; injection e1 => e1'.
+            have e : Nat.pred n0 = Nat.pred n1.
+            { apply IHys.
+              2-3: apply f_equal; lia.
+              destruct hin; auto. congruence. }
+            have en0 : S (Nat.pred n0) = n0.
+            { apply PeanoNat.Nat.succ_pred_pos. lia. }
+            have en1 : S (Nat.pred n1) = n1.
+            { apply PeanoNat.Nat.succ_pred_pos. lia. }
+            lia.
+          * inversion e1.
+          * inversion e0.
+          * inversion e0.
+    Qed.
+
+    Lemma index_of_None :
+      forall (x : A) (l : list A),
+        index_of x l = None -> ~List.In x l.
+    Proof using Type.
+      intros ?? e hin. induction l as [|y ys IHys]; cbn in *; auto.
+      destruct hin.
+      - rewrite -match_eq_dec_eq_bool in e. destruct (x == y); auto.
+        inversion e.
+      - rewrite -match_eq_dec_eq_bool in e. destruct (x == y); auto.
+        + inversion e.
+        + apply IHys; auto. destruct (index_of x ys); auto.
+          inversion e.
     Qed.
   End IndexOf.
 
@@ -436,6 +503,76 @@ Section ESyntaxTranslation.
                    (if eqb x y then F else instantiate_eform x u F)
     end.
 
+  Lemma instantiate_shadowed_term :
+    forall (t u : ETerm) (x : string) (rho rho' : list string),
+      (translate_ETerm (rho ++ x :: rho' ++ [x]) t)
+        {#| rho | + #| rho' | + 1 \to translate_ETerm rho' u} =
+        translate_ETerm (rho ++ x :: rho') t.
+  Proof.
+    intros. induction t using eterm_ind; try reflexivity; cbn.
+    - destruct (index_of x0 (rho ++ x :: rho' ++ [x])) eqn:e0;
+        destruct (index_of x0 (rho ++ x :: rho')) eqn:e1; cbn.
+      + have hin := index_of_In' _ _ _ e1.
+        have e : n = n0.
+        { replace rho' with (List.app rho' []) in e1.
+          have h := index_of_prefix x0 (rho ++ x :: rho') [x] [].
+          eapply h; eauto.
+          1-2: rewrite -!app_assoc in e0 e1 |- *; eauto.
+          apply app_nil_r. }
+        have hlt : n < #|rho ++ x :: rho'|.
+        { apply (index_of_length x0); rewrite e //. }
+        rewrite -match_eq_dec_eq_bool.
+        destruct ((#|rho| + #|rho'| + 1) == n); auto.
+        exfalso. have h : n < #| rho | + #| rho' | + 1.
+        { rewrite length_app in hlt. cbn in hlt. lia. }
+        lia.
+      + destruct (x == x0).
+        * subst. have h : (rho ++ x0 :: rho').(#|rho|) = Some x0.
+          { rewrite nth_error_app2; auto.
+            rewrite PeanoNat.Nat.sub_diag. now cbn. }
+          apply nth_error_In in h. apply index_of_None in e1. exfalso. now apply e1.
+        * apply index_of_In' in e0.
+          apply index_of_None in e1.
+          have h : List.In x0 [x].
+          { replace (rho ++ x :: rho' ++ [x])%list with ((rho ++ x :: rho') ++ [x])%list in e0.
+            2: { rewrite -!app_assoc app_comm_cons //. }
+             apply in_app_or in e0. destruct e0; auto. exfalso. now apply n0. }
+          cbn in h. destruct h; auto.
+          -- exfalso; now apply n0.
+          -- inversion H.
+      + apply index_of_In' in e1.
+        apply index_of_None in e0.
+        exfalso. apply e0. rewrite app_comm_cons app_assoc. apply in_or_app. now left.
+      + reflexivity.
+    - apply f_equal. rewrite map_map.
+      induction l as [|v vs IHvs]; auto.
+      cbn. rewrite IHvs.
+      + now apply Forall_tail in H.
+      + apply Forall_inv in H. rewrite H //.
+  Qed.
+
+  Lemma instantiate_shadowed_form :
+    forall (F : EForm) (t : ETerm) (x : string) (rho rho' : list string),
+      (translate_EForm_ (rho ++ x :: rho' ++ [x]) F)
+        {#| rho | + #| rho' | + 1 \to translate_ETerm rho' t} =
+        translate_EForm_ (rho ++ x :: rho') F.
+  Proof.
+    intros F t. induction F; try reflexivity.
+    - intros. cbn. apply f_equal. induction l; auto.
+      cbn; rewrite IHl. rewrite instantiate_shadowed_term //.
+    - intros; cbn. rewrite IHF //.
+    - intros; cbn. rewrite IHF1 IHF2 //.
+    - intros; cbn. rewrite IHF1 IHF2 //.
+    - intros; cbn. rewrite IHF1 IHF2 //.
+    - intros; cbn. rewrite IHF1 IHF2 //.
+    - intros; cbn. do 3 apply f_equal.
+      have h := (IHF x (s :: rho) rho').
+      cbn in h. rewrite -h. f_equal. lia.
+    - intros; cbn. apply f_equal.
+      have h := (IHF x (s :: rho) rho').
+      cbn in h. rewrite -h. f_equal. lia.
+  Qed.
+
   Lemma instantiate_eterm_commutes_instantiate_term :
     forall (x : string) (t u : ETerm) (rho : list string),
       ~(List.In x rho) ->
@@ -521,9 +658,10 @@ Section ESyntaxTranslation.
       { apply closed_in_translate_ETerm; auto. }
       rewrite -!match_eq_dec_eq_bool.
       destruct (x == s).
-      + (* have to show that if [x = s], then [x] will never
-           be replaced by [#|rho| + 1] (as it will be replaced by 0). *) admit.
-      + cbn in IHF. rewrite e PeanoNat.Nat.add_1_r IHF; auto.
+      + rewrite e0.
+        have h0 := instantiate_shadowed_form F t s [] rho.
+        rewrite !app_nil_l in h0. rewrite h0 //.
+       + cbn in IHF. rewrite e PeanoNat.Nat.add_1_r IHF; auto.
         intros [e' | hin']; try congruence.
         eapply closed_in_union_closed_in_right; eauto.
     - specialize (IHF (s :: rho)). apply f_equal; cbn.
@@ -547,12 +685,13 @@ Section ESyntaxTranslation.
       { apply closed_in_translate_ETerm; auto. }
       rewrite -!match_eq_dec_eq_bool.
       destruct (x == s).
-      + (* have to show that if [x = s], then [x] will never
-           be replaced by [#|rho| + 1] (as it will be replaced by 0). *) admit.
+      + rewrite e0.
+        have h0 := instantiate_shadowed_form F t s [] rho.
+        rewrite !app_nil_l in h0. rewrite h0 //.
       + cbn in IHF. rewrite e PeanoNat.Nat.add_1_r IHF; auto.
         intros [e' | hin']; try congruence.
         eapply closed_in_union_closed_in_right; eauto.
-  Admitted.
+  Qed.
 End ESyntaxTranslation.
 
 Class ETranslation (A B : Type) :=
@@ -1181,7 +1320,3 @@ Section HasTableauLemmas.
       (* easy *) admit.
   Admitted.
 End HasTableauLemmas.
-
-(** ** 7. Tactics *)
-
-Ltac esimpl := native_compute.
