@@ -50,10 +50,10 @@ Defined.
 Theorem hasTableau_outer_branching_proof :
   GuidedTableauSearch OuterSkolemization [Neg [[ branching ]]]
     subst outer_branching_proof = ret true.
-Proof. now vm_compute. Qed.
+Proof. now native_compute. Qed.
 (** Yay!! *)
 
 Theorem hasTableau_inner_branching_proof :
   GuidedTableauSearch InnerSkolemization [Neg [[ branching ]]]
     subst outer_branching_proof = ret true.
-Proof. now vm_compute. Qed.
+Proof. now native_compute. Qed.

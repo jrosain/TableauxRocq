@@ -64,7 +64,7 @@ Defined.
 Theorem hasTableau_outer_drinker_proof :
   GuidedTableauSearch OuterSkolemization [Neg [[ drinker ]]]
     outer_subst outer_drinker_proof = ret true.
-Proof. now vm_compute. Qed.
+Proof. now native_compute. Qed.
 
 (** In inner Skolemization, we only have to Skolemize once as ["X"] does not appear in the
     body of the Skolemized formula. As before, we provide the substitution using a finite list,
@@ -89,4 +89,4 @@ Defined.
 Theorem hasTableau_inner_drinker_proof :
   GuidedTableauSearch InnerSkolemization [Neg [[ drinker ]]]
     inner_subst inner_drinker_proof = ret true.
-Proof. now vm_compute. Qed.
+Proof. now native_compute. Qed.
