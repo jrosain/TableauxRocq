@@ -899,8 +899,7 @@ Section ValidityEquivalence.
     cbn in htab. destruct htab as [hGamma | hF].
     - left. rewrite -subst_commutes_with_env_forms. intro h. apply hGamma.
       have e' : (translate_EForm_ [] (ls_to_eform Gamma))@[sigma] =
-                  (ls_to_form (@subst_list string Form _ _ _ _ _ _ _
-                                 (forms (ls_to_econtext sko Gamma)) sigma)).
+                  (ls_to_form (forms (ls_to_econtext sko Gamma))@[sigma]).
       { clear. induction Gamma as [|G Gs IHGs]; cbn in *; try reflexivity.
         now rewrite -IHGs. }
       rewrite -e' //.
