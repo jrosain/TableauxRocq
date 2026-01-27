@@ -55,7 +55,7 @@ End BVInstances.
 Section SubstInstances.
   Context `{set_nat : set nat}.
 
-  #[global] Instance subst_list {X : Atom} {A B : Type} `{H : BV B} `{Subst A B} :
+  #[global] Instance subst_list {A B : Type} `{H : BV B} `{Subst A B} :
     Subst (list A) B :=
     fun xs sigma =>
       (fix F (xs : list A) : list A :=

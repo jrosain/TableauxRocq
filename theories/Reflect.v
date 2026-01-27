@@ -17,25 +17,31 @@ From Tableaux Require Import ATPCompat.
 (** We start by giving a data-structure that reflects the rules in [Proofs] extended for a
     use with the extended syntax. *)
 Inductive ExtendedRule : Type :=
-| AlphaNegNeg : EForm -> ExtendedRule
-| AlphaAnd : EForm -> ExtendedRule
-| AlphaNegOr : EForm -> ExtendedRule
-| AlphaNegImp : EForm -> ExtendedRule
-| BetaOr : EForm -> ExtendedRule
-| BetaImp : EForm -> ExtendedRule
-| BetaNegAnd : EForm -> ExtendedRule
-| BetaEqu : EForm -> ExtendedRule
-| BetaNegEqu : EForm -> ExtendedRule
-| GammaAll : EForm -> ExtendedRule
-| GammaNegEx : EForm -> ExtendedRule
-| DeltaEx : EForm -> ExtendedRule
-| DeltaNegAll : EForm -> ExtendedRule.
+| AlphaNegNeg : Form -> ExtendedRule
+| AlphaAnd : Form -> ExtendedRule
+| AlphaNegOr : Form -> ExtendedRule
+| AlphaNegImp : Form -> ExtendedRule
+| BetaOr : Form -> ExtendedRule
+| BetaImp : Form -> ExtendedRule
+| BetaNegAnd : Form -> ExtendedRule
+| BetaEqu : Form -> ExtendedRule
+| BetaNegEqu : Form -> ExtendedRule
+| GammaAll : Form -> string -> ExtendedRule
+| GammaNegEx : Form -> string -> ExtendedRule
+| DeltaEx : Form -> Term -> ExtendedRule
+| DeltaNegAll : Form -> Term -> ExtendedRule.
 
 (** As we want a proof tree, we will take a tree of extended rules as an input of the algorithm.
     Unary rules can be implemented by ignoring the *2nd* child of the tree. *)
 Inductive ExtendedRuleTree : Type :=
 | Leaf : ExtendedRuleTree
 | Node : ExtendedRuleTree -> ExtendedRule -> ExtendedRuleTree -> ExtendedRuleTree.
+
+Definition mkUnaryNode (rule : ExtendedRule) (T1 : ExtendedRuleTree) : ExtendedRuleTree :=
+  Node T1 rule Leaf.
+
+Definition mkBinaryNode (rule : ExtendedRule) (T1 T2 : ExtendedRuleTree) : ExtendedRuleTree :=
+  Node T1 rule T2.
 
 (** A small [Result] monad that stores the issues. *)
 Definition Result (A : Type) : Type := A * list string.
@@ -46,7 +52,7 @@ Definition bind {A B : Type} (r : Result A) (f : A -> Result B) : Result B :=
   let (x, s) := f (fst r) in
   (x, List.app (snd r) s).
 
-Definition error {A : Type} (x : A) (s : string) : Result A := (x, [s]).
+Definition error (s : string) : Result bool := (false, [s]).
 
 Notation "r >>= f" := (bind r f) (at level 50).
 
@@ -159,54 +165,108 @@ Definition get_all (F : Form) : option Form :=
   | _ => None
   end.
 
-Definition get_neg_ex (F : Form) : option Form :=
+Definition get_ex (F : Form) : option Form :=
   match F with
   | Neg (All (Neg F)) => Some F
   | _ => None
   end.
 
-Definition pr_form (F : Form) : string := "*not yet implemented*".
-Definition pr_context (Gamma : list Form) : string := "*not yet implemented*".
+Definition get_neg_ex (F : Form) : option Form :=
+  match F with
+  | Neg F => Utils.bind (get_ex F) (fun F => Some (Neg F))
+  | _ => None
+  end.
+
+Definition get_neg_all (F : Form) : option Form :=
+  match F with
+  | Neg (All F) => Some (Neg F)
+  | _ => None
+  end.
+
+Definition pr_list {A : Type} (pr_A : A -> string) (l : list A) : string :=
+  let fix F (l : list A) : string :=
+    match l with
+    | [] => ""
+    | [x] => pr_A x
+    | x :: xs => pr_A x ++ " ; " ++ F xs
+    end in
+  F l.
+
+Fixpoint pr_term (t : Term) : string :=
+  match t with
+  | Bound n => "x@" ++ nat_to_string n
+  | Free x => x
+  | Fun f l => f ++ "(" ++ pr_list pr_term l ++ ")"
+  end.
+
+Fixpoint pr_form (F : Form) : string :=
+  match F with
+  | Bot => "$false"
+  | Pred p l => p ++ "(" ++ pr_list pr_term l ++ ")"
+  | Neg F => "~(" ++ pr_form F ++ ")"
+  | Or F1 F2 => "(" ++ pr_form F1 ++ " | " ++ pr_form F2 ++ ")"
+  | All F => "! (" ++ pr_form F ++ ")"
+  end.
+
+Definition pr_context (Gamma : list Form) : string :=
+  "[ " ++ pr_list pr_form Gamma ++ " ]".
+
+Definition pr_bool (b : bool) : string :=
+  match b with
+  | true => "true"
+  | false => "false"
+  end.
 
 (** The guided proof-search is the following algorithm:
     - on a leaf: it tries to search for a closure [Bot] or [Neg Top] or a contradiction using
       the supplied substitution ; returns [false] if no closure rule can be found ;
     - on a node: it tries to apply the given rule on the given formula, and calls the
-      algorithm recursively.
-
-    /!\ it requires that the string "@" does not appear in the identifiers to work properly /!\ *)
-Fixpoint GuidedTableauSearch__aux
-  (i : nat) (j : nat)
-  (Gamma : list Form) (sigma : Substitution string Term) (tree : ExtendedRuleTree) : Result bool :=
+      algorithm recursively. *)
+Fixpoint GuidedTableauSearch
+  (sko : Skolemization) (Gamma : list Form) (sigma : Substitution string Term)
+  (tree : ExtendedRuleTree) : Result bool :=
   match tree with
   | Leaf =>
       if trivial_contradiction Gamma
       then ret true
       else if litteral_contradiction Gamma sigma
            then ret true
-           else error false ("No contradiction in the context: " ++ pr_context Gamma)
+           else error ("No contradiction in the context: " ++ pr_context (Gamma@[sigma]))
+
   | Node T1 rule T2 =>
 
       let alpha_rule (getter : Form -> option (list Form)) (err : string) (F : Form) :=
         match getter F with
-        | None => error false ("The formula " ++ pr_form F ++ " is not a " ++ err)
-        | Some l => GuidedTableauSearch__aux i j (List.app l Gamma) sigma T1
+        | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
+        | Some l => GuidedTableauSearch sko (List.app l Gamma) sigma T1
         end in
 
       let beta_rule (getter : Form -> option (list Form * list Form)) (err : string) (F : Form) :=
         match getter F with
-        | None => error false ("The formula " ++ pr_form F ++ " is not a " ++ err)
+        | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
         | Some (l1, l2) =>
-            GuidedTableauSearch__aux i j (List.app l1 Gamma) sigma T1 >>=
-              (fun b => if b then GuidedTableauSearch__aux i j (List.app l2 Gamma) sigma T2
+            GuidedTableauSearch sko (List.app l1 Gamma) sigma T1 >>=
+              (fun b => if b then GuidedTableauSearch sko (List.app l2 Gamma) sigma T2
                      else ret b)
         end in
 
-      let gamma_rule (getter : Form -> option Form) (err : string) (F : Form) :=
+      let gamma_rule (x : string) (getter : Form -> option Form) (err : string) (F : Form) :=
         match getter F with
-        | None => error false ("The formula " ++ pr_form F ++ " is not a " ++ err)
-        | Some F => GuidedTableauSearch__aux (i + 1) j (F{0 \to Free ("X@" ++ nat_to_string i)} :: Gamma)
-                     sigma T1
+        | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
+        | Some F =>
+            if isFresh x (fv Gamma)
+            then GuidedTableauSearch sko (F{0 \to Free x} :: Gamma) sigma T1
+            else error ("The variable " ++ x ++ " is not fresh in " ++ pr_context Gamma)
+        end in
+
+      let delta_rule (t : Term) (getter : Form -> option Form) (err : string) (F : Form) :=
+        match getter F with
+        | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
+        | Some F =>
+            if @is_sko _ _ _ OuterSkolemization t F (fv Gamma) empty_record
+            then GuidedTableauSearch sko (F{0 \to t} :: Gamma) sigma T1
+            else error ("The term " ++ pr_term t ++ " is not a valid Skolem symbol in the context "
+                          ++ pr_context Gamma)
         end in
 
       match rule with
@@ -221,16 +281,13 @@ Fixpoint GuidedTableauSearch__aux
       | BetaEqu F => beta_rule get_equ "equivalence" F
       | BetaNegEqu F => beta_rule get_neg_equ "negated equivalence" F
 
-      | GammaAll F => gamma_rule get_all "universal formula" F
-      | GammaNegEx F => gamma_rule get_neg_ex "negated existential formula" F
+      | GammaAll F x => gamma_rule x get_all "universal formula" F
+      | GammaNegEx F x => gamma_rule x get_neg_ex "negated existential formula" F
 
-      | _ => error false "Not yet implemented"
+      | DeltaEx F t => delta_rule t get_ex "existential formula" F
+      | DeltaNegAll F t => delta_rule t get_neg_all "negated universal formula" F
       end
   end.
-
-(* | DeltaEx : EForm -> ExtendedRule *)
-(* | DeltaNegAll : EForm -> ExtendedRule. *)
-(* |  *)
 
 (** ** 2. Soundness *)
 
