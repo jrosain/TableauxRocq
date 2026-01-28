@@ -1,7 +1,6 @@
 
+Set Warnings "-native-compiler".
 From Tableaux Require Import All.
-
-Import ATPCompat.
 
 Definition Axiom0 : EForm :=
 	EPred "p" [(EFun "a" [])] 
@@ -11,24 +10,19 @@ Definition T : EForm :=
 	EEx "X4" (EPred "p" [(EVar "X4")]) 
 .
 
-Definition subst := translate_substitution [("X4_8", (EFun "a" []))].
+Definition subst := translate_substitution [("X4_6", (EFun "a" []))].
 
 
-Theorem T_proof :
-	hasTableau OuterSkolemization {{ translate_EForm (Axiom0) ;;  translate_EForm (ENeg T) }} subst.
+Definition T_Proof : ExtendedRuleTree.
 Proof.
-exists \{ "X4_8" \}, \{\}.
-unshelve eapply hasTableauNegEx with (i := 0).
-1-3: shelve.
-1: exact "X4_8".
-1: reflexivity.
-1: now native_compute.
-1: reflexivity.
-1: now native_compute.
-1: now native_compute.
-eapply hasTableauContr with (i := 3) (j := 0).
-1: reflexivity. 
-1: reflexivity. 
-reflexivity.
+apply (mkUnaryNode ( GammaNegEx (Neg [[ EEx "X4" (EPred "p" [(EVar "X4")]) ]]) "X4_6" ) ).
+exact Leaf.
+Defined.
+
+Theorem hasTableau_T_proof :
+	GuidedTableauSearch InnerSkolemization [  [[ Axiom0 ]] ;  Neg [[ T ]] ]
+subst T_Proof = ret true.
+Proof.
+now native_compute.
 Qed.
 
