@@ -246,6 +246,14 @@ Section SetProperties.
   Qed.
   Hint Rewrite empty_unitl empty_unitr union_idemp union_assoc : set_db.
 
+  Lemma union_comm :
+    forall (s1 s2 : set_A),
+      union s1 s2 = union s2 s1.
+  Proof using Type.
+    intros; apply set_ext; intro; split; intro hin; rewrite !union_spec in hin |- *;
+      destruct hin as [hin | hin]; auto.
+  Qed.
+
   Lemma inter_sym :
     forall (s1 s2 : set_A), inter s1 s2 = inter s2 s1.
   Proof using Type.
@@ -300,6 +308,14 @@ Section SetProperties.
                   (f y) \union fold_left (fun (s0 : set_A) (b : B) => s0 \union f b) ys empty_set.
       { apply IHys. }
       rewrite e0 union_assoc //.
+  Qed.
+
+  Lemma mem_spec' :
+    forall (x : A) (s : set_A), mem x s = false <-> ~(set_in x s).
+  Proof using Type.
+    intros x s; split; intro h.
+    - intro hin. rewrite -mem_spec in hin. rewrite hin in h. inversion h.
+    - apply not_true_is_false. intro e. apply h. rewrite -mem_spec //.
   Qed.
 End SetProperties.
 Hint Rewrite @empty_unitl @empty_unitr @union_idemp @union_assoc : set_db.

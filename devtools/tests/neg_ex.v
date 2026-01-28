@@ -22,9 +22,10 @@ unshelve eapply hasTableauNegEx with (i := 0).
 1-3: shelve.
 1: exact "X4_8".
 1: reflexivity.
-1: now esimpl.
+1: now native_compute.
 1: reflexivity.
-1: now esimpl.
+1: now native_compute.
+1: now native_compute.
 eapply hasTableauContr with (i := 3) (j := 0).
 1: reflexivity. 
 1: reflexivity. 

@@ -391,4 +391,44 @@ Section SemanticsFacts.
     - intro; apply instantiate_imply_all; auto.
       unfold isLocallyClosed. now cbn.
   Qed.
+
+  Definition subst_to_env (M : Model pred func)
+    (sigma : Substitution var Term) : env M var :=
+    fun x => Some ([[ M # [] # empty_env M var |- sigma x ]]).
+
+  Lemma subst_commutes_with_env_terms :
+    forall (M : Model pred func) (t : Term) (rho : list M) (sigma : Substitution var Term),
+      [[ M # rho # empty_env M var |- t@[sigma] ]] =
+        [[ M # rho # subst_to_env M sigma |- t ]].
+  Proof using Type.
+    intros. induction t using term_ind; cbn; try reflexivity.
+    - apply isLocallyClosed_interp_env. apply isSubst.
+    - apply f_equal. induction l as [|u us IHus]; cbn; auto.
+      rewrite IHus.
+      + now apply Forall_tail in X.
+      + apply Forall_inv in X. rewrite X //.
+  Qed.
+
+  Lemma subst_commutes_with_env_forms :
+    forall (M : Model pred func) (F : Form) (rho : list M) (sigma : Substitution var Term),
+      [[ M # rho # empty_env M var |- F@[sigma] ]] <->
+        [[ M # rho # subst_to_env M sigma |- F ]].
+  Proof using Type.
+    intros M F. induction F; cbn.
+    - reflexivity.
+    - intros.
+      have e : map (interpret_term rho (empty_env M var)) (map (fun t : Term => t@[sigma]) l) =
+                 map (interpret_term rho (subst_to_env M sigma)) l.
+      { induction l as [|t ts IHts]; cbn; auto.
+        rewrite IHts. f_equal.
+        change ([[ M # rho # empty_env M var |- t@[sigma] ]] =
+                  [[ M # rho # subst_to_env M sigma |- t ]]).
+        apply subst_commutes_with_env_terms. }
+      now rewrite e.
+    - intros ??. rewrite IHF //.
+    - intros; rewrite IHF1 IHF2 //.
+    - intros. split; intros h x.
+      + rewrite -IHF //.
+      + rewrite IHF //.
+  Qed.
 End SemanticsFacts.

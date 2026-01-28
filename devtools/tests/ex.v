@@ -20,8 +20,9 @@ unshelve eapply hasTableauEx with (sko := OuterSkolemization) (i := 0).
 1-3: shelve.
 1: exact ((EFun "skolem@X3@0" [])).
 2, 3: reflexivity.
-1: now esimpl.
-1: now esimpl.
+1: now native_compute.
+1: now native_compute.
+1: now cbn.
 eapply hasTableauAnd with (i := 0).
 1: reflexivity. 
 eapply hasTableauContr with (i := 1) (j := 0).

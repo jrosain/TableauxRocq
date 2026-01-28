@@ -90,4 +90,15 @@ Section FVInstances.
       | [] => empty_set
       | x :: xs => (fv x) \union (F xs)
       end.
+
+  Lemma fv_list_in :
+    forall {A : Type} `{@FV var A} (x : A) (l : list A),
+      List.In x l -> fv l = fv (x :: l).
+  Proof using Type.
+    intros ???? hin; induction l as [|y ys IHys]; inversion hin.
+    - subst. cbn. rewrite -union_assoc union_idemp //.
+    - cbn. rewrite -union_assoc.
+      symmetry; etransitivity. { refine (f_equal (fun s => s \union fv ys) _). apply union_comm. }
+      rewrite union_assoc. cbn in IHys. rewrite -IHys; auto.
+  Qed.
 End FVInstances.

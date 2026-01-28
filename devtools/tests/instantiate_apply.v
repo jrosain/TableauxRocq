@@ -16,17 +16,19 @@ Proof.
   1-3: shelve.
   1: exact((EFun "skolem@X7@0"[])).
   2, 3: reflexivity.
-  1: { now esimpl. }
-  1: { now esimpl. }
+  1: { now native_compute. }
+  1: { now native_compute. }
+  1: { now cbn. }
   eapply hasTableauNegImp with (i := 0).
   1: { reflexivity. }
   unshelve eapply hasTableauNegEx with(i := 1).
   1-3: shelve.
   1: exact "Y5_12".
   1: { reflexivity. }
-  1: { now esimpl. }
+  1: { now native_compute. }
   1: { reflexivity. }
-  1: { now esimpl. }
+  1: { now native_compute. }
+  1: { now cbn. }
   eapply hasTableauNegOr with(i := 0).
   1: { reflexivity. }
   eapply hasTableauContr with(i := 4) (j := 1).

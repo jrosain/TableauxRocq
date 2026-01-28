@@ -1,6 +1,7 @@
 (** * Prelude.Utils: some utility functions / lemmas *)
 
 From Tableaux Require Import Init.
+From Tableaux Require Import Ind.
 From Tableaux Require Import Classes.
 
 From Corelib Require Import Program.Wf.
@@ -30,6 +31,30 @@ Fixpoint forallb2 {A : Type} (P : A -> A -> bool) (l1 l2 : list A) : bool :=
   | _, _ => false
   end.
 
+Lemma forallb2_eq :
+  forall {A : Type} {P : A -> A -> bool} (l1 l2 : list A),
+    (forall (x y : A), In x l1 -> P x y = true -> x = y) ->
+    forallb2 P l1 l2 = true -> l1 = l2.
+Proof.
+  intros ???. induction l1 as [| x xs IHxs]; destruct l2 as [|y ys]; cbn in *.
+  - reflexivity.
+  - now intros.
+  - now intros.
+  - intros h (h0 & h1)%andb_prop. apply h in h0.
+    2: auto. rewrite h0. apply f_equal, IHxs; auto.
+Qed.
+
+Lemma forallb2_refl :
+  forall {A : Type} {P : A -> A -> bool} (l : list A),
+    (forall (x : A), In x l -> P x x = true) ->
+    forallb2 P l l = true.
+Proof.
+  intros. induction l; auto.
+  cbn. rewrite Bool.andb_true_iff. split; auto.
+  - apply H. now right.
+  - apply IHl. intros. apply H. now left.
+Qed.
+
 Lemma eqb_list_is_eq :
   forall {A : Type} `{EqBool A} (l l' : list A),
     forallb2 eqb l l' = true <-> l = l'.
@@ -50,3 +75,10 @@ Proof.
   - exact (forallb2 eqb).
   - apply eqb_list_is_eq.
 Defined.
+
+Lemma nth_error_Some' :
+  forall {A : Type} (l : list A) (n : nat) (x : A),
+    l.(n) = Some x -> n < #|l|.
+Proof.
+  intros ???? e. rewrite -nth_error_Some. intro. congruence.
+Qed.
