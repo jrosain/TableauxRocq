@@ -75,5 +75,5 @@ done in the following files:
   though they have the same number of rules applied. Nevertheless, this gives a nice
   example of a branching rule.
 
-The folder [devtools/tests](devtools/tests) examples for the application of other rules,
-but these files are not documented.
+The folder [devtools/tests](devtools/tests) has examples for the application of other
+rules, but these files are not documented.
