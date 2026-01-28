@@ -447,8 +447,8 @@ Section SemanticsFacts.
     intros M F. induction F; cbn.
     - reflexivity.
     - intros.
-      have e : map (interpret_term rho (empty_env M var)) (map (fun t : Term => t@[sigma]) l) =
-                 map (interpret_term rho (subst_to_env M sigma)) l.
+      have e : map (interpret_term M rho (empty_env M var)) (map (fun t : Term => t@[sigma]) l) =
+                 map (interpret_term M rho (subst_to_env M sigma)) l.
       { induction l as [|t ts IHts]; cbn; auto.
         rewrite IHts. f_equal.
         change ([[ M # rho # empty_env M var |- t@[sigma] ]] =
