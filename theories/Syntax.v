@@ -158,6 +158,24 @@ Inductive Form_ {pred func var : Atom} : Type :=
 
 Arguments Form_ : clear implicits.
 
+Definition is_positive_litteral {pred func var : Atom}
+  (F : Form_ pred func var) : bool :=
+  match F with
+  | Pred _ _ => true
+  | _ => false
+  end.
+
+Definition is_negative_litteral {pred func var : Atom}
+  (F : Form_ pred func var) : bool :=
+  match F with
+  | Neg F => is_positive_litteral F
+  | _ => false
+  end.
+
+Definition is_litteral  {pred func var : Atom}
+  (F : Form_ pred func var) : bool :=
+  is_positive_litteral F || is_negative_litteral F.
+
 (** *** Decidable equality for formulas *)
 Section DecEqForms.
   Context {pred func var : Atom}.
