@@ -1258,13 +1258,14 @@ Section HasTableauLemmas.
       nth_error (forms Gamma) i = Some [[ ENeg (EAll x F) ]] ->
       Sf0 = rem_symbol (symbol sko [[t]] hsko) (translate_EForm_ [x] F) Sf ->
       in_record (symbol sko [[t]] hsko) Sf ->
+      closed_in (fun x s => ~ set_in x s) (bv_eform F) t ->
       hasTableau_ sko
         (set_con_sko_record
            (add_symbol (symbol sko [[t]] hsko) (translate_EForm_ [x] F) (con_sko_record Gamma))
            (Gamma ,, [[ instantiate_eform x t (ENeg F) ]])) S Sf0 sigma ->
       hasTableau_ sko Gamma S Sf sigma.
-  Proof.
-    intros ?????????? e0 e1 hin htab.
+  Proof using Type.
+    intros ?????????? e0 e1 hin hclosed htab.
     have e2 : Sf = add_symbol (symbol sko [[t]] hsko) (translate_EForm_ [x] F) Sf0.
     { rewrite e1. symmetry; now apply add_rem_symbol. }
     rewrite e2.
@@ -1275,10 +1276,9 @@ Section HasTableauLemmas.
       { replace [x] with (List.app [] [x]).
         2: now cbn.
         rewrite (instantiate_eform_commutes_instantiate_form x t (ENeg F) []); auto; cbn.
-        - apply closed_in_nil.
-        - admit. }
+        apply closed_in_nil. }
       rewrite -e in htab. now cbn in htab.
-  Admitted.
+  Qed.
 
   Lemma hasTableauEx :
     forall (Gamma : Con) (sigma : Substitution string Term) (S : SetOfString) (Sf Sf0 : sko_record)
@@ -1288,6 +1288,7 @@ Section HasTableauLemmas.
       nth_error (forms Gamma) i = Some [[ EEx x F ]] ->
       Sf0 = rem_symbol (symbol sko [[ t ]] hsko)
               (translate_EForm_ [x] (ENeg F)) Sf -> in_record (symbol sko [[ t ]] hsko) Sf ->
+      closed_in (fun x s => ~ set_in x s) (bv_eform F) t ->
       hasTableau_ sko (set_con_sko_record
                          (add_symbol (symbol sko [[t]] hsko)
                             (translate_EForm_ [x] (ENeg F)) (con_sko_record Gamma))
@@ -1295,7 +1296,7 @@ Section HasTableauLemmas.
                             [[ instantiate_eform x t F ]])) S Sf0 sigma ->
       hasTableau_ sko Gamma S Sf sigma.
   Proof using Type.
-    intros ?????????? e0 e1 e2 htab. eapply hasTableauNegAll.
+    intros ?????????? e0 e1 e2 hclosed htab. eapply hasTableauNegAll.
     all: eauto.
     Unshelve.
     3: exact i.
