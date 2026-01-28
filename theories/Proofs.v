@@ -10,51 +10,32 @@ From Tableaux Require Import Syntax.
 
 (** As we want to keep a [sko_record] in the contexts, contexts get parameterized by
     skolemization instances. *)
-Section Contexts.
-  Context `{set_nat : set nat} {pred func var : Atom} {sko : Skolemization_ pred func var}.
+Section Context.
+  Context `{set_nat : set nat} {pred func var : Atom}.
 
-  Record Con_ :=
-    { forms : list (Form_ pred func var)
-    ; con_sko_record : sko_record sko }.
+  Let Form := Form_ pred func var.
 
-  Definition empty_ctx : Con_ :=
-    {| forms := []
-    ;  con_sko_record := empty_record |}.
+  Definition Con_ := list (Form_ pred func var).
 
-  Definition in_ctx (F : Form_ pred func var) (Gamma : Con_) : Prop :=
-    List.In F (forms Gamma).
+  Definition empty_ctx : Con_ := [].
+  Definition in_ctx (F : Form) (Gamma : Con_) : Prop := List.In F Gamma.
+  Definition extend_ctx (Gamma : Con_) (F : Form) : Con_ := F :: Gamma.
 
-  Definition extend_ctx (Gamma : Con_) (A : Form_ pred func var) : Con_ :=
-    {| forms := A :: forms Gamma
-    ;  con_sko_record := con_sko_record Gamma |}.
+  #[global] Instance fv_ctx : @FV var Con_ := ltac:(typeclasses eauto).
 
-  Fixpoint fv_ctx_ (Gamma : list (Form_ pred func var)) : set_atom var :=
-    match Gamma with
-    | [] => empty_set
-    | F :: Fs => fv F \union fv_ctx_ Fs
-    end.
-
-  #[global] Instance fv_ctx : @FV var Con_ :=
-    fun Gamma => fv_ctx_ (forms Gamma).
-
-  Fixpoint subst_ctx_ (Gamma : list (Form_ pred func var)) (sigma : Substitution var (Term_ func var))
-    : list (Form_ pred func var) :=
+  Fixpoint subst_ctx_ (Gamma : Con_) (sigma : Substitution var (Term_ func var)) : Con_ :=
     match Gamma with
     | [] => []
     | F :: Fs => F@[sigma] :: subst_ctx_ Fs sigma
     end.
 
   #[global] Instance subst_ctx : Subst Con_ (Term_ func var) :=
-    fun Gamma sigma =>
-      {| forms := subst_ctx_ (forms Gamma) sigma
-      ;  con_sko_record := con_sko_record Gamma |}. (* TODO: we probably want to subst this *)
+    subst_ctx_.
 
-  Definition set_con_sko_record (record : sko_record sko) (Gamma : Con_) : Con_ :=
-    {| forms := forms Gamma
-    ;  con_sko_record := record |}.
-End Contexts.
+  Definition ctx_to_form (Gamma : Con_) := ls_to_form Gamma.
+End Context.
 
-Arguments Con_ {_} _ _ _.
+Arguments Con_ : clear implicits.
 
 Notation "Gamma ,, A" := (extend_ctx Gamma A) (at level 20).
 Notation "A \in Gamma" := (in_ctx A Gamma) (at level 30).
@@ -71,7 +52,7 @@ Section TableauxProofs.
 
   Let set_var := set_atom var.
   Let set_func := set_atom func.
-  Let Con := Con_ pred func var sko.
+  Let Con := Con_ pred func var.
   Let Term := Term_ func var.
   Let Form := Form_ pred func var.
   Let sko_record := sko_record sko.
@@ -101,10 +82,11 @@ Section TableauxProofs.
 
   (** Beta rule *)
   | hasTableauOr :
-    forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
+    forall (Gamma : Con) (S1 S2 : set_var) (Sf : sko_record) (sigma : Substitution var Term)
       (F1 F2 : Form),
-      (Or F1 F2) \in Gamma -> hasTableau_ (Gamma ,, F1) S1 Sf1 sigma -> hasTableau_ (Gamma ,, F2) S2 Sf2 sigma ->
-      hasTableau_ Gamma (S1 \union S2) (join Sf1 Sf2) sigma
+      (Or F1 F2) \in Gamma -> disjoint S1 S2 = true ->
+      hasTableau_ (Gamma ,, F1) S1 Sf sigma -> hasTableau_ (Gamma ,, F2) S2 Sf sigma ->
+      hasTableau_ Gamma (S1 \union S2) Sf sigma
 
   (** Gamma rule *)
   | hasTableauAll :
@@ -116,11 +98,10 @@ Section TableauxProofs.
    (** Delta rule *)
   | hasTableauNegAll :
     forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
-      (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) (con_sko_record Gamma) = true),
-      (Neg (All F)) \in Gamma -> hasTableau_ (set_con_sko_record
-                                       (add_symbol (symbol sko t Hsko) F (con_sko_record Gamma))
-                                       (Gamma ,, Neg F{0 \to t})) S Sf sigma ->
-      hasTableau_ Gamma S (add_symbol (symbol sko t Hsko) F Sf) sigma.
+      (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) Sf = true),
+      (Neg (All F)) \in Gamma ->
+      hasTableau_ (Gamma ,, Neg F{0 \to t}) S (add_symbol (symbol sko t Hsko) F Sf) sigma ->
+      hasTableau_ Gamma S Sf sigma.
   Set Elimination Schemes.
   Scheme hasTableau__ind := Induction for hasTableau_ Sort Prop.
 
@@ -138,7 +119,7 @@ Section TableauxProofs.
   | satisfiable_hasTableauContr :
     forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
       (P P' : Form) (hin : P \in Gamma) (hin' : P' \in Gamma) (e : Neg P@[sigma] = P'@[sigma]),
-      [[ M # [] # mu |- ls_to_form (forms Gamma) ]] ->
+      [[ M # [] # mu |- ctx_to_form Gamma ]] ->
       is_tableau_satisfiable M mu (hasTableauContr Gamma S Sf sigma P P' hin hin' e)
 
   | satisfiable_hasTableauNegNeg :
@@ -154,18 +135,18 @@ Section TableauxProofs.
       is_tableau_satisfiable M mu (hasTableauNegOr Gamma S Sf sigma F1 F2 hin htab)
 
   | satisfiable_hasTableauOr1 :
-    forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
-      (F1 F2 : Form) (hin : (Or F1 F2) \in Gamma) (htab1 : hasTableau_ (Gamma ,, F1) S1 Sf1 sigma)
-      (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf2 sigma),
+    forall (Gamma : Con) (S1 S2 : set_var) (Sf : sko_record) (sigma : Substitution var Term)
+      (F1 F2 : Form) (hin : (Or F1 F2) \in Gamma) (hdisj : disjoint S1 S2 = true)
+      (htab1 : hasTableau_ (Gamma ,, F1) S1 Sf sigma) (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf sigma),
       is_tableau_satisfiable M mu htab1 ->
-      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf1 Sf2 sigma F1 F2 hin htab1 htab2)
+      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf sigma F1 F2 hin hdisj htab1 htab2)
 
   | satisfiable_hasTableauOr2 :
-    forall (Gamma : Con) (S1 S2 : set_var) (Sf1 Sf2 : sko_record) (sigma : Substitution var Term)
-      (F1 F2 : Form) (hin : (Or F1 F2) \in Gamma) (htab1 : hasTableau_ (Gamma ,, F1) S1 Sf1 sigma)
-      (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf2 sigma),
+    forall (Gamma : Con) (S1 S2 : set_var) (Sf : sko_record) (sigma : Substitution var Term)
+      (F1 F2 : Form) (hin : (Or F1 F2) \in Gamma) (hdisj : disjoint S1 S2 = true)
+      (htab1 : hasTableau_ (Gamma ,, F1) S1 Sf sigma) (htab2 : hasTableau_ (Gamma ,, F2) S2 Sf sigma),
       is_tableau_satisfiable M mu htab2 ->
-      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf1 Sf2 sigma F1 F2 hin htab1 htab2)
+      is_tableau_satisfiable M mu (hasTableauOr Gamma S1 S2 Sf sigma F1 F2 hin hdisj htab1 htab2)
 
   | satisfiable_hasTableauAll :
     forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
@@ -176,11 +157,9 @@ Section TableauxProofs.
 
   | satisfiable_hasTableauNegAll :
     forall (Gamma : Con) (S : set_var) (Sf : sko_record) (sigma : Substitution var Term)
-      (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) (con_sko_record Gamma) = true)
+      (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) Sf = true)
       (hin : (Neg (All F)) \in Gamma)
-      (htab : hasTableau_ (set_con_sko_record
-                             (add_symbol (symbol sko t Hsko) F (con_sko_record Gamma))
-                             (Gamma ,, Neg F{0 \to t})) S Sf sigma),
+      (htab : hasTableau_ (Gamma ,, Neg F{0 \to t}) S (add_symbol (symbol sko t Hsko) F Sf) sigma),
       is_tableau_satisfiable M mu htab ->
       is_tableau_satisfiable M mu (hasTableauNegAll Gamma S Sf sigma F t Hsko hin htab).
 End TableauxProofs.
@@ -191,7 +170,7 @@ Arguments is_tableau_satisfiable {_ _ _ _ _} _ _ {_ _ _ _} _.
 Section TableauxSoundness.
   Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
 
-  Let Con := Con_ pred func var sko.
+  Let Con := Con_ pred func var.
   Let Form := Form_ pred func var.
   Let Term := Term_ func var.
 
@@ -203,7 +182,7 @@ Section TableauxSoundness.
     forall (M : Model pred func) {Gamma : Con} {S : set_atom var}
       {Sf : sko_record sko} {sigma : Substitution var Term}
       (T : hasTableau_ sko Gamma S Sf sigma) (mu : env M var),
-      [[ M # [] # mu |- ls_to_form (forms Gamma) ]] ->
+      [[ M # [] # mu |- ctx_to_form Gamma ]] ->
       is_tableau_satisfiable M mu T.
   Proof.
     intros ??????? hinterp. induction T.
@@ -247,8 +226,8 @@ Section TableauxSoundness.
 
   Theorem hasTableau_sound :
     forall (sigma : Substitution var Term) (Gamma : Con) (F : Form),
-      isClosed (forms (Gamma ,, Neg F)) ->
-      hasTableau sko (Gamma ,, Neg F) sigma -> (forms Gamma \models F).
+      isClosed (Gamma ,, Neg F) ->
+      hasTableau sko (Gamma ,, Neg F) sigma -> Gamma \models F.
   Proof using Type.
     intros ??? hclosedGamma (S & Sf & htab).
     rewrite models_iff. intros M. left. intro hsat.
