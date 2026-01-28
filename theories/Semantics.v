@@ -135,14 +135,6 @@ Arguments interpret {_ _ _} _ {_ _ _} _ _ _.
 Notation "\models F" := (is_valid F) (at level 40).
 Notation "[[ M # rho # sigma |- F ]]" := (interpret M rho sigma F).
 Notation "F \equiv G" := (equiv F G) (at level 30).
-
-Fixpoint ls_to_form {pred func var : Atom} (Gamma : list (Form_ pred func var))
-  : Form_ pred func var :=
-  match Gamma with
-  | [] => Neg Bot
-  | F :: Fs => Neg (Or (Neg F) (Neg (ls_to_form Fs)))
-  end.
-
 Notation "Gamma \models F" := (is_valid (Or (Neg (ls_to_form Gamma)) F)) (at level 40).
 
 Section SemanticsFacts.

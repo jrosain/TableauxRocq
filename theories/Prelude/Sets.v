@@ -184,6 +184,15 @@ Section SetProperties.
     rewrite union_spec. now right.
   Qed.
 
+  Lemma is_empty_union :
+    forall (s1 s2 : set_A), is_empty s1 /\ is_empty s2 -> is_empty (s1 \union s2).
+  Proof using Type.
+    intros ?? (empty1 & empty2). apply is_empty_spec'.
+    intros x hin. rewrite union_spec in hin. destruct hin.
+    - eapply is_empty_spec in empty1; eauto.
+    - eapply is_empty_spec in empty2; eauto.
+  Qed.
+
   Fixpoint from_list (l : list A) : set_A :=
     match l with
     | [] => empty_set

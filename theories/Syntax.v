@@ -359,6 +359,13 @@ Section FVForms.
       end.
 End FVForms.
 
+Fixpoint ls_to_form {pred func var : Atom} (Gamma : list (Form_ pred func var))
+  : Form_ pred func var :=
+  match Gamma with
+  | [] => Neg Bot
+  | F :: Fs => Neg (Or (Neg F) (Neg (ls_to_form Fs)))
+  end.
+
 Section isClosedLemmas.
   Context {pred func var : Atom} `{set_nat : set nat}.
 
@@ -384,6 +391,21 @@ Section isClosedLemmas.
     rewrite union_spec in H. destruct H.
     - now apply (is_empty_spec x) in hclosedF.
     - now apply (is_empty_spec x) in hclosedl.
+  Qed.
+
+  Lemma isClosedList_isClosedFormList :
+    forall (l : list Form),
+      isClosed (ls_to_form l) <-> isClosed l.
+  Proof using Type.
+    intros; induction l as [|F Fs IHFs]; unfold isClosed; cbn.
+    - reflexivity.
+    - split; intro h; unfold isClosed in IHFs; cbn in *.
+      + apply is_empty_union; split.
+        * now apply is_empty_union1 in h.
+        * apply is_empty_union2 in h. rewrite -IHFs //.
+      + apply is_empty_union; split.
+        * now apply is_empty_union1 in h.
+        * apply is_empty_union2 in h. rewrite IHFs //.
   Qed.
 
   Lemma isClosed_subst_term :
