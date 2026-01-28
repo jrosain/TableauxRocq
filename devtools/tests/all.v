@@ -20,9 +20,10 @@ unshelve eapply hasTableauAll with (i := 0).
 1-3: shelve.
 1: exact "X3_5".
 1: reflexivity.
-1: now esimpl.
+1: now native_compute.
 1: reflexivity.
-1: now esimpl.
+1: now native_compute.
+1: now native_compute.
 eapply hasTableauAnd with (i := 0).
 1: reflexivity. 
 eapply hasTableauContr with (i := 1) (j := 0).

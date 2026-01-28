@@ -16,9 +16,9 @@ Proof.
 exists \{\}, \{\}.
 eapply hasTableauNegEqu with (S1 := @empty_set string _) (S2 := @empty_set string _) (Sf1 := empty_record) (Sf2 := empty_record) (i := 0).
 1: reflexivity.
-3: now esimpl. 
-3: now esimpl. 
-3: now esimpl. 
+3: now native_compute. 
+3: now native_compute. 
+3: now native_compute. 
 {
 eapply hasTableauContr with (i := 0) (j := 1).
 1: reflexivity. 
