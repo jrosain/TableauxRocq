@@ -60,19 +60,23 @@ Notation "r >>= f" := (bind r f) (at level 50).
 Definition trivial_contradiction (Gamma : list Form) : bool :=
   List.existsb (fun F => orb (eqb F Bot) (eqb F [[ ENeg ETop ]])) Gamma.
 
-(** Returns true iff there exists two litterals [P] and [P'] such that [Neg P@[sigma] = P'@[sigma]] in
-    [Gamma]. *)
-Definition litteral_contradiction (Gamma : list Form) (sigma : Substitution string Term) : bool :=
-  let Gamma__pos := List.filter is_positive_litteral Gamma in
-  let Gamma__neg := List.filter is_negative_litteral Gamma in
+Fixpoint is_negative (F : Form) : bool :=
+  match F with
+  | Neg F => negb (is_negative F)
+  | _ => false
+  end.
+
+Definition is_positive (F : Form) : bool := negb (is_negative F).
+
+(** Returns true iff there exists two formulas [F] and [F'] such that [Neg P@[sigma] = P'@[sigma]] in [Gamma]. *)
+Definition formula_contradiction (Gamma : list Form) (sigma : Substitution string Term) : bool :=
+  let Gamma__pos := List.filter is_positive Gamma in
+  let Gamma__neg := List.filter is_negative Gamma in
   List.existsb (fun F => List.existsb (fun G => eqb ((Neg F)@[sigma]) (G@[sigma])) Gamma__neg) Gamma__pos.
 
 Definition get_neg_neg (F : Form) : option (list Form) :=
   match F with
-  | Neg F => match F with
-          | Neg F => Some [F]
-          | _ => None
-          end
+  | Neg (Neg F) => Some [F]
   | _ => None
   end.
 
@@ -84,17 +88,7 @@ Definition get_or (F : Form) : option (list Form * list Form) :=
 
 Definition get_and (F : Form) : option (list Form) :=
   match F with
-  | Neg F =>
-      Utils.bind (get_or F)
-        (fun l =>
-           match l with
-           | ([F1], [F2]) =>
-               match F1, F2 with
-               | Neg F1, Neg F2 => Some [F1 ; F2]
-               | _, _ => None
-               end
-           | _ => None
-           end)
+  | Neg (Or (Neg F1) (Neg F2)) => Some [F1 ; F2]
   | _ => None
   end.
 
@@ -106,15 +100,7 @@ Definition get_neg_or (F : Form) : option (list Form) :=
 
 Definition get_neg_imp (F : Form) : option (list Form) :=
   match F with
-  | Neg F => Utils.bind (get_or F)
-            (fun l => match l with
-                   | ([F1], [F2]) =>
-                       match F1 with
-                       | Neg F1 => Some [ F1 ; Neg F2 ]
-                       | _ => None
-                       end
-                   | _ => None
-                   end)
+  | Neg (Or (Neg F1) F2)  => Some [F1 ; Neg F2]
   | _ => None
   end.
 
@@ -200,84 +186,116 @@ Definition pr_bool (b : bool) : string :=
   | false => "false"
   end.
 
-(** The guided proof-search is the following algorithm:
-    - on a leaf: it tries to search for a closure [Bot] or [Neg Top] or a contradiction using
-      the supplied substitution ; returns [false] if no closure rule can be found ;
-    - on a node: it tries to apply the given rule on the given formula, and calls the
-      algorithm recursively. *)
-Fixpoint GuidedTableauSearch
-  (sko : Skolemization) (Gamma : list Form) (sigma : Substitution string Term)
-  (tree : ExtendedRuleTree) : Result bool :=
-  match tree with
-  | Leaf =>
-      if trivial_contradiction Gamma
-      then ret true
-      else if litteral_contradiction Gamma sigma
-           then ret true
-           else error ("No contradiction in the context: " ++ pr_context (Gamma@[sigma]))
+Section GuidedTableauSearchAlgorithm.
+  Context (sko : Skolemization).
 
-  | Node T1 rule T2 =>
+  Definition rule_wrapper {A : Type} (Gamma : Con) (F : Form) (err : string)
+    (getter : Form -> option A) (action : A -> Result bool) : Result bool :=
+    if negb (mem_ctx F Gamma)
+    then error ("Formula " ++ pr_form F ++ " not found in the context " ++ pr_context Gamma)
+    else
+      match getter F with
+      | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
+      | Some x => action x
+      end.
 
-      let alpha_rule (getter : Form -> option (list Form)) (err : string) (F : Form) :=
-        match getter F with
-        | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
-        | Some l => GuidedTableauSearch sko (List.app l Gamma) sigma T1
-        end in
+  Definition SearchAlgorithm :=
+    Con -> Substitution string Term -> sko_record sko -> ExtendedRuleTree -> Result bool.
 
-      let beta_rule (getter : Form -> option (list Form * list Form)) (err : string) (F : Form) :=
-        match getter F with
-        | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
-        | Some (l1, l2) =>
-            GuidedTableauSearch sko (List.app l1 Gamma) sigma T1 >>=
-              (fun b => if b then GuidedTableauSearch sko (List.app l2 Gamma) sigma T2
-                     else ret b)
-        end in
+  Definition alpha_rule (Gamma : Con) (sigma : Substitution string Term) (T : ExtendedRuleTree)
+    (record : sko_record sko) (F : Form) (getter : Form -> option (list Form)) (err : string)
+    (search : SearchAlgorithm)  :=
+    rule_wrapper Gamma F err getter (fun l => search (List.app l Gamma) sigma record T).
 
-      let gamma_rule (x : string) (getter : Form -> option Form) (err : string) (F : Form) :=
-        match getter F with
-        | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
-        | Some F =>
-            if isFresh x (fv Gamma)
-            then GuidedTableauSearch sko (F{0 \to Free x} :: Gamma) sigma T1
-            else error ("The variable " ++ x ++ " is not fresh in " ++ pr_context Gamma)
-        end in
+  Definition beta_rule (Gamma : Con) (sigma : Substitution string Term) (T1 T2 : ExtendedRuleTree)
+    (record : sko_record sko) (F : Form) (getter : Form -> option (list Form * list Form))
+    (err : string) (search : SearchAlgorithm)  :=
+    rule_wrapper Gamma F err getter
+      (fun l => search (List.app (fst l) Gamma) sigma record T1 >>=
+               (fun b => if b then search (List.app (snd l) Gamma) sigma record T2
+                      else ret b)).
 
-      let delta_rule (t : Term) (getter : Form -> option Form) (err : string) (F : Form) :=
-        match getter F with
-        | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
-        | Some F =>
-            if @is_sko _ _ _ OuterSkolemization t F (fv Gamma) empty_record
-            then GuidedTableauSearch sko (F{0 \to t} :: Gamma) sigma T1
-            else error ("The term " ++ pr_term t ++ " is not a valid Skolem symbol in the context "
-                          ++ pr_context Gamma)
-        end in
+  Definition gamma_rule (Gamma : Con) (sigma : Substitution string Term) (T : ExtendedRuleTree)
+    (record : sko_record sko) (F : Form) (x : string) (getter : Form -> option Form)
+    (err : string) (search : SearchAlgorithm)  :=
+    rule_wrapper Gamma F err getter
+      (fun F => search (F{0 \to Free x} :: Gamma) sigma record T).
 
-      match rule with
-      | AlphaNegNeg F => alpha_rule get_neg_neg "double negation" F
-      | AlphaAnd F => alpha_rule get_and "conjunction" F
-      | AlphaNegOr F => alpha_rule get_neg_or "negated disjunction" F
-      | AlphaNegImp F => alpha_rule get_neg_imp "negated implication" F
+  Definition delta_rule (Gamma : Con) (sigma : Substitution string Term) (T : ExtendedRuleTree)
+    (record : sko_record sko) (F : Form) (t : Term) (getter : Form -> option Form)
+    (err : string) (search : SearchAlgorithm)  :=
+    rule_wrapper Gamma F err getter
+      (fun F => if @is_sko _ _ _ sko t F (fv Gamma) record
+             then
+               match get_symbol t with
+               | None => error "This shouldn't ever happen."
+               | Some f => search (F{0 \to t} :: Gamma) sigma (add_symbol f F record) T
+               end
+             else
+               error ("The term " ++ pr_term t ++ " is not a valid Skolem symbol in the context "
+                        ++ pr_context Gamma)).
 
-      | BetaOr F => beta_rule get_or "disjunction" F
-      | BetaImp F => beta_rule get_imp "implication" F
-      | BetaNegAnd F => beta_rule get_neg_and "negated conjunction" F
-      | BetaEqu F => beta_rule get_equ "equivalence" F
-      | BetaNegEqu F => beta_rule get_neg_equ "negated equivalence" F
+  (** The guided proof-search is the following algorithm:
+      - on a leaf: it tries to search for a closure [Bot] or [Neg Top] or a contradiction using
+        the supplied substitution ; returns [false] if no closure rule can be found ;
+      - on a node: it tries to apply the given rule on the given formula, and calls the
+        algorithm recursively. *)
+  Fixpoint GuidedTableauSearch__aux
+    (Gamma : list Form) (sigma : Substitution string Term)
+    (record : sko_record sko) (tree : ExtendedRuleTree) : Result bool :=
+    match tree with
+    | Leaf =>
+        if trivial_contradiction Gamma
+        then ret true
+        else if formula_contradiction Gamma sigma
+             then ret true
+             else error ("No contradiction in the context: " ++ pr_context (Gamma@[sigma]))
 
-      | GammaAll F x => gamma_rule x get_all "universal formula" F
-      | GammaNegEx F x => gamma_rule x get_neg_ex "negated existential formula" F
+    | Node T1 rule T2 =>
 
-      | DeltaEx F t => delta_rule t get_ex "existential formula" F
-      | DeltaNegAll F t => delta_rule t get_neg_all "negated universal formula" F
-      end
-  end.
+        let alpha_rule (F : Form) (getter : Form -> option (list Form)) (err : string) :=
+          alpha_rule Gamma sigma T1 record F getter err GuidedTableauSearch__aux in
+
+        let beta_rule (F : Form) (getter : Form -> option (list Form * list Form)) (err : string) :=
+          beta_rule Gamma sigma T1 T2 record F getter err GuidedTableauSearch__aux in
+
+        let gamma_rule (F : Form) (x : string) (getter : Form -> option Form) (err : string) :=
+          gamma_rule Gamma sigma T1 record F x getter err GuidedTableauSearch__aux in
+
+        let delta_rule (F : Form) (t : Term) (getter : Form -> option Form) (err : string) :=
+          delta_rule Gamma sigma T1 record F t getter err GuidedTableauSearch__aux in
+
+        match rule with
+        | AlphaNegNeg F => alpha_rule F get_neg_neg "double negation"
+        | AlphaAnd F => alpha_rule F get_and "conjunction"
+        | AlphaNegOr F => alpha_rule F get_neg_or "negated disjunction"
+        | AlphaNegImp F => alpha_rule F get_neg_imp "negated implication"
+
+        | BetaOr F => beta_rule F get_or "disjunction"
+        | BetaImp F => beta_rule F get_imp "implication"
+        | BetaNegAnd F => beta_rule F get_neg_and "negated conjunction"
+        | BetaEqu F => beta_rule F get_equ "equivalence"
+        | BetaNegEqu F => beta_rule F get_neg_equ "negated equivalence"
+
+        | GammaAll F x => gamma_rule F x get_all "universal formula"
+        | GammaNegEx F x => gamma_rule F x get_neg_ex "negated existential formula"
+
+        | DeltaEx F t => delta_rule F t get_ex "existential formula"
+        | DeltaNegAll F t => delta_rule F t get_neg_all "negated universal formula"
+        end
+    end.
+
+  Definition GuidedTableauSearch (Gamma : list Form) (sigma : Substitution string Term)
+    (tree : ExtendedRuleTree) : Result bool :=
+    GuidedTableauSearch__aux Gamma sigma empty_record tree.
+End GuidedTableauSearchAlgorithm.
 
 (** ** 2. Soundness *)
 
 Lemma trivial_contradiction_sound :
   forall (Gamma : list Form),
     trivial_contradiction Gamma = true -> List.In Bot Gamma \/ List.In [[ ENeg ETop ]] Gamma.
-Proof.
+Proof using Type.
   intro Gamma; induction Gamma as [|F Fs IHFs]; cbn.
   - now intro.
   - intros [ [e1 | e2]%Bool.orb_prop | e3]%Bool.orb_prop.
@@ -290,6 +308,6 @@ Qed.
 
 Lemma litteral_contradiction_sound :
   forall (Gamma : list Form) (sigma : Substitution string Term),
-    litteral_contradiction Gamma sigma = true ->
+    formula_contradiction Gamma sigma = true ->
     exists (P P' : Form), List.In P Gamma /\ List.In (Neg P') Gamma /\ P@[sigma] = (Neg P')@[sigma].
   Admitted.

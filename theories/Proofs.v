@@ -19,6 +19,12 @@ Section Context.
 
   Definition empty_ctx : Con_ := [].
   Definition in_ctx (F : Form) (Gamma : Con_) : Prop := List.In F Gamma.
+  Fixpoint mem_ctx (F : Form) (Gamma : Con_) : bool :=
+    match Gamma with
+    | [] => false
+    | G :: Gamma => eqb F G || mem_ctx F Gamma
+    end.
+
   Definition extend_ctx (Gamma : Con_) (F : Form) : Con_ := F :: Gamma.
 
   #[global] Instance fv_ctx : @FV var Con_ := ltac:(typeclasses eauto).
