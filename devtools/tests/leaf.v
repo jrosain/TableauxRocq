@@ -2,8 +2,12 @@
 Set Warnings "-native-compiler".
 From Tableaux Require Import All.
 
+Definition Axiom0 : EForm :=
+	EPred "a" [] 
+.
+
 Definition T : EForm :=
-	ENeg (EEqu (ETop) (EBot)) 
+	EPred "a" [] 
 .
 
 Definition subst := translate_substitution [].
@@ -11,18 +15,11 @@ Definition subst := translate_substitution [].
 
 Definition T_Proof : ExtendedRuleTree.
 Proof.
-apply (mkUnaryNode ( AlphaNegNeg (Neg (Neg [[ EEqu (ETop) (EBot) ]])) ) ).
-apply (mkBinaryNode ( BetaEqu [[ EEqu (ETop) (EBot) ]] ) ).
-{
 exact Leaf.
-}
-{
-exact Leaf.
-}
 Defined.
 
 Theorem hasTableau_T_proof :
-	GuidedTableauSearch InnerSkolemization [  Neg [[ T ]] ]
+	GuidedTableauSearch InnerSkolemization [  [[ Axiom0 ]] ;  Neg [[ T ]] ]
 subst T_Proof = ret true.
 Proof.
 now native_compute.

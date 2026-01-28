@@ -1,7 +1,6 @@
 
+Set Warnings "-native-compiler".
 From Tableaux Require Import All.
-
-Import ATPCompat.
 
 Definition T : EForm :=
 	ENeg (EImp (ETop) (EBot)) 
@@ -10,24 +9,22 @@ Definition T : EForm :=
 Definition subst := translate_substitution [].
 
 
-Theorem T_proof :
-	hasTableau OuterSkolemization {{  translate_EForm (ENeg T) }} subst.
+Definition T_Proof : ExtendedRuleTree.
 Proof.
-exists \{\}, \{\}.
-eapply hasTableauNegNeg with (i := 0).
-1: reflexivity. 
-eapply hasTableauImp with (S1 := @empty_set string _) (S2 := @empty_set string _) (Sf1 := empty_record) (Sf2 := empty_record) (i := 0).
-1: reflexivity.
-3: now native_compute.
-3: now native_compute.
-3: now native_compute.
+apply (mkUnaryNode ( AlphaNegNeg (Neg (Neg [[ EImp (ETop) (EBot) ]])) ) ).
+apply (mkBinaryNode ( BetaImp [[ EImp (ETop) (EBot) ]] ) ).
 {
-eapply hasTableauNegTop with (i := 0).
-reflexivity.
+exact Leaf.
 }
 {
-eapply hasTableauBot with (i := 0).
-reflexivity.
+exact Leaf.
 }
+Defined.
+
+Theorem hasTableau_T_proof :
+	GuidedTableauSearch InnerSkolemization [  Neg [[ T ]] ]
+subst T_Proof = ret true.
+Proof.
+now native_compute.
 Qed.
 

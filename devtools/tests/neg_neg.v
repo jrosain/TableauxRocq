@@ -1,22 +1,28 @@
 
+Set Warnings "-native-compiler".
 From Tableaux Require Import All.
 
-Import ATPCompat.
+Definition Axiom0 : EForm :=
+	ENeg (EPred "a" []) 
+.
 
 Definition T : EForm :=
-	ENeg (EBot) 
+	ENeg (EPred "a" []) 
 .
 
 Definition subst := translate_substitution [].
 
 
-Theorem T_proof :
-	hasTableau OuterSkolemization {{  translate_EForm (ENeg T) }} subst.
+Definition T_Proof : ExtendedRuleTree.
 Proof.
-exists \{\}, \{\}.
-eapply hasTableauNegNeg with (i := 0).
-1: reflexivity. 
-eapply hasTableauBot with (i := 0).
-reflexivity.
+apply (mkUnaryNode ( AlphaNegNeg (Neg (Neg [[ EPred "a" [] ]])) ) ).
+exact Leaf.
+Defined.
+
+Theorem hasTableau_T_proof :
+	GuidedTableauSearch InnerSkolemization [  [[ Axiom0 ]] ;  Neg [[ T ]] ]
+subst T_Proof = ret true.
+Proof.
+now native_compute.
 Qed.
 
