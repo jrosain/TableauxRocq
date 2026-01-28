@@ -246,6 +246,14 @@ Section SetProperties.
   Qed.
   Hint Rewrite empty_unitl empty_unitr union_idemp union_assoc : set_db.
 
+  Lemma union_comm :
+    forall (s1 s2 : set_A),
+      union s1 s2 = union s2 s1.
+  Proof using Type.
+    intros; apply set_ext; intro; split; intro hin; rewrite !union_spec in hin |- *;
+      destruct hin as [hin | hin]; auto.
+  Qed.
+
   Lemma inter_sym :
     forall (s1 s2 : set_A), inter s1 s2 = inter s2 s1.
   Proof using Type.
