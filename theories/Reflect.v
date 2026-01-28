@@ -136,9 +136,9 @@ Definition get_neg_and (F : Form) : option (list Form * list Form) :=
   Utils.bind (get_neg_neg F) (fun l => get_or (List.hd Bot l)).
 
 Definition get_equ (F : Form) : option (list Form * list Form) :=
-  match get_neg_or F with
+  match get_and F with
   | Some [F1 ; F2] =>
-      match get_or F1, get_or F2 with
+      match get_imp F1, get_imp F2 with
       | Some ([nF], [G]), Some ([nG], [F]) => Some ([nF ; nG], [G ; F])
       | _, _ => None
       end
@@ -146,16 +146,11 @@ Definition get_equ (F : Form) : option (list Form * list Form) :=
   end.
 
 Definition get_neg_equ (F : Form) : option (list Form * list Form) :=
-  match get_neg_neg F with
-  | Some [F] =>
-      match get_or F with
-      | Some ([F1], [F2]) =>
-          match get_neg_or F1, get_neg_or F2 with
-          | Some l, Some l' => Some (l, l')
-          | _, _ => None
+  match F with
+  | Neg F => match get_equ F with
+          | Some ([nF ; nG], [G ; F]) => Some ([nG ; F], [nF ; G])
+          | _ => None
           end
-      | _ => None
-      end
   | _ => None
   end.
 
