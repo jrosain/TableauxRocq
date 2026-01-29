@@ -60,11 +60,9 @@ Proof.
 Defined.
 
 (** Now, behold the full power of reflection: *)
-(* NOTE: needs soundness of the reflection to write the real theorem. *)
 Theorem hasTableau_outer_drinker_proof :
-  GuidedTableauSearch OuterSkolemization [Neg [[ drinker ]]]
-    outer_subst outer_drinker_proof = ret true.
-Proof. now native_compute. Qed.
+  hasTableau OuterSkolemization [Neg (translate_EForm drinker)] outer_subst.
+Proof. tableaux outer_drinker_proof. Qed.
 
 (** In inner Skolemization, we only have to Skolemize once as ["X"] does not appear in the
     body of the Skolemized formula. As before, we provide the substitution using a finite list,
@@ -87,6 +85,5 @@ Proof.
 Defined.
 
 Theorem hasTableau_inner_drinker_proof :
-  GuidedTableauSearch InnerSkolemization [Neg [[ drinker ]]]
-    inner_subst inner_drinker_proof = ret true.
-Proof. now native_compute. Qed.
+  hasTableau InnerSkolemization [Neg (translate_EForm drinker)] inner_subst.
+Proof. tableaux inner_drinker_proof. Qed.

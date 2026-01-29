@@ -193,6 +193,14 @@ Section SetProperties.
     - eapply is_empty_spec in empty2; eauto.
   Qed.
 
+  Lemma union_congl :
+    forall (s1 s2 s3 : set_A), s1 = s2 -> s3 \union s1 = s3 \union s2.
+  Proof using Type. intros. now apply f_equal. Qed.
+
+  Lemma union_congr :
+    forall (s1 s2 s3 : set_A), s1 = s2 -> s1 \union s3 = s2 \union s3.
+  Proof using Type. intros. now apply (f_equal (fun s => s \union s3)). Qed.
+
   Fixpoint from_list (l : list A) : set_A :=
     match l with
     | [] => empty_set

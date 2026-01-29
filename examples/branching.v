@@ -48,12 +48,10 @@ Defined.
 
 (** Let's see if this is indeed a proof. *)
 Theorem hasTableau_outer_branching_proof :
-  GuidedTableauSearch OuterSkolemization [Neg [[ branching ]]]
-    subst outer_branching_proof = ret true.
-Proof. now native_compute. Qed.
+  hasTableau OuterSkolemization [Neg (translate_EForm branching)] subst.
+Proof. tableaux outer_branching_proof. Qed.
 (** Yay!! *)
 
 Theorem hasTableau_inner_branching_proof :
-  GuidedTableauSearch InnerSkolemization [Neg [[ branching ]]]
-    subst outer_branching_proof = ret true.
-Proof. now native_compute. Qed.
+  hasTableau InnerSkolemization [Neg (translate_EForm branching)] subst.
+Proof. tableaux outer_branching_proof. Qed.

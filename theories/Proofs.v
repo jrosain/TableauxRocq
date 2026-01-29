@@ -19,6 +19,26 @@ Section Context.
 
   Definition empty_ctx : Con_ := [].
   Definition in_ctx (F : Form) (Gamma : Con_) : Prop := List.In F Gamma.
+  Fixpoint mem_ctx (F : Form) (Gamma : Con_) : bool :=
+    match Gamma with
+    | [] => false
+    | G :: Gamma => eqb F G || mem_ctx F Gamma
+    end.
+
+  Lemma mem_ctx_in_ctx :
+    forall (Gamma : Con_) (F : Form), mem_ctx F Gamma = true <-> in_ctx F Gamma.
+  Proof using Type.
+    intros ??; induction Gamma as [|G Gs IHGs].
+    - now cbn.
+    - cbn; split.
+      + intros h%Bool.orb_true_elim. destruct h.
+        * rewrite eqbIsEq in e. now left.
+        * rewrite IHGs in e. now right.
+      + intros [e | hin].
+        * rewrite e EqBool_refl. now cbn.
+        * apply Bool.orb_true_intro. right. rewrite IHGs //.
+  Qed.
+
   Definition extend_ctx (Gamma : Con_) (F : Form) : Con_ := F :: Gamma.
 
   #[global] Instance fv_ctx : @FV var Con_ := ltac:(typeclasses eauto).
@@ -33,12 +53,72 @@ Section Context.
     subst_ctx_.
 
   Definition ctx_to_form (Gamma : Con_) := ls_to_form Gamma.
+
+  Definition sub_ctx (Gamma Gamma' : Con_) :=
+    forall (F : Form), in_ctx F Gamma -> in_ctx F Gamma'.
+
+  Definition is_sub_ctx (Gamma Gamma' : Con_) : bool :=
+    forallb (fun F => mem_ctx F Gamma') Gamma.
+
+  Lemma is_sub_ctx_sound :
+    forall (Gamma Gamma' : Con_),
+      is_sub_ctx Gamma Gamma' = true -> sub_ctx Gamma Gamma'.
+  Proof using Type.
+    intros ?? e. unfold is_sub_ctx in e. induction Gamma as [|F Gamma IHGamma].
+    - now intros F contra.
+    - cbn in e |- *. apply andb_prop in e. intros G [e' | hin].
+      + subst. rewrite -mem_ctx_in_ctx. apply e.
+      + apply IHGamma.
+        * apply e.
+        * apply hin.
+  Qed.
+
+  Lemma is_sub_ctx_complete :
+    forall (Gamma Gamma' : Con_),
+      sub_ctx Gamma Gamma' -> is_sub_ctx Gamma Gamma' = true.
+  Proof using Type.
+    intros ?? hsub. induction Gamma as [|F Gamma IHGamma]; cbn; auto.
+    apply andb_true_intro; split.
+    - rewrite mem_ctx_in_ctx. apply hsub. now left.
+    - apply IHGamma. intros G hin. apply hsub. now right.
+  Qed.
+
+  Lemma extend_sub_ctx :
+    forall (Gamma Gamma' : Con_) (F : Form),
+      sub_ctx Gamma Gamma' -> sub_ctx (F :: Gamma) (F :: Gamma').
+  Proof using Type.
+    intros ??? hsub; unfold sub_ctx in hsub |- *.
+    intros G [-> | hG].
+    - now left.
+    - right; now apply hsub.
+  Qed.
+
+  Lemma cons_sub_ctx :
+    forall (Gamma Gamma' : Con_) (F : Form),
+      sub_ctx Gamma Gamma' -> sub_ctx Gamma (F :: Gamma').
+  Proof using Type.
+    intros ??? hsub. unfold sub_ctx in hsub |- *; cbn.
+    intros G hin; right. now apply hsub.
+  Qed.
+
+  Lemma sub_ctx_cong :
+    forall (Gamma Gamma' : Con_) (F G : Form),
+      sub_ctx Gamma (F :: Gamma') -> sub_ctx (G :: Gamma) (F :: G :: Gamma').
+  Proof using Type.
+    intros ???? hsub H hin. cbn in hin |- *. destruct hin; auto.
+    apply hsub in H0; cbn in H0; destruct H0 as [e | hin]; auto.
+  Qed.
+
+  Lemma sub_ctx_refl :
+    forall (Gamma : Con_), sub_ctx Gamma Gamma.
+  Proof using Type. do 2 intro. tauto. Qed.
 End Context.
 
 Arguments Con_ : clear implicits.
 
 Notation "Gamma ,, A" := (extend_ctx Gamma A) (at level 20).
 Notation "A \in Gamma" := (in_ctx A Gamma) (at level 30).
+Notation "A \subseteq Gamma" := (sub_ctx A Gamma) (at level 30).
 Notation "{{ }}" := (empty_ctx).
 Notation "{{ F }}" := (empty_ctx ,, F).
 Notation "{{ F1 ;; F2 ;; .. ;; Fk }}" :=
@@ -95,9 +175,9 @@ Section TableauxProofs.
    (** Delta rule *)
   | hasTableauNegAll :
     forall (Gamma : Con) (symbs : sko_record) (sigma : Substitution var Term)
-      (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) symbs = true),
+      (F : Form) (t : Term) (Hsko : is_sko t (Neg (All F)) (fv Gamma) symbs = true),
       (Neg (All F)) \in Gamma ->
-      hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) F symbs) sigma ->
+      hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) (Neg (All F)) symbs) sigma ->
       hasTableau_ Gamma symbs sigma.
   Set Elimination Schemes.
   Scheme hasTableau__ind := Induction for hasTableau_ Sort Prop.
@@ -146,15 +226,64 @@ Section TableauxProofs.
       is_tableau_satisfiable M mu (hasTableauAll Gamma symbs sigma x F hin htab)
 
   | satisfiable_hasTableauNegAll :
-    forall (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) symbs = true)
+    forall (F : Form) (t : Term) (Hsko : is_sko t (Neg (All F)) (fv Gamma) symbs = true)
       (hin : (Neg (All F)) \in Gamma)
-      (htab : hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) F symbs) sigma),
+      (htab : hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) (Neg (All F)) symbs) sigma),
       is_tableau_satisfiable M mu htab ->
       is_tableau_satisfiable M mu (hasTableauNegAll Gamma symbs sigma F t Hsko hin htab).
 End TableauxProofs.
 Arguments is_tableau_satisfiable {_ _ _ _ _} _ _ {_ _ _} _.
 
-(* TODO: structural lemmas, e.g., strengthening, exchange law, (need something else?) *)
+Section TableauxProperties.
+  Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
+
+  Let Con := Con_ pred func var.
+  Let Form := Form_ pred func var.
+  Let Term := Term_ func var.
+
+  (** If [Gamma \subseteq Gamma'], then as long as [fv Gamma = fv Gamma'], weakening holds for tableau proofs. *)
+  Lemma weakening :
+    forall (Gamma Gamma' : Con) (symbs : sko_record sko) (sigma : Substitution var Term),
+      fv Gamma = fv Gamma' -> Gamma \subseteq Gamma' ->
+      hasTableau_ sko Gamma symbs sigma ->
+      hasTableau_ sko Gamma' symbs sigma.
+  Proof using Type.
+    intros ????? hsubset htab. generalize dependent Gamma'. induction htab;
+      intros Gamma' efv hsubset.
+    - apply hsubset in i. now apply hasTableauBot.
+    - apply hsubset in i, i0. eapply hasTableauContr.
+      + apply i.
+      + apply i0.
+      + apply e.
+    - apply hsubset in i. eapply hasTableauNegNeg; eauto.
+      apply IHhtab; auto.
+      + cbn. now rewrite efv.
+      + now apply extend_sub_ctx.
+    - apply hsubset in i. eapply hasTableauNegOr; eauto.
+      apply IHhtab; auto.
+      + cbn. rewrite -!union_assoc efv //.
+      + now do 2 apply extend_sub_ctx.
+    - apply hsubset in i. eapply hasTableauOr; eauto.
+      + apply IHhtab1.
+        * cbn. now rewrite efv.
+        * now apply extend_sub_ctx.
+      + apply IHhtab2.
+        * cbn. now rewrite efv.
+        * now apply extend_sub_ctx.
+    - apply hsubset in i. eapply hasTableauAll; eauto.
+      apply IHhtab.
+      2: now apply extend_sub_ctx.
+      cbn. now rewrite efv.
+    - apply hsubset in i.
+      have Hsko' := Hsko. rewrite efv in Hsko'.
+      apply hasTableauNegAll with (t := t) (Hsko := Hsko'); eauto.
+      have esym : symbol sko t Hsko = symbol sko t Hsko'.
+      { destruct efv. f_equal. apply EqDec_UIP. }
+      rewrite -esym. apply IHhtab.
+      + cbn. now rewrite efv.
+      + now apply extend_sub_ctx.
+  Qed.
+End TableauxProperties.
 
 Section TableauxSoundness.
   Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).

@@ -99,7 +99,10 @@ Section SkolemizationDef.
         t = Fun (symbol data t F S Sf Hsko) (args data t F S Sf Hsko)
     ; locally_closed :
       forall {t : Term_ func var} {F : Form_ pred func var} {S : set_var} {Sf : sko_record data}
-        (Hsko : is_sko data t F S Sf = true), isLocallyClosed t }.
+        (Hsko : is_sko data t F S Sf = true), isLocallyClosed t
+    ; symbol_sound :
+      forall {t : Term_ func var} {F : Form_ pred func var} {S : set_var} {Sf : sko_record data}
+        (hsko : is_sko data t F S Sf = true), get_symbol t = Some (symbol data t F S Sf hsko) }.
 
   Record Skolemization_ :=
     { skoData :> SkolemizationData
