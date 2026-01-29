@@ -25,6 +25,20 @@ Section Context.
     | G :: Gamma => eqb F G || mem_ctx F Gamma
     end.
 
+  Lemma mem_ctx_in_ctx :
+    forall (Gamma : Con_) (F : Form), mem_ctx F Gamma = true <-> in_ctx F Gamma.
+  Proof using Type.
+    intros ??; induction Gamma as [|G Gs IHGs].
+    - now cbn.
+    - cbn; split.
+      + intros h%Bool.orb_true_elim. destruct h.
+        * rewrite eqbIsEq in e. now left.
+        * rewrite IHGs in e. now right.
+      + intros [e | hin].
+        * rewrite e EqBool_refl. now cbn.
+        * apply Bool.orb_true_intro. right. rewrite IHGs //.
+  Qed.
+
   Definition extend_ctx (Gamma : Con_) (F : Form) : Con_ := F :: Gamma.
 
   #[global] Instance fv_ctx : @FV var Con_ := ltac:(typeclasses eauto).

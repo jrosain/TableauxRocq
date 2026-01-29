@@ -241,7 +241,7 @@ Section GuidedTableauSearchAlgorithm.
       - on a node: it tries to apply the given rule on the given formula, and calls the
         algorithm recursively. *)
   Fixpoint GuidedTableauSearch__aux
-    (Gamma : list Form) (sigma : Substitution string Term)
+    (Gamma : Con) (sigma : Substitution string Term)
     (record : sko_record sko) (tree : ExtendedRuleTree) : Result bool :=
     match tree with
     | Leaf =>
@@ -292,9 +292,10 @@ End GuidedTableauSearchAlgorithm.
 
 (** ** 2. Soundness *)
 
+(** *** The [Leaf] Case *)
 Lemma trivial_contradiction_sound :
-  forall (Gamma : list Form),
-    trivial_contradiction Gamma = true -> List.In Bot Gamma \/ List.In [[ ENeg ETop ]] Gamma.
+  forall (Gamma : Con),
+    trivial_contradiction Gamma = true -> Bot \in Gamma \/ [[ ENeg ETop ]] \in Gamma.
 Proof using Type.
   intro Gamma; induction Gamma as [|F Fs IHFs]; cbn.
   - now intro.
@@ -306,8 +307,120 @@ Proof using Type.
       * right. now right.
 Qed.
 
-Lemma litteral_contradiction_sound :
-  forall (Gamma : list Form) (sigma : Substitution string Term),
+Lemma formula_contradiction_sound :
+  forall (Gamma : Con) (sigma : Substitution string Term),
     formula_contradiction Gamma sigma = true ->
-    exists (P P' : Form), List.In P Gamma /\ List.In (Neg P') Gamma /\ P@[sigma] = (Neg P')@[sigma].
-  Admitted.
+    exists (P P' : Form), P \in Gamma /\ P' \in Gamma /\ P@[sigma] = (Neg P')@[sigma].
+Proof.
+  intros ?? e. unfold formula_contradiction in e.
+  rewrite existsb_exists in e. destruct e as (F & hin & e).
+  rewrite existsb_exists in e. destruct e as (F' & hin' & e').
+  rewrite eqbIsEq in e'. exists F', F. repeat split; auto.
+  - now rewrite filter_In in hin'.
+  - now rewrite filter_In in hin.
+Qed.
+
+Lemma auxiliary_GuidedTableauSearch_Leaf_sound :
+  forall {sko : Skolemization} {Gamma : Con} {sigma : Substitution string Term}
+    {record : sko_record sko},
+    GuidedTableauSearch__aux sko Gamma sigma record Leaf = ret true ->
+    Bot \in Gamma \/ [[ ENeg ETop ]] \in Gamma \/
+      exists (P P' : Form), P \in Gamma /\ P' \in Gamma /\ P@[sigma] = (Neg P')@[sigma].
+Proof.
+  intros ???? e. cbn in e.
+  destruct (trivial_contradiction Gamma) eqn:e0.
+  - apply trivial_contradiction_sound in e0. destruct e0.
+    + now left.
+    + right; now left.
+  - destruct (formula_contradiction Gamma sigma) eqn:e1.
+    + apply formula_contradiction_sound in e1. now do 2 right.
+    + inversion e.
+Qed.
+
+(** *** Soundness of rule wrapper *)
+Lemma rule_wrapper_sound :
+  forall {A : Type} (Gamma : Con) (F : Form) (err : string) (getter : Form -> option A)
+    (action : A -> Result bool),
+    rule_wrapper Gamma F err getter action = ret true ->
+    exists (x : A), getter F = Some x /\ F \in Gamma /\ action x = ret true.
+Proof.
+  intros ?????? e. unfold rule_wrapper in e.
+  destruct (negb (mem_ctx F Gamma)) eqn:ein.
+  - inversion e.
+  - destruct (getter F) eqn:egetter.
+    + rewrite Bool.negb_false_iff mem_ctx_in_ctx in ein. now exists a.
+    + inversion e.
+Qed.
+
+(** *** alpha rules *)
+Lemma alpha_rule_sound :
+  forall (sko : Skolemization) (Gamma : Con) (sigma : Substitution string Term)
+    (record : sko_record sko) (T : ExtendedRuleTree) (F : Form) (err : string)
+    (getter : Form -> option (list Form)),
+    alpha_rule sko Gamma sigma T record F getter err (GuidedTableauSearch__aux sko) = ret true ->
+    exists (l : list Form), getter F = Some l /\ F \in Gamma /\
+                         GuidedTableauSearch__aux sko (List.app l Gamma) sigma record T = ret true.
+Proof.
+  intros ???????? e. unfold alpha_rule in e.
+  now apply rule_wrapper_sound in e.
+Qed.
+
+(** **** alpha-rules getters *)
+Lemma getter_neg_neg_sound :
+  forall (F : Form) (l : list Form),
+    get_neg_neg F = Some l -> exists (G : Form), l = [G] /\ F = Neg (Neg G).
+Proof.
+  intros ?? e. unfold get_neg_neg in e. destruct F; try inversion e.
+  destruct F; try inversion e.
+  now exists F.
+Qed.
+
+Lemma getter_and_sound :
+  forall (F : Form) (l : list Form),
+    get_and F = Some l -> exists (F1 F2 : Form), l = [F1 ; F2] /\ F = Neg (Or (Neg F1) (Neg F2)).
+Proof.
+  intros ?? e. unfold get_and in e. destruct F eqn:eF; try inversion e.
+  destruct f eqn:ef; try inversion e.
+  destruct f0_1 eqn:f1; try inversion e.
+  destruct f0_2 eqn:f2; try inversion e.
+  exists f0, f3; auto.
+Qed.
+
+Lemma auxiliary_GuidedTableauSearch_sound :
+  forall (sko : Skolemization) (Gamma : Con) (sigma : Substitution string Term)
+    (record : sko_record sko) (tree : ExtendedRuleTree),
+    GuidedTableauSearch__aux sko Gamma sigma record tree = ret true ->
+    hasTableau_ sko Gamma record sigma.
+Proof.
+  intros ????? e. generalize dependent Gamma. revert record. induction tree as [|T1 IHT1 r T2 IHT2];
+    intros record Gamma e.
+
+  (* Case: [Leaf] *)
+  - destruct (auxiliary_GuidedTableauSearch_Leaf_sound e) as [hin | h].
+    + now apply hasTableauBot.
+    + destruct h as [ hin | [ P [ P' [ hin [ hin' e' ] ] ] ] ].
+      * apply In_nth_error in hin. destruct hin as (n & e').
+        eapply ExtendedRules.hasTableauNegTop; eauto.
+      * eapply hasTableauContr.
+        -- apply hin'.
+        -- apply hin.
+        -- auto.
+
+  (* Case: [Node] *)
+  - destruct r.
+
+    (* The first 4 goals are alpha rules. *)
+    1-4: cbn in e; apply alpha_rule_sound in e; destruct e as (l & e & hin & e1).
+
+    (* Case: [AlphaNegNeg] *)
+    + apply getter_neg_neg_sound in e; destruct e as (G & el & e); rewrite e in hin.
+      eapply hasTableauNegNeg; eauto. rewrite el in e1. cbn in e1.
+      now apply IHT1.
+
+    (* Case: [AlphaAnd] *)
+    + apply getter_and_sound in e; destruct e as (F1 & F2 & el & e); rewrite e in hin.
+      eapply hasTableauNegOr; eauto. eapply hasTableauNegNeg.
+      * now left.
+      * eapply hasTableauNegNeg.
+        -- right; now left.
+        -- (* weakening *) Admitted.
