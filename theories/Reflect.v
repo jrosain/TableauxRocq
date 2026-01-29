@@ -159,7 +159,7 @@ Definition get_ex (F : Form) : option Form :=
 
 Definition get_neg_ex (F : Form) : option Form :=
   match F with
-  | Neg F => Utils.bind (get_ex F) (fun F => Some (Neg F))
+  | Neg (Neg (All (Neg F))) => Some (Neg F)
   | _ => None
   end.
 
@@ -524,6 +524,40 @@ Proof.
   - now apply f_equal.
 Qed.
 
+(** *** Gamma rules *)
+
+Lemma gamma_rule_sound :
+  forall (sko : Skolemization) (Gamma : Con) (sigma : Substitution string Term)
+    (record : sko_record sko) (T : ExtendedRuleTree) (F : Form) (x : string) (err : string)
+    (getter : Form -> option Form),
+    gamma_rule sko Gamma sigma T record F x getter err (GuidedTableauSearch__aux sko) = ret true ->
+    exists (G : Form), getter F = Some G /\ F \in Gamma /\
+                         GuidedTableauSearch__aux sko (G{0 \to Free x} :: Gamma) sigma record T = ret true.
+Proof.
+  intros ????????? e. unfold gamma_rule in e.
+  now apply rule_wrapper_sound in e.
+Qed.
+
+(** *** Gamma rules getters *)
+
+Lemma get_all_sound :
+  forall (F G : Form),
+    get_all F = Some G -> F = All G.
+Proof.
+  intros ?? e. destruct F eqn:eF; cbn in *; try inversion e; auto.
+Qed.
+
+Lemma get_neg_ex_sound :
+  forall (F G : Form),
+    get_neg_ex F = Some G -> exists (H : Form), G = Neg H /\ F = Neg (Neg (All (Neg H))).
+Proof.
+  intros ?? e. destruct F eqn:eF; cbn in *; try inversion e.
+  destruct f eqn:ef; try inversion e.
+  destruct f0 eqn:ef0; try inversion e.
+  destruct f1 eqn:ef1; try inversion e.
+  now exists f2.
+Qed.
+
 Lemma auxiliary_GuidedTableauSearch_sound :
   forall (sko : Skolemization) (Gamma : Con) (sigma : Substitution string Term)
     (record : sko_record sko) (tree : ExtendedRuleTree),
@@ -552,6 +586,9 @@ Proof.
 
     (* The 5 next goals are beta rules. *)
     5-9: cbn in e; apply beta_rule_sound in e; destruct e as (l1 & l2 & e & hin & e1 & e2).
+
+    (* The next two are gamma rules. *)
+    10,11: cbn in e; apply gamma_rule_sound in e; destruct e as (G & e & hin & e1).
 
     (* Case: [AlphaNegNeg] *)
     + apply getter_neg_neg_sound in e; destruct e as (G & el & e); rewrite e in hin.
@@ -659,5 +696,21 @@ Proof.
          ++ injection el => e2' e1'; rewrite e2' in e2; now apply IHT2.
 
     (* Case: [GammaAll] *)
+    + apply get_all_sound in e; rewrite e in hin.
+      eapply hasTableauAll; eauto.
+
+    (* Case: [GammaNegEx] *)
+    + apply get_neg_ex_sound in e; destruct e as (F & eF & e); rewrite e in hin.
+      subst. eapply hasTableauNegNeg; eauto.
+      eapply hasTableauAll with (x := s); [now left|].
+      apply weakening with (Gamma := Gamma ,, (Neg F){0 \to Free s}).
+      ++ have efv : fv Gamma = @fv_list string _ _ (Gamma ,, All (Neg F)).
+         { now rewrite (fv_list_in (Neg (Neg (All (Neg F)))) Gamma). }
+         now cbn; rewrite efv; cbn; symmetry;
+           etransitivity; [rewrite union_comm -!union_assoc union_idemp union_comm //|].
+      ++ apply extend_sub_ctx, cons_sub_ctx, sub_ctx_refl.
+      ++ now apply IHT1.
+
+    (* Case: [DeltaEx] *)
     + 
  Admitted.
