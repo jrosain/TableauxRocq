@@ -6,8 +6,8 @@ From Tableaux Require Import ATPCompat.
 (** In this file, we implement a guided tableau proof-search procedure. It is named
     "guided" as the rules to apply and the substitution are given.
 
-    It returns a boolean if the tableau is closed. The goal is to show that this procedure
-    is correct and complete, to make it possible to output proof certificates from this
+    It returns a boolean if the tableau is closed. We show that this procedure
+    is sound, which makes it possible to output proof certificates from this
     algorithm. *)
 
 (** ** 1. The algorithm *)
@@ -708,7 +708,17 @@ Proof.
       eapply hasTableauOr; [now left| |].
       * eapply hasTableauOr; [do 2 right; now left| |].
         -- apply weakening with (Gamma := Gamma ,, Neg F2 ,, Neg F1).
-           ++ admit. (* easy *)
+           ++ cbn; do 2 apply union_congl;
+              symmetry; rewrite !union_assoc; etransitivity;
+                [apply f_equal; rewrite -!union_assoc union_idemp !union_assoc;
+                 apply f_equal; rewrite -!union_assoc union_idemp !union_assoc;
+                 apply f_equal; rewrite -!union_assoc union_idemp // |].
+              have efv : fv Gamma = ((fv F1 \union fv F2) \union (fv F2 \union fv F1)) \union @fv_list string _ _ Gamma.
+              { rewrite (fv_list_in f); rewrite e; auto. }
+              symmetry; etransitivity; [apply efv|]; rewrite -!union_assoc;
+                refine (f_equal (fun s => s \union fv Gamma) _).
+              rewrite (union_comm (fv F1) (fv F2)); rewrite !union_assoc; do 2 f_equal;
+                do 2 rewrite (union_comm (fv F1) (fv F2)); rewrite -union_assoc union_idemp //.
            ++ do 2 apply extend_sub_ctx; do 4 apply cons_sub_ctx; apply sub_ctx_refl.
            ++ injection el => e2' e1'; rewrite e1' in e1; now apply IHT1.
         -- apply hasTableauContr with (P := F2) (P' := Neg F2); auto.
@@ -719,7 +729,15 @@ Proof.
            ++ right; now left.
            ++ now left.
         -- apply weakening with (Gamma := Gamma ,, F1 ,, F2).
-           ++ admit. (* easy *)
+           ++ cbn; do 2 apply union_congl;
+                have efv : fv Gamma = ((fv F1 \union fv F2) \union (fv F2 \union fv F1)) \union @fv_list string _ _ Gamma.
+              { rewrite (fv_list_in f); rewrite e; auto. }
+              etransitivity; [apply efv|]; rewrite -!union_assoc;
+                refine (f_equal (fun s => s \union fv Gamma) _); symmetry; etransitivity;
+                [now do 2 (rewrite !union_assoc; apply f_equal;
+                           rewrite -!union_assoc union_idemp)|].
+              rewrite union_comm !union_assoc; do 2 f_equal;
+                rewrite union_idemp -union_assoc union_idemp union_comm //.
            ++ do 2 apply extend_sub_ctx; do 4 apply cons_sub_ctx; apply sub_ctx_refl.
            ++ injection el => e2' e1'; rewrite e2' in e2; now apply IHT2.
 
@@ -730,13 +748,25 @@ Proof.
       -- eapply hasTableauNegOr; [now left|].
          eapply hasTableauNegNeg; [right; now left|].
          apply weakening with (Gamma := Gamma ,, F1 ,, Neg F2).
-         ++ admit. (* easy *)
+         ++ cbn; rewrite -!union_assoc; apply union_congr; symmetry; etransitivity;
+              [apply union_congr; rewrite !union_assoc union_idemp; do 2 apply union_congl;
+               rewrite -!union_assoc union_idemp //|].
+            etransitivity; [apply union_congr; rewrite union_comm; apply union_congr;
+                            apply union_congl; rewrite union_comm //|];
+              rewrite !union_assoc !union_idemp -!union_assoc union_idemp;
+              rewrite (union_comm (fv F2 \union fv F1) (fv F2)) -!union_assoc union_idemp
+                !union_assoc union_idemp //.
          ++ apply sub_ctx_cong, extend_sub_ctx. do 3 apply cons_sub_ctx; apply sub_ctx_refl.
          ++ injection el => e2' e1'; rewrite e1' in e1; now apply IHT1.
       -- eapply hasTableauNegOr; [now left|].
          eapply hasTableauNegNeg; [right; now left|].
          apply weakening with (Gamma := Gamma ,, F2 ,, Neg F1).
-         ++ admit. (* easy *)
+         ++ cbn; rewrite -!union_assoc; apply union_congr; symmetry; etransitivity;
+              [now do 3 (apply union_congr; rewrite !union_assoc union_idemp;
+                         rewrite -!union_assoc)|].
+            etransitivity; [now do 2 (apply union_congr;
+                                      rewrite union_comm -!union_assoc union_idemp)|];
+              rewrite !union_assoc !union_idemp union_comm //.
          ++ apply sub_ctx_cong, extend_sub_ctx. do 3 apply cons_sub_ctx; apply sub_ctx_refl.
          ++ injection el => e2' e1'; rewrite e2' in e2; now apply IHT2.
 
@@ -773,7 +803,7 @@ Proof.
       eapply hasTableauNegAll with (t := t) (Hsko := hsko); eauto.
       rewrite (symbol_sound hsko) in esym; injection esym => ->.
       rewrite -e; rewrite eF in e1; now apply IHT1.
- Admitted.
+Qed.
 
 Theorem GuidedTableauSearch_sound :
   forall (sko : Skolemization) (Gamma : Con) (sigma : Substitution string Term)
