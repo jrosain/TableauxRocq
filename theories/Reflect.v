@@ -242,7 +242,7 @@ Section GuidedTableauSearchAlgorithm.
     (record : sko_record sko) (F : Form) (t : Term) (getter : Form -> option Form)
     (err : string) (search : SearchAlgorithm)  :=
     rule_wrapper Gamma F err getter
-      (fun F0 => if @is_sko _ _ _ sko t F (fv Gamma) record
+      (fun F0 => if sko t F (fv Gamma) record
              then
                match get_symbol t with
                | None => error "This shouldn't ever happen."
