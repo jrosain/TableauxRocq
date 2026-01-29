@@ -3,6 +3,7 @@
 
 ((coq-mode . ((company-coq-dir-local-symbols . (("\\to" . ?→)
 												("\\in" . ?∈)
+												("\\subseteq" . ?⊆)
 												("\\models" . ?⊧)
 												("[[" . ?〚)
 												("]]" . ?〛)

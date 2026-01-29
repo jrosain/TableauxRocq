@@ -75,6 +75,12 @@ Qed.
 Section EqDecOtherInstances.
   Context {A : Type} `{EqDec A}.
 
+  #[global] Instance eq_dec_bool : EqDec bool.
+  Proof using Type.
+    red. intros [] []; auto.
+    right; now intro.
+  Qed.
+
   #[global] Instance eq_dec_list : EqDec (list A).
   Proof using H.
     intros xs; induction xs as [| x xs IHxs]; intro ys; destruct ys as [|y ys].

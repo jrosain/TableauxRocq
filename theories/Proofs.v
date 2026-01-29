@@ -53,12 +53,26 @@ Section Context.
     subst_ctx_.
 
   Definition ctx_to_form (Gamma : Con_) := ls_to_form Gamma.
+
+  Definition sub_ctx (Gamma Gamma' : Con_) :=
+    forall (F : Form), in_ctx F Gamma -> in_ctx F Gamma'.
+
+  Lemma extend_sub_ctx :
+    forall (Gamma Gamma' : Con_) (F : Form),
+      sub_ctx Gamma Gamma' -> sub_ctx (F :: Gamma) (F :: Gamma').
+  Proof using Type.
+    intros ??? hsub; unfold sub_ctx in hsub |- *.
+    intros G [-> | hG].
+    - now left.
+    - right; now apply hsub.
+  Qed.
 End Context.
 
 Arguments Con_ : clear implicits.
 
 Notation "Gamma ,, A" := (extend_ctx Gamma A) (at level 20).
 Notation "A \in Gamma" := (in_ctx A Gamma) (at level 30).
+Notation "A \subseteq Gamma" := (sub_ctx A Gamma) (at level 30).
 Notation "{{ }}" := (empty_ctx).
 Notation "{{ F }}" := (empty_ctx ,, F).
 Notation "{{ F1 ;; F2 ;; .. ;; Fk }}" :=
@@ -174,7 +188,56 @@ Section TableauxProofs.
 End TableauxProofs.
 Arguments is_tableau_satisfiable {_ _ _ _ _} _ _ {_ _ _} _.
 
-(* TODO: structural lemmas, e.g., strengthening, exchange law, (need something else?) *)
+Section TableauxProperties.
+  Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
+
+  Let Con := Con_ pred func var.
+  Let Form := Form_ pred func var.
+  Let Term := Term_ func var.
+
+  (** If [Gamma \subseteq Gamma'], then as long as [fv Gamma = fv Gamma'], weakening holds for tableau proofs. *)
+  Lemma weakening :
+    forall (Gamma Gamma' : Con) (symbs : sko_record sko) (sigma : Substitution var Term),
+      fv Gamma = fv Gamma' -> Gamma \subseteq Gamma' ->
+      hasTableau_ sko Gamma symbs sigma ->
+      hasTableau_ sko Gamma' symbs sigma.
+  Proof using Type.
+    intros ????? hsubset htab. generalize dependent Gamma'. induction htab;
+      intros Gamma' efv hsubset.
+    - apply hsubset in i. now apply hasTableauBot.
+    - apply hsubset in i, i0. eapply hasTableauContr.
+      + apply i.
+      + apply i0.
+      + apply e.
+    - apply hsubset in i. eapply hasTableauNegNeg; eauto.
+      apply IHhtab; auto.
+      + cbn. now rewrite efv.
+      + now apply extend_sub_ctx.
+    - apply hsubset in i. eapply hasTableauNegOr; eauto.
+      apply IHhtab; auto.
+      + cbn. rewrite -!union_assoc efv //.
+      + now do 2 apply extend_sub_ctx.
+    - apply hsubset in i. eapply hasTableauOr; eauto.
+      + apply IHhtab1.
+        * cbn. now rewrite efv.
+        * now apply extend_sub_ctx.
+      + apply IHhtab2.
+        * cbn. now rewrite efv.
+        * now apply extend_sub_ctx.
+    - apply hsubset in i. eapply hasTableauAll; eauto.
+      apply IHhtab.
+      2: now apply extend_sub_ctx.
+      cbn. now rewrite efv.
+    - apply hsubset in i.
+      have Hsko' := Hsko. rewrite efv in Hsko'.
+      apply hasTableauNegAll with (t := t) (Hsko := Hsko'); eauto.
+      have esym : symbol sko t Hsko = symbol sko t Hsko'.
+      { destruct efv. f_equal. apply EqDec_UIP. }
+      rewrite -esym. apply IHhtab.
+      + cbn. now rewrite efv.
+      + now apply extend_sub_ctx.
+  Qed.
+End TableauxProperties.
 
 Section TableauxSoundness.
   Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
