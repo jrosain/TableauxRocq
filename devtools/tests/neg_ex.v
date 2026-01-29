@@ -19,10 +19,9 @@ apply (mkUnaryNode ( GammaNegEx (Neg [[ EEx "X4" (EPred "p" [(EVar "X4")]) ]]) "
 exact Leaf.
 Defined.
 
-Theorem hasTableau_T_proof :
-	GuidedTableauSearch InnerSkolemization [  [[ Axiom0 ]] ;  Neg [[ T ]] ]
-subst T_Proof = ret true.
+Theorem hasTableau_T_Proof :
+	hasTableau InnerSkolemization [  [[ Axiom0 ]] ;  Neg (translate_EForm T) ] subst.
 Proof.
-now native_compute.
+tableaux T_Proof.
 Qed.
 
