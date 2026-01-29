@@ -21,10 +21,9 @@ exact Leaf.
 }
 Defined.
 
-Theorem hasTableau_T_proof :
-	GuidedTableauSearch InnerSkolemization [  Neg [[ T ]] ]
-subst T_Proof = ret true.
+Theorem hasTableau_T_Proof :
+	hasTableau InnerSkolemization [  Neg (translate_EForm T) ] subst.
 Proof.
-now native_compute.
+tableaux T_Proof.
 Qed.
 
