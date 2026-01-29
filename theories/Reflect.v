@@ -242,11 +242,11 @@ Section GuidedTableauSearchAlgorithm.
     (record : sko_record sko) (F : Form) (t : Term) (getter : Form -> option Form)
     (err : string) (search : SearchAlgorithm)  :=
     rule_wrapper Gamma F err getter
-      (fun F => if @is_sko _ _ _ sko t F (fv Gamma) record
+      (fun F0 => if @is_sko _ _ _ sko t F (fv Gamma) record
              then
                match get_symbol t with
                | None => error "This shouldn't ever happen."
-               | Some f => search (F{0 \to t} :: Gamma) sigma (add_symbol f F record) T
+               | Some f => search (F0{0 \to t} :: Gamma) sigma (add_symbol f F record) T
                end
              else
                error ("The term " ++ pr_term t ++ " is not a valid Skolem symbol in the context "
@@ -558,6 +558,47 @@ Proof.
   now exists f2.
 Qed.
 
+(** *** Delta rules *)
+
+Lemma delta_rule_sound :
+  forall (sko : Skolemization) (Gamma : Con) (sigma : Substitution string Term)
+    (record : sko_record sko) (T : ExtendedRuleTree) (F : Form) (t : Term) (err : string)
+    (getter : Form -> option Form),
+    delta_rule sko Gamma sigma T record F t getter err (GuidedTableauSearch__aux sko) = ret true ->
+    exists (f : string) (G : Form),
+      getter F = Some G /\ F \in Gamma /\ sko t F (fv Gamma) record = true /\ get_symbol t = Some f /\
+        GuidedTableauSearch__aux sko (G{0 \to t} :: Gamma) sigma (add_symbol f F record) T = ret true.
+Proof.
+  intros ????????? e. unfold delta_rule in e.
+  apply rule_wrapper_sound in e.
+  destruct e as (G & eG & hin & e).
+  destruct (sko t F (fv Gamma) record) eqn:hsko; try inversion e.
+  destruct (get_symbol t) eqn:esym; try inversion e.
+  exists a, G; repeat split; auto.
+Qed.
+
+(** *** Delta rules getters *)
+
+Lemma get_ex_sound :
+  forall (F G : Form),
+    get_ex F = Some G -> F = Neg (All (Neg G)).
+Proof.
+  intros ?? e; destruct F eqn:eF; try inversion e.
+  destruct f eqn:ef; try inversion e.
+  now destruct f0 eqn:ef0; try inversion e.
+Qed.
+
+Lemma get_neg_all_sound :
+  forall (F G : Form),
+    get_neg_all F = Some G -> exists (H : Form), G = Neg H /\ F = Neg (All H).
+Proof.
+  intros ?? e; destruct F eqn:eF; try inversion e.
+  destruct f eqn:ef; try inversion e.
+  now exists f0.
+Qed.
+
+(** *** Soundness of the auxiliary algorithm. *)
+
 Lemma auxiliary_GuidedTableauSearch_sound :
   forall (sko : Skolemization) (Gamma : Con) (sigma : Substitution string Term)
     (record : sko_record sko) (tree : ExtendedRuleTree),
@@ -589,6 +630,10 @@ Proof.
 
     (* The next two are gamma rules. *)
     10,11: cbn in e; apply gamma_rule_sound in e; destruct e as (G & e & hin & e1).
+
+    (* The last two cases are delta rules. *)
+    12,13: cbn in e; apply delta_rule_sound in e;
+      destruct e as (g & G & e & hin & hsko & esym & e1).
 
     (* Case: [AlphaNegNeg] *)
     + apply getter_neg_neg_sound in e; destruct e as (G & el & e); rewrite e in hin.
@@ -704,13 +749,28 @@ Proof.
       subst. eapply hasTableauNegNeg; eauto.
       eapply hasTableauAll with (x := s); [now left|].
       apply weakening with (Gamma := Gamma ,, (Neg F){0 \to Free s}).
-      ++ have efv : fv Gamma = @fv_list string _ _ (Gamma ,, All (Neg F)).
-         { now rewrite (fv_list_in (Neg (Neg (All (Neg F)))) Gamma). }
-         now cbn; rewrite efv; cbn; symmetry;
-           etransitivity; [rewrite union_comm -!union_assoc union_idemp union_comm //|].
-      ++ apply extend_sub_ctx, cons_sub_ctx, sub_ctx_refl.
-      ++ now apply IHT1.
+      * have efv : fv Gamma = @fv_list string _ _ (Gamma ,, All (Neg F)).
+        { now rewrite (fv_list_in (Neg (Neg (All (Neg F)))) Gamma). }
+        now cbn; rewrite efv; cbn; symmetry;
+          etransitivity; [rewrite union_comm -!union_assoc union_idemp union_comm //|].
+      * apply extend_sub_ctx, cons_sub_ctx, sub_ctx_refl.
+      * now apply IHT1.
 
     (* Case: [DeltaEx] *)
-    + 
+    + apply get_ex_sound in e; rewrite !e in hin hsko.
+      eapply hasTableauNegAll with (t := t) (Hsko := hsko); eauto.
+      eapply hasTableauNegNeg; [now left|].
+      change (hasTableau_ sko ((Gamma ,, Neg (Neg G) {0 \to t}) ,, G {0 \to t})
+                (add_symbol (symbol sko t hsko) (Neg (All (Neg G))) record) sigma).
+      apply weakening with (Gamma := Gamma ,, G {0 \to t}).
+      * cbn; rewrite -union_assoc union_idemp //.
+      * apply extend_sub_ctx, cons_sub_ctx, sub_ctx_refl.
+      * rewrite (symbol_sound hsko) in esym; injection esym => ->.
+        rewrite -e; now apply IHT1.
+
+    (* Case: [DeltaNegAll] *)
+    + apply get_neg_all_sound in e; destruct e as (F & eF & e); rewrite e in hin hsko.
+      eapply hasTableauNegAll with (t := t) (Hsko := hsko); eauto.
+      rewrite (symbol_sound hsko) in esym; injection esym => ->.
+      rewrite -e; rewrite eF in e1; now apply IHT1.
  Admitted.

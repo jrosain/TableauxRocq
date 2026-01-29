@@ -1214,15 +1214,16 @@ Module ExtendedRules.
     Lemma hasTableauNegAll :
       forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record)
         (i : nat) (F : EForm) (x : string) (t : ETerm)
-        (hsko : is_sko (translate_ETerm [] t) (Neg (translate_EForm_ [x] F)) (fv Gamma) symbs = true),
+        (hsko : is_sko (translate_ETerm [] t) (Neg (All (translate_EForm_ [x] F))) (fv Gamma) symbs
+                = true),
         Gamma.(i) = Some [[ ENeg (EAll x F) ]] ->
         closed_in (fun x s => ~ set_in x s) (bv_eform F) t ->
         hasTableau_ sko (Gamma ,, [[ instantiate_eform x t (ENeg F) ]])
-          (add_symbol (symbol sko [[t]] hsko) (translate_EForm_ [x] F) symbs) sigma ->
+          (add_symbol (symbol sko [[t]] hsko) (Neg (All (translate_EForm_ [x] F))) symbs) sigma ->
         hasTableau_ sko Gamma symbs sigma.
     Proof using Type.
       intros ???????? e hclosed htab.
-      apply (hasTableauNegAll sko Gamma symbs sigma (translate_EForm_ [x] F) [[ t ]] hsko).
+      apply (hasTableauNegAll sko Gamma symbs sigma [[F]] [[ t ]] hsko).
       - cbn in e |- *; eapply con_nth_in; eauto.
       - have e' : (translate_EForm_ [x] (ENeg F)) {0 \to [[t]]} =
                     [[instantiate_eform x t (ENeg F)]].
@@ -1236,12 +1237,13 @@ Module ExtendedRules.
     Lemma hasTableauEx :
       forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record)
         (i : nat) (F : EForm) (x : string) (t : ETerm)
-        (hsko : is_sko (translate_ETerm [] t) (Neg (Neg (translate_EForm_ [x] F))) (fv Gamma) symbs = true),
+        (hsko : is_sko (translate_ETerm [] t) (Neg (All (Neg (translate_EForm_ [x] F)))) (fv Gamma)
+                  symbs = true),
         Gamma.(i) = Some [[ EEx x F ]] ->
         closed_in (fun x s => ~ set_in x s) (bv_eform F) t ->
         hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (instantiate_eform x t F)) ]] ,,
                            [[ instantiate_eform x t F ]])
-          (add_symbol (symbol sko [[t]] hsko) (Neg (translate_EForm_ [x] F)) symbs) sigma ->
+          (add_symbol (symbol sko [[t]] hsko) (Neg (All (Neg (translate_EForm_ [x] F)))) symbs) sigma ->
         hasTableau_ sko Gamma symbs sigma.
     Proof using Type.
       intros ???????? e hclosed htab. eapply hasTableauNegAll.

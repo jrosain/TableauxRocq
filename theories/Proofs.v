@@ -175,9 +175,9 @@ Section TableauxProofs.
    (** Delta rule *)
   | hasTableauNegAll :
     forall (Gamma : Con) (symbs : sko_record) (sigma : Substitution var Term)
-      (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) symbs = true),
+      (F : Form) (t : Term) (Hsko : is_sko t (Neg (All F)) (fv Gamma) symbs = true),
       (Neg (All F)) \in Gamma ->
-      hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) F symbs) sigma ->
+      hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) (Neg (All F)) symbs) sigma ->
       hasTableau_ Gamma symbs sigma.
   Set Elimination Schemes.
   Scheme hasTableau__ind := Induction for hasTableau_ Sort Prop.
@@ -226,9 +226,9 @@ Section TableauxProofs.
       is_tableau_satisfiable M mu (hasTableauAll Gamma symbs sigma x F hin htab)
 
   | satisfiable_hasTableauNegAll :
-    forall (F : Form) (t : Term) (Hsko : is_sko t (Neg F) (fv Gamma) symbs = true)
+    forall (F : Form) (t : Term) (Hsko : is_sko t (Neg (All F)) (fv Gamma) symbs = true)
       (hin : (Neg (All F)) \in Gamma)
-      (htab : hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) F symbs) sigma),
+      (htab : hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) (Neg (All F)) symbs) sigma),
       is_tableau_satisfiable M mu htab ->
       is_tableau_satisfiable M mu (hasTableauNegAll Gamma symbs sigma F t Hsko hin htab).
 End TableauxProofs.
