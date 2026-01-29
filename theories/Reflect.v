@@ -774,3 +774,22 @@ Proof.
       rewrite (symbol_sound hsko) in esym; injection esym => ->.
       rewrite -e; rewrite eF in e1; now apply IHT1.
  Admitted.
+
+Theorem GuidedTableauSearch_sound :
+  forall (sko : Skolemization) (Gamma : Con) (sigma : Substitution string Term)
+    (tree : ExtendedRuleTree),
+    GuidedTableauSearch sko Gamma sigma tree = ret true ->
+    hasTableau sko Gamma sigma.
+Proof. intros. eapply auxiliary_GuidedTableauSearch_sound; eauto. Qed.
+
+(** ** 3. Tactic *)
+
+(** Using the algorithm together with the soundness theorem, we provide a tactic [tableaux]
+    that gives a proof [hasTableau sko Gamma sigma] if possible, or fails with an error otherwise. *)
+Ltac tableaux tree :=
+  try (apply (GuidedTableauSearch_sound _ _ _ tree); native_compute;
+       match goal with
+       | [ |- (false, [?err]) = (true, []) ] =>
+           idtac "tableaux failed with the following error message: " err; fail
+       | _ => reflexivity
+       end).
