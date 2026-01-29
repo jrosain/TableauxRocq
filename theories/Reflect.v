@@ -94,7 +94,7 @@ Definition get_and (F : Form) : option (list Form) :=
 
 Definition get_neg_or (F : Form) : option (list Form) :=
   match F with
-  | Neg F => Utils.bind (get_or F) (fun l => Some (List.map (fun F => Neg F) (List.app (fst l) (snd l))))
+  | Neg F => Utils.bind (get_or F) (fun l => Some (List.map (fun F => Neg F) (List.app (snd l) (fst l))))
   | _ => None
   end.
 
@@ -386,6 +386,31 @@ Proof.
   exists f0, f3; auto.
 Qed.
 
+Lemma getter_neg_or_sound :
+  forall (F : Form) (l : list Form),
+    get_neg_or F = Some l -> exists (F1 F2 : Form), l = [Neg F2 ; Neg F1] /\ F = Neg (Or F1 F2).
+Proof.
+  intros ?? e. unfold get_neg_or in e. destruct F eqn:eF; try inversion e.
+  unfold Utils.bind in e.
+  have h : exists F1 F2, get_or f = Some ([F1], [F2]).
+  { destruct (get_or f) eqn:ef; try inversion e.
+    destruct f; try inversion ef. cbn in ef. now exists f1, f2. }
+  destruct h as (F1 & F2 & h). rewrite h in e.
+  cbn in e. exists F1, F2; split.
+  - now injection e => ->.
+  - destruct f; try inversion h; auto.
+Qed.
+
+Lemma getter_neg_imp_sound :
+  forall (F : Form) (l : list Form),
+    get_neg_imp F = Some l -> exists (F1 F2 : Form), l = [F1 ; Neg F2] /\ F = Neg (Or (Neg F1) F2).
+Proof.
+  intros ?? e. unfold get_neg_imp in e. destruct F eqn:eF; try inversion e.
+  destruct f eqn:ef; try inversion e.
+  destruct f0_1 eqn:ef1; try inversion e.
+  now exists f0, f0_2.
+Qed.
+
 Lemma auxiliary_GuidedTableauSearch_sound :
   forall (sko : Skolemization) (Gamma : Con) (sigma : Substitution string Term)
     (record : sko_record sko) (tree : ExtendedRuleTree),
@@ -414,13 +439,40 @@ Proof.
 
     (* Case: [AlphaNegNeg] *)
     + apply getter_neg_neg_sound in e; destruct e as (G & el & e); rewrite e in hin.
-      eapply hasTableauNegNeg; eauto. rewrite el in e1. cbn in e1.
-      now apply IHT1.
+      eapply hasTableauNegNeg; eauto.
+      rewrite el in e1; now apply IHT1.
 
     (* Case: [AlphaAnd] *)
     + apply getter_and_sound in e; destruct e as (F1 & F2 & el & e); rewrite e in hin.
       eapply hasTableauNegOr; eauto. eapply hasTableauNegNeg.
       * now left.
       * eapply hasTableauNegNeg.
-        -- right; now left.
-        -- (* weakening *) Admitted.
+        -- do 2 right; now left.
+        -- apply weakening with (Gamma := Gamma ,, F2 ,, F1).
+           ++ cbn. symmetry; etransitivity; [apply f_equal; now rewrite -union_assoc union_idemp|].
+              etransitivity; [apply f_equal;
+                              now rewrite -union_assoc (union_comm (fv F2) (fv F1)) union_assoc|];
+                rewrite -!union_assoc union_idemp //.
+           ++ do 2 apply extend_sub_ctx; do 2 apply cons_sub_ctx; apply sub_ctx_refl.
+           ++ rewrite el in e1; now apply IHT1.
+
+    (* Case: [AlphaNegOr] *)
+    + apply getter_neg_or_sound in e; destruct e as (F1 & F2 & el & e); rewrite e in hin.
+      eapply hasTableauNegOr; eauto.
+      rewrite el in e1; now apply IHT1.
+
+    (* Case: [AlphaNegImp] *)
+    + apply getter_neg_imp_sound in e; destruct e as (F1 & F2 & el & e); rewrite e in hin.
+      eapply hasTableauNegOr; eauto.
+      eapply hasTableauNegNeg.
+      * right; now left.
+      * apply weakening with (Gamma := Gamma ,, Neg F2 ,, F1).
+        ++ now cbn; rewrite -!union_assoc (union_comm (fv F1) (fv F2));
+             symmetry; etransitivity; [refine (f_equal (fun s => s \union fv Gamma) _);
+                                       rewrite union_assoc union_idemp //|].
+        ++ do 2 apply extend_sub_ctx. apply cons_sub_ctx, sub_ctx_refl.
+        ++ rewrite el in e1; now apply IHT1.
+
+    (* Case: [BetaOr] *)
+    + admit.
+ Admitted.

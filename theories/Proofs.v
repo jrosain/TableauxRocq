@@ -57,6 +57,32 @@ Section Context.
   Definition sub_ctx (Gamma Gamma' : Con_) :=
     forall (F : Form), in_ctx F Gamma -> in_ctx F Gamma'.
 
+  Definition is_sub_ctx (Gamma Gamma' : Con_) : bool :=
+    forallb (fun F => mem_ctx F Gamma') Gamma.
+
+  Lemma is_sub_ctx_sound :
+    forall (Gamma Gamma' : Con_),
+      is_sub_ctx Gamma Gamma' = true -> sub_ctx Gamma Gamma'.
+  Proof using Type.
+    intros ?? e. unfold is_sub_ctx in e. induction Gamma as [|F Gamma IHGamma].
+    - now intros F contra.
+    - cbn in e |- *. apply andb_prop in e. intros G [e' | hin].
+      + subst. rewrite -mem_ctx_in_ctx. apply e.
+      + apply IHGamma.
+        * apply e.
+        * apply hin.
+  Qed.
+
+  Lemma is_sub_ctx_complete :
+    forall (Gamma Gamma' : Con_),
+      sub_ctx Gamma Gamma' -> is_sub_ctx Gamma Gamma' = true.
+  Proof using Type.
+    intros ?? hsub. induction Gamma as [|F Gamma IHGamma]; cbn; auto.
+    apply andb_true_intro; split.
+    - rewrite mem_ctx_in_ctx. apply hsub. now left.
+    - apply IHGamma. intros G hin. apply hsub. now right.
+  Qed.
+
   Lemma extend_sub_ctx :
     forall (Gamma Gamma' : Con_) (F : Form),
       sub_ctx Gamma Gamma' -> sub_ctx (F :: Gamma) (F :: Gamma').
@@ -66,6 +92,18 @@ Section Context.
     - now left.
     - right; now apply hsub.
   Qed.
+
+  Lemma cons_sub_ctx :
+    forall (Gamma Gamma' : Con_) (F : Form),
+      sub_ctx Gamma Gamma' -> sub_ctx Gamma (F :: Gamma').
+  Proof using Type.
+    intros ??? hsub. unfold sub_ctx in hsub |- *; cbn.
+    intros G hin; right. now apply hsub.
+  Qed.
+
+  Lemma sub_ctx_refl :
+    forall (Gamma : Con_), sub_ctx Gamma Gamma.
+  Proof using Type. do 2 intro. tauto. Qed.
 End Context.
 
 Arguments Con_ : clear implicits.
