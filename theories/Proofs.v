@@ -101,6 +101,14 @@ Section Context.
     intros G hin; right. now apply hsub.
   Qed.
 
+  Lemma sub_ctx_cong :
+    forall (Gamma Gamma' : Con_) (F G : Form),
+      sub_ctx Gamma (F :: Gamma') -> sub_ctx (G :: Gamma) (F :: G :: Gamma').
+  Proof using Type.
+    intros ???? hsub H hin. cbn in hin |- *. destruct hin; auto.
+    apply hsub in H0; cbn in H0; destruct H0 as [e | hin]; auto.
+  Qed.
+
   Lemma sub_ctx_refl :
     forall (Gamma : Con_), sub_ctx Gamma Gamma.
   Proof using Type. do 2 intro. tauto. Qed.
