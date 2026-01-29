@@ -60,18 +60,6 @@ Notation "r >>= f" := (bind r f) (at level 50).
 Definition trivial_contradiction (Gamma : list Form) : bool :=
   List.existsb (fun F => orb (eqb F Bot) (eqb F [[ ENeg ETop ]])) Gamma.
 
-Definition is_positive_litteral (F : Form) : bool :=
-  match F with
-  | Pred _ _ => true
-  | _ => false
-  end.
-
-Definition is_negative_litteral (F : Form) : bool :=
-  match F with
-  | Neg F => is_positive_litteral F
-  | _ => false
-  end.
-
 (** Returns true iff there exists two litterals [P] and [P'] such that [Neg P@[sigma] = P'@[sigma]] in
     [Gamma]. *)
 Definition litteral_contradiction (Gamma : list Form) (sigma : Substitution string Term) : bool :=

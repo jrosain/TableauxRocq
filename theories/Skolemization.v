@@ -2,6 +2,7 @@
 
 From Tableaux Require Import Prelude.All.
 From Tableaux Require Import Syntax.
+From Tableaux Require Import Semantics.
 
 (** In this file, we implement first-order Skolemization in the framework of Cantone
     and Nicolosi-Asmundo (in their paper _A Sound Framework for δ-Rule Variants
@@ -9,7 +10,7 @@ From Tableaux Require Import Syntax.
     Skolemization-independent in the definition of tableaux and make it work seamlessly
     for different instances of this class. *)
 Section SkolemizationDef.
-  Context {pred func var : Atom}.
+  Context {pred func var : Atom} `{set_nat : set nat}.
 
   Let set_var := set_atom var.
   Let set_func := set_atom func.
@@ -81,23 +82,42 @@ Section SkolemizationDef.
       ; specs :: SkoRecordSpecs data }.
   End SkoRecord.
 
-  Class Skolemization_ :=
+  Record SkolemizationData :=
     { sko_record : SkoRecord_
     ; is_sko :> Term_ func var -> Form_ pred func var -> set_var -> sko_record -> bool
     ; symbol :
         forall (t : Term_ func var) (F : Form_ pred func var) (S : set_var) (Sf : sko_record),
-          is_sko t F S Sf = true -> func }.
+          is_sko t F S Sf = true -> func
+    ; args :
+      forall (t : Term_ func var) (F : Form_ pred func var) (S : set_var) (Sf : sko_record),
+        is_sko t F S Sf = true -> list (Term_ func var) }.
+
+  Class isSkolemization (data : SkolemizationData) :=
+    { is_func :
+      forall {t : Term_ func var} {F : Form_ pred func var} {S : set_var} {Sf : sko_record data}
+        (Hsko : is_sko data t F S Sf = true),
+        t = Fun (symbol data t F S Sf Hsko) (args data t F S Sf Hsko)
+    ; locally_closed :
+      forall {t : Term_ func var} {F : Form_ pred func var} {S : set_var} {Sf : sko_record data}
+        (Hsko : is_sko data t F S Sf = true), isLocallyClosed t }.
+
+  Record Skolemization_ :=
+    { skoData :> SkolemizationData
+    ; is_skolemization :: isSkolemization skoData }.
 End SkolemizationDef.
 
 Coercion specs : SkoRecord_ >-> SkoRecordSpecs.
+Coercion is_skolemization : Skolemization_ >-> isSkolemization.
 
 Arguments SkoRecordData : clear implicits.
 Arguments SkoRecord_ : clear implicits.
 
-Arguments Skolemization_ : clear implicits.
+Arguments SkolemizationData : clear implicits.
+Arguments Skolemization_ _ _ _ {_}.
 Arguments sko_record {_ _ _} _.
 Arguments is_sko {_ _ _ _} _ _ _ _.
 Arguments symbol {_ _ _} _ _ {_ _ _} _.
+Arguments args {_ _ _} _ _ {_ _ _} _.
 
 Section SkoSymbolLemmas.
   Context {pred func var : Atom} {record : SkoRecord_ pred func var}.
@@ -198,7 +218,7 @@ End SkoSymbolLemmas.
 
 (** ** Some classic instances *)
 Section SkolemizationInstances.
-  Context {pred func var : Atom} `{set_term : set (Term_ func var)}.
+  Context {pred func var : Atom}.
 
   Let set_var := set_atom var.
   Let set_func := set_atom func.
@@ -280,6 +300,17 @@ Section SkolemizationInstances.
     all: now rewrite e in hsko.
   Defined.
 
+  Definition SkoWrapper_args (t : Term_ func var) {P : func -> list (Term_ func var) -> bool}
+    (hsko : SkoWrapper_is_sko t P = true) : list (Term_ func var).
+  Proof.
+    refine
+      (match t as t0 return t = t0 -> list (Term_ func var) with
+       | Bound _ | Free _ => fun e => False_rect (list (Term_ func var)) _
+       | Fun _ l => fun _ => l
+       end eq_refl).
+    all: now rewrite e in hsko.
+  Defined.
+
   Definition is_fv_in (S : set_atom var) (t : Term_ func var) : bool :=
     match t with
     | Bound _ | Fun _ _ => false
@@ -292,7 +323,7 @@ Section SkolemizationInstances.
     | Fun f l => forallb (is_fv_in S) l
     end.
 
-  Definition OuterSkolemization : Skolemization_ pred func var.
+  Definition OuterSkolemizationData : SkolemizationData pred func var.
   Proof.
     unshelve econstructor.
     - exact sko_record_sets. (* in outer skolemization, we only worry about freshness of the
@@ -304,9 +335,27 @@ Section SkolemizationInstances.
       exact (SkoWrapper_is_sko t
                (fun f l => andb (only_fv_in S t) (isFresh f Sf))).
     - intros t ??? hsko. apply (SkoWrapper_symbol t hsko).
+    - intros t ??? hsko. apply (SkoWrapper_args t hsko).
   Defined.
 
-  Definition InnerSkolemization : Skolemization_ pred func var.
+  Lemma isSkolemization_OuterSkolemizationData :
+    isSkolemization OuterSkolemizationData.
+  Proof.
+    constructor.
+    - intros. destruct t; cbn in *; try (inversion Hsko; fail).
+      reflexivity.
+    - intros; destruct t; cbn in *; try (inversion Hsko; fail).
+      (* other way of isLocallyClosed_Fun_isLocallyClosed_list *)
+  Admitted.
+
+  Definition OuterSkolemization : Skolemization_ pred func var.
+  Proof.
+    unshelve econstructor.
+    - exact OuterSkolemizationData.
+    - exact isSkolemization_OuterSkolemizationData.
+  Defined.
+
+  Definition InnerSkolemizationData : SkolemizationData pred func var.
   Proof.
     unshelve econstructor.
     - exact sko_record_sets. (* in inner skolemization, we also only care about freshness of the
@@ -317,6 +366,18 @@ Section SkolemizationInstances.
          Skolem symbols already appearing in the branch. *)
       exact (SkoWrapper_is_sko t (fun f l => andb (only_fv_in (fv F) t) (isFresh f Sf))).
     - intros t ??? hsko. apply (SkoWrapper_symbol t hsko).
+    - intros t ??? hsko. apply (SkoWrapper_args t hsko).
+  Defined.
+
+  Lemma isSkolemization_InnerSkolemizationData :
+    isSkolemization InnerSkolemizationData.
+  Proof. Admitted.
+
+  Definition InnerSkolemization : Skolemization_ pred func var.
+  Proof.
+    unshelve econstructor.
+    - exact InnerSkolemizationData.
+    - exact isSkolemization_InnerSkolemizationData.
   Defined.
 End SkolemizationInstances.
 
@@ -324,7 +385,4 @@ Module ConcreteSkolemizationInstances.
   Export ConcreteSyntaxInstances.
 
   Definition Skolemization := Skolemization_ string string string.
-
-  Existing Instance OuterSkolemization.
-  Existing Instance InnerSkolemization.
 End ConcreteSkolemizationInstances.

@@ -158,6 +158,24 @@ Inductive Form_ {pred func var : Atom} : Type :=
 
 Arguments Form_ : clear implicits.
 
+Definition is_positive_litteral {pred func var : Atom}
+  (F : Form_ pred func var) : bool :=
+  match F with
+  | Pred _ _ => true
+  | _ => false
+  end.
+
+Definition is_negative_litteral {pred func var : Atom}
+  (F : Form_ pred func var) : bool :=
+  match F with
+  | Neg F => is_positive_litteral F
+  | _ => false
+  end.
+
+Definition is_litteral  {pred func var : Atom}
+  (F : Form_ pred func var) : bool :=
+  is_positive_litteral F || is_negative_litteral F.
+
 (** *** Decidable equality for formulas *)
 Section DecEqForms.
   Context {pred func var : Atom}.
@@ -340,6 +358,100 @@ Section FVForms.
       | All F'   => rec F'
       end.
 End FVForms.
+
+Fixpoint ls_to_form {pred func var : Atom} (Gamma : list (Form_ pred func var))
+  : Form_ pred func var :=
+  match Gamma with
+  | [] => Neg Bot
+  | F :: Fs => Neg (Or (Neg F) (Neg (ls_to_form Fs)))
+  end.
+
+Section isClosedLemmas.
+  Context {pred func var : Atom} `{set_nat : set nat}.
+
+  Let Term := Term_ func var.
+  Let Form := Form_ pred func var.
+
+  Lemma isClosedList_elem :
+    forall (l : list Form) (F : Form),
+      List.In F l -> isClosed l -> isClosed F.
+  Proof using Type.
+    intros ?? hin hclosed. induction l as [|G Gs IHGs]; inversion hin.
+    - unfold isClosed in hclosed |- *; cbn in hclosed |- *.
+      subst. now apply is_empty_union1 in hclosed.
+    - apply IHGs; auto. now apply is_empty_union2 in hclosed.
+  Qed.
+
+  Lemma isClosedList_isClosedForm_isClosed :
+    forall (l : list Form) (F : Form),
+      isClosed F -> isClosed l -> isClosed (F :: l).
+  Proof using Type.
+    intros ?? hclosedF hclosedl. unfold isClosed in hclosedF, hclosedl |- *.
+    cbn in *. apply is_empty_spec'. intros.
+    rewrite union_spec in H. destruct H.
+    - now apply (is_empty_spec x) in hclosedF.
+    - now apply (is_empty_spec x) in hclosedl.
+  Qed.
+
+  Lemma isClosedList_isClosedFormList :
+    forall (l : list Form),
+      isClosed (ls_to_form l) <-> isClosed l.
+  Proof using Type.
+    intros; induction l as [|F Fs IHFs]; unfold isClosed; cbn.
+    - reflexivity.
+    - split; intro h; unfold isClosed in IHFs; cbn in *.
+      + apply is_empty_union; split.
+        * now apply is_empty_union1 in h.
+        * apply is_empty_union2 in h. rewrite -IHFs //.
+      + apply is_empty_union; split.
+        * now apply is_empty_union1 in h.
+        * apply is_empty_union2 in h. rewrite IHFs //.
+  Qed.
+
+  Lemma isClosed_subst_term :
+    forall (t : Term) (sigma : Substitution var Term),
+      isClosed t -> t@[sigma] = t.
+  Proof using Type.
+    intros t sigma hclosed; induction t using term_ind; try reflexivity.
+    - unfold isClosed in hclosed. apply (is_empty_spec a) in hclosed.
+      + destruct hclosed.
+      + cbn. rewrite singleton_spec //.
+    - cbn. apply f_equal. induction l as [|u us IHus]; auto.
+      cbn. rewrite IHus.
+      + unfold isClosed in hclosed |- *; cbn in *.
+        rewrite set_fold_left in hclosed.
+        rewrite empty_unitl in hclosed. now apply is_empty_union2 in hclosed.
+      + now apply Forall_tail in X.
+      + apply Forall_inv in X. change (u@[sigma] :: us = u :: us).
+        rewrite X; auto. unfold isClosed in hclosed |- *; cbn in *.
+        rewrite set_fold_left in hclosed.
+        rewrite empty_unitl in hclosed. now apply is_empty_union1 in hclosed.
+  Qed.
+
+  Lemma isClosed_subst_form :
+    forall (F : Form) (sigma : Substitution var Term),
+      isClosed F -> F@[sigma] = F.
+  Proof using Type.
+    intros. induction F; auto.
+    - cbn. apply f_equal. induction l as [|t ts IHts]; auto.
+      cbn. rewrite IHts.
+      + unfold isClosed in H |- *; cbn in *.
+        rewrite set_fold_left in H.
+        rewrite empty_unitl in H. now apply is_empty_union2 in H.
+      + rewrite isClosed_subst_term //.
+        unfold isClosed in H |- *; cbn in *.
+        rewrite set_fold_left in H.
+        rewrite empty_unitl in H. now apply is_empty_union1 in H.
+    - change (Neg (F@[sigma]) = Neg F). rewrite IHF //.
+    - change (Or F1@[sigma] F2@[sigma] = Or F1 F2). rewrite IHF1.
+      + unfold isClosed in H |- *; cbn in *.
+        now apply is_empty_union1 in H.
+      + rewrite IHF2 //.
+        unfold isClosed in H |- *; cbn in *.
+        now apply is_empty_union2 in H.
+    - change (All F@[sigma] = All F). rewrite IHF //.
+  Qed.
+End isClosedLemmas.
 
 (** ** Utils functions *)
 Definition get_symbol {func var : Atom} (t : Term_ func var) : option func :=
