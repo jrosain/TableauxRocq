@@ -5,8 +5,27 @@ From Tableaux Require Import All.
     both in outer and inner Skolemization.
 
     We start by defining the drinker formula using the extended syntax: *)
+Definition drinker0 : EForm :=
+  EEx "x" (EImp (EPred "P" [EVar "x"]) (EAll "y" (EPred "P" ([EVar "y"])))).
+
+(** As this is a bit verbose, some notations (that have to be imported) can be used instead: *)
+Import ExtendedSyntaxNotation.
 Definition drinker : EForm :=
-    EEx "x" (EImp (EPred "P" [EVar "x"]) (EAll "y" (EPred "P" [EVar "y"]))).
+  '? "x" :("P" ''('"x") '=> '! "y" :("P" ''('"y"))).
+
+(** These two really define the same formula: *)
+Goal drinker0 = drinker. reflexivity. Qed.
+
+(** The extended notation, defined in the module [ExtendedSyntaxNotation], uses a "quoting"
+    system, i.e., it uses quotes for connectors, variables & arguments of functions and
+    predicates. The correspondance is as follows:
+    - ['!] for [EAll] and ['?] for [EEx], that must be followed by a variable and the token
+      [:(], which should then contain a formula [F] followed by the closing of a parenthesis,
+    - ['||], ['&&], ['=>] and ['<=>] for, respectively, [EOr], [EAnd], [EImp] and [EEqu],
+    - ['~] for [ENeg],
+    - [P ''(t1 ,, .. ,, tn)] for a predicate,
+    - [f '(t1 ,, .. ,, tn)] for a function,
+    - and ['x] for a simple variable. *)
 
 (** In the outer Skolemization proof, we have to instantiate the drinker formula twice by
     [X] then [X2] as the first Skolemization step yields [f X]. We can then instantiate
@@ -14,7 +33,7 @@ Definition drinker : EForm :=
 
     In TableauxRocq, we can give this substitution as a finite list and automatically
     translate it to the system's internal substitution type using [translate_substitution]. *)
-Definition outer_subst := translate_substitution [("X2", EFun "f" [ EVar "X" ])].
+Definition outer_subst := translate_substitution [("X2", "f" '('"X"))].
 
 (** We can now define the proof tree of this formula. This is done by defining the object
     called [ExtendedRuleTree]. This object records the extension rule applied, as well as
@@ -43,8 +62,8 @@ Proof.
   apply (mkUnaryNode (AlphaNegImp (option_get Bot (get_neg_ex (Neg [[ drinker ]]))){0 \to Free "X"})).
 
   (** We can now apply the first Skolemization rule, generating the Skolem symbol [f X]. *)
-  apply (mkUnaryNode (DeltaNegAll (Neg [[ EAll "y" (EPred "P" [EVar "y"]) ]])
-                        [[ EFun "f" [ EVar "X" ] ]])).
+  apply (mkUnaryNode (DeltaNegAll (Neg [[ '! "y" :("P" ''('"y"))  ]])
+                        [[ "f" '('"X") ]])).
 
   (** Then, we have to apply back the drinker formula, which generates a new metavariable [X2] *)
   apply (mkUnaryNode (GammaNegEx (Neg [[ drinker ]]) "X2")).
@@ -77,8 +96,8 @@ Proof.
   apply (mkUnaryNode (AlphaNegImp (option_get Bot (get_neg_ex (Neg [[ drinker ]]))){0 \to Free "X"})).
 
   (** We can now apply the first Skolemization rule, generating the Skolem symbol [c]. *)
-  apply (mkUnaryNode (DeltaNegAll (Neg [[ EAll "y" (EPred "P" [EVar "y"]) ]])
-                        [[ EFun "c" [] ]])).
+  apply (mkUnaryNode (DeltaNegAll (Neg [[ '! "y" :("P" ''('"y")) ]])
+                        [[ "c" '() ]])).
 
   (** This is enough to have a contradiction. *)
   exact Leaf.

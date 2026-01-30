@@ -1,7 +1,7 @@
 (** * Reflect: sound and complete algorithm to "search" for tableaux proofs *)
 
 From Tableaux Require Import Core.
-From Tableaux Require Import ATPCompat.
+From Tableaux Require Import ExtendedSyntax.
 
 (** In this file, we implement a guided tableau proof-search procedure. It is named
     "guided" as the rules to apply and the substitution are given.
@@ -612,8 +612,8 @@ Proof.
   - destruct (auxiliary_GuidedTableauSearch_Leaf_sound e) as [hin | h].
     + now apply hasTableauBot.
     + destruct h as [ hin | [ P [ P' [ hin [ hin' e' ] ] ] ] ].
-      * apply In_nth_error in hin. destruct hin as (n & e').
-        eapply ExtendedRules.hasTableauNegTop; eauto.
+      * cbn in hin. eapply hasTableauNegNeg; eauto.
+        apply hasTableauBot. now left.
       * eapply hasTableauContr.
         -- apply hin'.
         -- apply hin.
