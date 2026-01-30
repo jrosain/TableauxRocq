@@ -34,11 +34,16 @@ Inductive ExtendedRule : Type :=
 (** As we want a proof tree, we will take a tree of extended rules as an input of the algorithm.
     Unary rules can be implemented by ignoring the *2nd* child of the tree. *)
 Inductive ExtendedRuleTree : Type :=
-| Leaf : ExtendedRuleTree
+| Leaf : option (Form * Form) -> ExtendedRuleTree
 | Node : ExtendedRuleTree -> ExtendedRule -> ExtendedRuleTree -> ExtendedRuleTree.
 
+Definition mkTrivialClosure : ExtendedRuleTree := Leaf None.
+
+Definition mkClosure (F G : Form) : ExtendedRuleTree :=
+  Leaf (Some (F, G)).
+
 Definition mkUnaryNode (rule : ExtendedRule) (T1 : ExtendedRuleTree) : ExtendedRuleTree :=
-  Node T1 rule Leaf.
+  Node T1 rule (Leaf None).
 
 Definition mkBinaryNode (rule : ExtendedRule) (T1 T2 : ExtendedRuleTree) : ExtendedRuleTree :=
   Node T1 rule T2.
@@ -60,19 +65,19 @@ Notation "r >>= f" := (bind r f) (at level 50).
 Definition trivial_contradiction (Gamma : list Form) : bool :=
   List.existsb (fun F => orb (eqb F Bot) (eqb F [[ ENeg ETop ]])) Gamma.
 
-Fixpoint is_negative (F : Form) : bool :=
+Definition is_neg (F : Form) : bool :=
   match F with
-  | Neg F => negb (is_negative F)
+  | Neg _ => true
   | _ => false
   end.
 
-Definition is_positive (F : Form) : bool := negb (is_negative F).
-
 (** Returns true iff there exists two formulas [F] and [F'] such that [Neg P@[sigma] = P'@[sigma]] in [Gamma]. *)
-Definition formula_contradiction (Gamma : list Form) (sigma : Substitution string Term) : bool :=
-  let Gamma__pos := List.filter is_positive Gamma in
-  let Gamma__neg := List.filter is_negative Gamma in
-  List.existsb (fun F => List.existsb (fun G => eqb ((Neg F)@[sigma]) (G@[sigma])) Gamma__neg) Gamma__pos.
+Definition formula_contradiction (F G : Form) (Gamma : Con) (sigma : Substitution string Term): bool :=
+  mem_ctx F Gamma && mem_ctx G Gamma &&
+    (match F with
+     | Neg F => negb (is_neg G) && eqb F@[sigma] G@[sigma]
+     | _ => is_neg G && eqb (Neg F)@[sigma] G@[sigma]
+     end).
 
 Definition get_neg_neg (F : Form) : option (list Form) :=
   match F with
@@ -219,6 +224,12 @@ Section GuidedTableauSearchAlgorithm.
   Definition SearchAlgorithm :=
     Con -> Substitution string Term -> sko_record sko -> ExtendedRuleTree -> Result bool.
 
+  Definition closure_rule (search_contradiction : Con -> Substitution string Term -> bool)
+    (Gamma : Con) (sigma : Substitution string Term) :=
+    if search_contradiction Gamma sigma
+    then ret true
+    else error ("No trivial contradiction in the context: " ++ pr_context (Gamma@[sigma])).
+
   Definition alpha_rule (Gamma : Con) (sigma : Substitution string Term) (T : ExtendedRuleTree)
     (record : sko_record sko) (F : Form) (getter : Form -> option (list Form)) (err : string)
     (search : SearchAlgorithm)  :=
@@ -261,12 +272,9 @@ Section GuidedTableauSearchAlgorithm.
     (Gamma : Con) (sigma : Substitution string Term)
     (record : sko_record sko) (tree : ExtendedRuleTree) : Result bool :=
     match tree with
-    | Leaf =>
-        if trivial_contradiction Gamma
-        then ret true
-        else if formula_contradiction Gamma sigma
-             then ret true
-             else error ("No contradiction in the context: " ++ pr_context (Gamma@[sigma]))
+    | Leaf None => closure_rule (fun Gamma _ => trivial_contradiction Gamma) Gamma sigma
+
+    | Leaf (Some (F, G)) => closure_rule (formula_contradiction F G) Gamma sigma
 
     | Node T1 rule T2 =>
 
@@ -324,35 +332,63 @@ Proof using Type.
       * right. now right.
 Qed.
 
-Lemma formula_contradiction_sound :
-  forall (Gamma : Con) (sigma : Substitution string Term),
-    formula_contradiction Gamma sigma = true ->
+Lemma formula_contradiction_sound_neg :
+  forall (F F' G : Form) (Gamma : Con) (sigma : Substitution string Term),
+    formula_contradiction F G Gamma sigma = true -> F = Neg F' ->
     exists (P P' : Form), P \in Gamma /\ P' \in Gamma /\ P@[sigma] = (Neg P')@[sigma].
 Proof.
-  intros ?? e. unfold formula_contradiction in e.
-  rewrite existsb_exists in e. destruct e as (F & hin & e).
-  rewrite existsb_exists in e. destruct e as (F' & hin' & e').
-  rewrite eqbIsEq in e'. exists F', F. repeat split; auto.
-  - now rewrite filter_In in hin'.
-  - now rewrite filter_In in hin.
+  intros ????? ((hin & hin')%andb_prop & e)%andb_prop eF; unfold formula_contradiction in e;
+    rewrite eF in e.
+  apply andb_prop in e; destruct e as (h & e).
+  rewrite eqbIsEq in e. exists F, G. rewrite !mem_ctx_in_ctx in hin, hin'; repeat split; auto.
+  rewrite eF; cbn; now apply f_equal.
 Qed.
 
-Lemma auxiliary_GuidedTableauSearch_Leaf_sound :
-  forall {sko : Skolemization} {Gamma : Con} {sigma : Substitution string Term}
-    {record : sko_record sko},
-    GuidedTableauSearch__aux sko Gamma sigma record Leaf = ret true ->
-    Bot \in Gamma \/ [[ ENeg ETop ]] \in Gamma \/
-      exists (P P' : Form), P \in Gamma /\ P' \in Gamma /\ P@[sigma] = (Neg P')@[sigma].
+Lemma formula_contradiction_sound_pos :
+  forall (F G : Form) (Gamma : Con) (sigma : Substitution string Term),
+    formula_contradiction F G Gamma sigma = true -> is_neg F = false ->
+    exists (P P' : Form), P \in Gamma /\ P' \in Gamma /\ P@[sigma] = (Neg P')@[sigma].
 Proof.
-  intros ???? e. cbn in e.
-  destruct (trivial_contradiction Gamma) eqn:e0.
-  - apply trivial_contradiction_sound in e0. destruct e0.
-    + now left.
-    + right; now left.
-  - destruct (formula_contradiction Gamma sigma) eqn:e1.
-    + apply formula_contradiction_sound in e1. now do 2 right.
-    + inversion e.
+  intros ???? ((hin & hin')%andb_prop & e)%andb_prop eF; unfold formula_contradiction in e.
+  have e' : (is_neg G && eqb (Neg F) @[ sigma] G @[ sigma])%bool = true.
+  { destruct F; try inversion eF; auto. }
+  clear e. apply andb_prop in e'; destruct e' as (h & e).
+  rewrite eqbIsEq in e. exists G, F. rewrite !mem_ctx_in_ctx in hin, hin'; repeat split; auto.
 Qed.
+
+Lemma is_neg_dec :
+  forall (F : Form), (exists (F' : Form), F = Neg F') \/ is_neg F = false.
+Proof.
+  intros F; destruct F; auto.
+  left. now exists F.
+Qed.
+
+Lemma formula_contradiction_sound :
+  forall (F G : Form) (Gamma : Con) (sigma : Substitution string Term),
+    formula_contradiction F G Gamma sigma = true ->
+    exists (P P' : Form), P \in Gamma /\ P' \in Gamma /\ P@[sigma] = (Neg P')@[sigma].
+Proof.
+  intros ???? e. destruct (is_neg_dec F) as [e0 | e0].
+  - destruct e0 as (F' & eF). eapply formula_contradiction_sound_neg; eauto.
+  - eapply formula_contradiction_sound_pos; eauto.
+Qed.
+
+(* Lemma auxiliary_GuidedTableauSearch_Leaf_sound : *)
+(*   forall {sko : Skolemization} {Gamma : Con} {sigma : Substitution string Term} *)
+(*     {record : sko_record sko}, *)
+(*     GuidedTableauSearch__aux sko Gamma sigma record Leaf = ret true -> *)
+(*     Bot \in Gamma \/ [[ ENeg ETop ]] \in Gamma \/ *)
+(*       exists (P P' : Form), P \in Gamma /\ P' \in Gamma /\ P@[sigma] = (Neg P')@[sigma]. *)
+(* Proof. *)
+(*   intros ???? e. cbn in e. *)
+(*   destruct (trivial_contradiction Gamma) eqn:e0. *)
+(*   - apply trivial_contradiction_sound in e0. destruct e0. *)
+(*     + now left. *)
+(*     + right; now left. *)
+(*   - destruct (formula_contradiction Gamma sigma) eqn:e1. *)
+(*     + apply formula_contradiction_sound in e1. now do 2 right. *)
+(*     + inversion e. *)
+(* Qed. *)
 
 (** *** Soundness of rule wrapper *)
 Lemma rule_wrapper_sound :
@@ -609,15 +645,19 @@ Proof.
     intros record Gamma e.
 
   (* Case: [Leaf] *)
-  - destruct (auxiliary_GuidedTableauSearch_Leaf_sound e) as [hin | h].
-    + now apply hasTableauBot.
-    + destruct h as [ hin | [ P [ P' [ hin [ hin' e' ] ] ] ] ].
-      * cbn in hin. eapply hasTableauNegNeg; eauto.
+  - destruct o; cbn in e.
+    + destruct p as (F & G); unfold closure_rule in e;
+        destruct (formula_contradiction F G Gamma sigma) eqn:e'; try inversion e.
+      apply formula_contradiction_sound in e'; destruct e' as (P & P' & hin & hin' & e').
+      eapply hasTableauContr.
+      * apply hin'.
+      * apply hin.
+      * now symmetry.
+    + unfold closure_rule in e; destruct (trivial_contradiction Gamma) eqn:e'; try inversion e.
+      apply trivial_contradiction_sound in e'; destruct e' as [hbot | hnegtop].
+      * now apply hasTableauBot.
+      * cbn in hnegtop; eapply hasTableauNegNeg; eauto.
         apply hasTableauBot. now left.
-      * eapply hasTableauContr.
-        -- apply hin'.
-        -- apply hin.
-        -- auto.
 
   (* Case: [Node] *)
   - destruct r.

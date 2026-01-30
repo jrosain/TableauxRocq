@@ -71,9 +71,12 @@ Proof.
   (** We can use the same trick as before to split the formulas, replacing [X] by [X2]. *)
   apply (mkUnaryNode (AlphaNegImp (option_get Bot (get_neg_ex (Neg [[ drinker ]]))){0 \to Free "X2"})).
 
-  (** Now, we claim that there is a contradiction with the substitution [X2 -> f X], so we can
-      simply say that the proof finishes here. *)
-  exact Leaf.
+  (** Now, we claim that there is a contradiction with the substitution [X2 -> f X] between
+      [P X2] and [Neg (P (f X))]. We can give these two formulas in any order to the utility
+      function [mkClosure]. *)
+  exact (mkClosure [[ "P" ''('"X2") ]] [[ '~ ("P" ''("f" '('"X"))) ]] ).
+  (** For trivial closures, e.g., with [Bot] or [Neg Top], use [mkTrivialClosure] which is a
+      _constant_ [ExtendedRuleTree], i.e.: [exact mkTrivialClosure]. *)
 
   (** Very importantly, this proof must be [Defined]. *)
 Defined.
@@ -100,7 +103,7 @@ Proof.
                         [[ "c" '() ]])).
 
   (** This is enough to have a contradiction. *)
-  exact Leaf.
+  exact (mkClosure [[ "P" ''('"X") ]] [[ '~ ("P" ''("c" '())) ]] ).
 Defined.
 
 Theorem hasTableau_inner_drinker_proof :

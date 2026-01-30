@@ -30,7 +30,8 @@ Proof.
 
   (** The first branch is the one where the formula _on the left_ is, i.e., here, it will
       be [Neg P(a)]. *)
-  { (** Here, we can directly closed the branch. *) exact Leaf. }
+  { (** Here, we can directly closed the branch, instantiating [X} by [a]. *)
+    exact (mkClosure [[ '~ ("P" ''("a" '())) ]] [[ "P" ''('"X") ]]). }
 
   (** The second branch is the one where the formula _on the right_ is, i.e., here, it will
       be [Neg P(b)]. *)
@@ -42,7 +43,7 @@ Proof.
                           (option_get Bot (get_neg_ex (Neg [[ branching ]]))){0 \to Free "X2"})).
 
     (** Finally, we claim that this is enough to close the tableau. *)
-    exact Leaf. }
+    exact (mkClosure [[ '~ ("P" ''("b" '())) ]] [[ "P" ''('"X2") ]]). }
 Defined.
 
 (** Let's see if this is indeed a proof. *)
