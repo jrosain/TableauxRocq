@@ -9,7 +9,7 @@ From Tableaux Require Import Semantics.
     follow. The goal is to be able to be Skolemization-independent in the definition of
     tableaux and make it work seamlessly for different instances of this class. *)
 Section SkolemizationDef.
-  Context {pred func var : Atom} `{set_nat : set nat}.
+  Context {pred func var : Atom}.
 
   Let set_var := set_atom var.
   Let set_func := set_atom func.
@@ -107,9 +107,6 @@ Section SkolemizationDef.
       forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
         (hsko : is_sko data t F symbs Gamma = true),
         t = Fun (symbol data hsko) (args data hsko)
-    ; locally_closed :
-      forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con},
-        is_sko data t F symbs Gamma = true -> isLocallyClosed t
     ; symbol_sound :
       forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
         (hsko : is_sko data t F symbs Gamma = true),
@@ -122,8 +119,9 @@ Section SkolemizationDef.
       forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
         (Hsko : is_sko data t (Neg (All F)) symbs Gamma = true) (M : Model pred func) (c : M)
         (mu : env M var),
-      exists M' mu', [[ M' # [] # mu' '|= F{0 \to t} ]] /\
-                  ([[ M' # [] # mu' '|= F{0 \to t} ]] -> [[ M #  [c] # mu  '|= F ]]) }.
+        [[M # [] # mu '|= F {0 \to t}]] ->
+        exists M' mu', [[ M' # [] # mu' '|= F{0 \to t} ]] /\
+                    ([[ M' # [] # mu' '|= F{0 \to t} ]] -> [[ M #  [c] # mu  '|= F ]]) }.
 
   Record Skolemization_ :=
     { skoData :> SkolemizationData
@@ -137,7 +135,7 @@ Arguments SkoRecordData : clear implicits.
 Arguments SkoRecord_ : clear implicits.
 
 Arguments SkolemizationData : clear implicits.
-Arguments Skolemization_ _ _ _ {_}.
+Arguments Skolemization_ : clear implicits.
 Arguments sko_record {_ _ _} _.
 
 Section SkoSymbolLemmas.
@@ -292,29 +290,69 @@ Section SkolemizationInstances.
     - intros t ??? hsko. apply (SkoWrapper_args t hsko).
   Defined.
 
+  Lemma OuterSkolemization_isLocallyClosed :
+    forall (t : Term_ func var) (F : Form_ pred func var) (symbs : sko_record OuterSkolemizationData)
+      (Gamma : list (Form_ pred func var)),
+      OuterSkolemizationData t F symbs Gamma = true -> isLocallyClosed t.
+  Proof using Type.
+    intros ???? hsko; destruct t; cbn in *; try (inversion hsko; fail).
+    apply OuterSkolemization_is_sko_pred_sound in hsko; destruct hsko as (_ & _ & hfv).
+    clear Gamma symbs F; induction l as [|t ts IHts]; unfold isLocallyClosed; cbn; unfold is_empty;
+      auto.
+    change (bv t \union bv_list ts = \{\}); apply is_empty_union; split.
+    + have h : exists x, t = Free x by apply hfv; now left.
+      destruct h as (x & e); rewrite e; now cbn.
+    + apply IHts; intros; apply hfv; now right.
+  Qed.
+
+  Lemma OuterSkolemization_isFunc :
+    forall (t : Term_ func var) (F : Form_ pred func var) (symbs : sko_record OuterSkolemizationData)
+      (Gamma : list (Form_ pred func var)) (hsko : OuterSkolemizationData t F symbs Gamma = true),
+      t = Fun (symbol OuterSkolemizationData hsko) (args OuterSkolemizationData hsko).
+  Proof using Type.
+    intros. destruct t; cbn in *; try (inversion hsko; fail).
+    reflexivity.
+  Qed.
+
+  Lemma OuterSkolemization_function_symbols :
+    forall {t : Term_ func var} {F : Form_ pred func var} {symbs : sko_record OuterSkolemizationData}
+      {Gamma : list (Form_ pred func var)} (hsko : OuterSkolemizationData t F symbs Gamma = true),
+      function_symbols (args OuterSkolemizationData hsko) = \{\}.
+  Proof using Type.
+    intros; destruct t; try (inversion hsko; fail); cbn in hsko |- *;
+      unfold OuterSkolemization_is_sko_pred in hsko.
+    have hsko' := andb_prop _ _ hsko.
+    destruct hsko' as (_ & hfree); clear hsko.
+    induction l as [|t ts IHts]; auto; cbn.
+    cbn in hfree; apply andb_prop in hfree; destruct hfree as [hfreet hfreets].
+    rewrite set_fold_left empty_unitl IHts; auto.
+    destruct t; try inversion hfreet; cbn; apply empty_unitl.
+  Qed.
+
   Lemma isSkolemization_OuterSkolemizationData :
     isSkolemization OuterSkolemizationData.
   Proof.
     constructor.
-    - intros. destruct t; cbn in *; try (inversion hsko; fail).
-      reflexivity.
-    - intros ???? hsko; destruct t; cbn in *; try (inversion hsko; fail).
-      apply OuterSkolemization_is_sko_pred_sound in hsko; destruct hsko as (_ & _ & hfv).
-      clear Gamma symbs F; induction l as [|t ts IHts]; unfold isLocallyClosed; cbn; unfold is_empty;
-        auto.
-      change (bv t \union bv_list ts = \{\}); apply is_empty_union; split.
-      + have h : exists x, t = Free x by apply hfv; now left.
-        destruct h as (x & e); rewrite e; now cbn.
-      + apply IHts; intros; apply hfv; now right.
+    - apply OuterSkolemization_isFunc.
     - intros; cbn. unfold SkoWrapper_symbol. destruct t; cbn; try inversion hsko;
         reflexivity.
     - intros; cbn. destruct t; auto; cbn.
       unfold OuterSkolemization_is_sko_pred. admit. (* TODO *)
     - intros ???? hsko ???.
       set f := symbol OuterSkolemizationData hsko.
-      set l0 := args OuterSkolemizationData hsko.
-      set l := map (interpret_term M [] mu) l0.
-      exists (ReplacementModel f l c), mu.
+      set l := args OuterSkolemizationData hsko.
+      set M' := ReplacementModel f l mu c.
+      exists M', mu.
+      have e : interpret_term M' [] mu t = c.
+      { unfold M'. rewrite (OuterSkolemization_isFunc _ _ _ _ hsko) fresh_interp_replaced_term //.
+        - eapply isLocallyClosed_Fun_isLocallyClosed_list' with (f := f).
+          rewrite -OuterSkolemization_isFunc. eapply OuterSkolemization_isLocallyClosed; eauto.
+        - rewrite OuterSkolemization_function_symbols. intro hin; now apply empty_spec in hin. }
+      unfold interpret in H |- *; rewrite !form_env_inst_commutes in H |- *.
+      1-2: eapply OuterSkolemization_isLocallyClosed; eauto.
+      cbn in H |- *; split; unfold interpret; rewrite e.
+      + admit.
+      + admit.
   Admitted.
 
   Definition OuterSkolemization : Skolemization_ pred func var.

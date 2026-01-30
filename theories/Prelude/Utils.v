@@ -82,3 +82,11 @@ Lemma nth_error_Some' :
 Proof.
   intros ???? e. rewrite -nth_error_Some. intro. congruence.
 Qed.
+
+Fixpoint replace_in_list {A : Type} `{EqBool A} (x y : A) (l : list A) : list A :=
+  match l with
+  | [] => []
+  | z :: zs =>
+      (if eqb x z then y
+       else z) :: replace_in_list x y zs
+  end.

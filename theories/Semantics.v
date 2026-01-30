@@ -98,22 +98,12 @@ Section SemanticsDef.
     now specialize (hequ M).
   Qed.
 
-  (** The same model but where a function is replaced by another element. *)
-  Section ReplacementModel.
-    Context {M : Model} (f : func) (l : list M) (c : M).
-
-    Existing Instance eqb_atom.
-
-    Definition interp_func' (f' : func) (l' : list M) : M :=
-      if eqb f f' && eqb l l' then c
-      else @interp_func M f' l'.
-
-    Definition ReplacementModel : Model :=
-      {| car := M
-      ;  interp_func := interp_func'
-      ;  interp_pred := interp_pred
-      ;  non_empty := non_empty |}.
-  End ReplacementModel.
+  Definition update_model_interp (M : Model) (i_fun : func -> list M -> M)
+    (i_pred : pred -> list M -> Prop) : Model :=
+    {| car := M
+    ;  interp_func := i_fun
+    ;  interp_pred := i_pred
+    ;  non_empty := non_empty |}.
 End SemanticsDef.
 
 Arguments Model : clear implicits.
@@ -384,6 +374,47 @@ Section SemanticsFacts.
     - apply hinterp.
   Qed.
 
+  Lemma isClosed_interp_term_env_eq :
+    forall (M : Model pred func) (t : Term) (rho : list M) (sigma mu : env M var),
+      isClosed t ->
+      [[ M # rho # sigma '|= t ]] = [[ M # rho # mu '|= t ]].
+  Proof using Type.
+    intros ????? hclosed; induction t using term_ind; cbn; auto.
+    - unfold isClosed in hclosed; cbn in hclosed;
+        apply is_empty_spec with (x := a) in hclosed.
+      + inversion hclosed.
+      + now apply singleton_spec.
+    - apply f_equal. induction l as [|u us IHus]; cbn; auto.
+      rewrite IHus.
+      + unfold isClosed in hclosed |- *; cbn in *.
+        rewrite set_fold_left in hclosed. now apply is_empty_union2 in hclosed.
+      + now apply Forall_tail in X.
+      + apply Forall_inv in X; rewrite X //.
+        unfold isClosed in hclosed |- *; cbn in *.
+        rewrite set_fold_left in hclosed. apply is_empty_union1 in hclosed.
+        now rewrite empty_unitl in hclosed.
+  Qed.
+
+  Lemma isClosed_interp_form_env_eq :
+    forall (M : Model pred func) (F : Form) (rho : list M) (sigma mu : env M var),
+      isClosed F ->
+      [[ M # rho # sigma '|= F ]] = [[ M # rho # mu '|= F ]].
+  Proof using Type.
+    intros ????? hclosed; revert rho; induction F; cbn; auto.
+    - intro; apply f_equal. induction l as [|t ts IHts]; cbn; auto.
+      rewrite IHts; unfold isClosed in hclosed |- *; cbn in *.
+      + rewrite set_fold_left in hclosed; now apply is_empty_union2 in hclosed.
+      + f_equal. change ([[ M # rho # sigma '|= t ]] = [[ M # rho # mu '|= t ]]).
+        apply isClosed_interp_term_env_eq. unfold isClosed;
+          rewrite set_fold_left empty_unitl in hclosed; now apply is_empty_union1 in hclosed.
+    - intros; rewrite IHF //.
+    - intros; rewrite IHF1; [| rewrite IHF2 //];
+        unfold isClosed in hclosed |- *; cbn in *.
+      + now apply is_empty_union1 in hclosed.
+      + now apply is_empty_union2 in hclosed.
+    - intro; apply prodext=>x; rewrite IHF; auto.
+  Qed.
+
   Definition subst_to_env (M : Model pred func)
     (sigma : Substitution var Term) : env M var :=
     fun x => Some ([[ M # [] # empty_env M var '|= sigma x ]]).
@@ -424,3 +455,113 @@ Section SemanticsFacts.
       + rewrite IHF //.
   Qed.
 End SemanticsFacts.
+
+(** ** Replacement model *)
+
+(** The same model but where a function is replaced by another element. *)
+Section ReplacementModel.
+  Context {pred func var : Atom} `{set_nat : set nat} {M : Model pred func} (f : func)
+    (l : list (Term_ func var)) (mu : env M var) (c : M).
+
+  Let t := Fun f l.
+  Let l0 := map (interpret_term M [] mu) l.
+
+  Existing Instance eqb_atom.
+
+  Definition interp_func' (f' : func) (l' : list M) : M :=
+    if eqb f f' && eqb l0 l' then c
+    else @interp_func _ _ M f' l'.
+
+  Definition interp_pred' (p : pred) (l' : list M) : Prop :=
+    interp_pred p (replace_in_list c (interp_func f l0) l').
+
+  Definition ReplacementModel : Model pred func :=
+    {| car := M
+    ;  interp_func := interp_func'
+    ;  interp_pred := interp_pred'
+    ;  non_empty := non_empty |}.
+
+  Lemma fresh_symbol_same_interp :
+    forall (u : Term_ func var) (rho : list M),
+      ~(set_in f (function_symbols u)) ->
+      interpret_term M rho mu u =
+        interpret_term ReplacementModel rho mu u.
+  Proof using Type.
+    intros u rho; induction u using term_ind; try reflexivity.
+    intros hnin; cbn in hnin; rewrite set_fold_left in hnin; cbn; unfold interp_func'.
+    destruct (eqb f f0 && eqb l0 (map (interpret_term ReplacementModel rho mu) l1))%bool eqn:econd;
+      rewrite econd.
+    - apply andb_prop in econd; destruct econd as (eF & eMap).
+      exfalso; apply hnin; rewrite !eqbIsEq in eF; subst.
+      rewrite union_spec; left; now apply singleton_spec.
+    - rewrite Bool.andb_false_iff in econd; destruct econd as [enF | enMap].
+      + rewrite -Bool.not_true_iff_false eqbIsEq in enF. apply f_equal.
+        induction l1 as [|v vs IHvs]; cbn; auto.
+        rewrite IHvs.
+        * now apply Forall_tail in X.
+        * intro. rewrite union_spec in H; destruct H as [contra | contra].
+          -- rewrite singleton_spec in contra; now apply enF.
+          -- apply hnin. rewrite union_spec; right; cbn.
+             rewrite empty_unitl set_fold_left union_spec; now right.
+        * apply Forall_inv in X; rewrite X //.
+          intro contra; apply hnin; rewrite union_spec; right.
+          cbn; rewrite empty_unitl set_fold_left union_spec; now left.
+      + apply f_equal. clear enMap. induction l1 as [|v vs IHvs]; cbn; auto; rewrite IHvs.
+        * now apply Forall_tail in X.
+        * intros [e | hin]%union_spec.
+          -- apply hnin; rewrite union_spec; now left.
+          -- apply hnin; rewrite union_spec; right.
+             cbn; rewrite empty_unitl set_fold_left union_spec; now right.
+        * apply Forall_inv in X. rewrite X //.
+          intro hin; apply hnin; rewrite union_spec; right;
+            cbn; rewrite empty_unitl set_fold_left union_spec; now left.
+  Qed.
+
+  Lemma same_interp_list :
+    forall (l' : list (Term_ func var)) (rho : list M),
+      ~(set_in f (function_symbols l')) ->
+      map (interpret_term M rho mu) l' =
+        map (interpret_term ReplacementModel rho mu) l'.
+  Proof using Type.
+    intros ?? hnin. induction l' as [|u us IHus]; auto; cbn.
+    rewrite IHus.
+    - intro hin; apply hnin; cbn.
+      rewrite empty_unitl set_fold_left union_spec; now right.
+    - rewrite fresh_symbol_same_interp //. intro hin; apply hnin; cbn.
+      rewrite empty_unitl set_fold_left union_spec; now left.
+  Qed.
+
+  Lemma fresh_interp_replaced_term :
+    forall (rho : list M),
+      isLocallyClosed l ->
+      ~(set_in f (function_symbols l)) ->
+      interpret_term ReplacementModel rho mu t = c.
+  Proof using Type.
+    intros ? hclosed hnin. unfold t; cbn; unfold interp_func'.
+    destruct (eqb f f && eqb l0 (map (interpret_term ReplacementModel rho mu) l))%bool eqn:econd;
+      rewrite econd; auto.
+    rewrite Bool.andb_false_iff in econd; destruct econd as [enF | enMap].
+    - rewrite -Bool.not_true_iff_false eqbIsEq in enF; exfalso; now apply enF.
+    - rewrite -Bool.not_true_iff_false eqbIsEq in enMap; exfalso; apply enMap.
+      unfold l0. rewrite -same_interp_list; auto.
+      clear enMap hnin l0 t. induction l as [|u us IHus]; auto; cbn.
+      rewrite IHus.
+      + unfold isLocallyClosed in hclosed |- *; cbn in *; now apply is_empty_union2 in hclosed.
+      + erewrite isLocallyClosed_interp_env; eauto.
+        now apply is_empty_union1 in hclosed.
+  Qed.
+
+  Lemma interp_form_replacement_model :
+    forall (rho : list M) (F : Form_ pred func var),
+      interpret_form_ M rho mu F = interpret_form_ ReplacementModel rho mu F.
+  Proof.
+    intros ??; generalize dependent rho. induction F;
+      intros rho; auto; cbn.
+    - unfold interp_pred'. apply f_equal.
+      induction l1 as [|u us IHus]; cbn; auto.
+      rewrite IHus; f_equal. admit.
+    - rewrite IHF //.
+    - rewrite IHF1 IHF2 //.
+    - apply prodext=>c'. rewrite IHF //.
+  Admitted.
+End ReplacementModel.

@@ -300,39 +300,63 @@ Section TableauxSoundness.
 
       Note that [Gamma] must be a closed context. *)
   Lemma hasTableau_satisfiable :
-    forall (M : Model pred func) {Gamma : Con} {symbs : sko_record sko}
-      {sigma : Substitution var Term} (T : hasTableau_ sko Gamma symbs sigma) (mu : env M var),
-      [[ M # [] # mu '|= ctx_to_form Gamma ]] ->
-      is_tableau_satisfiable M mu T.
+    forall {Gamma : Con} {symbs : sko_record sko}
+      {sigma : Substitution var Term} (T : hasTableau_ sko Gamma symbs sigma),
+      (exists (M : Model pred func), forall (mu : env M var),
+          [[ M # [] # mu '|= ctx_to_form Gamma ]]) ->
+      exists (M' : Model pred func), forall (mu' : env M' var),
+        is_tableau_satisfiable M' mu' T.
   Proof using Type.
-    intros ?????? hinterp. induction T.
-    - exfalso. have contra := in_form_list_interp i hinterp.
+    intros ???? (M & hinterp).
+
+    (* We start by building the model *)
+    have h :
+      exists (M' : Model pred func),
+        forall (mu' : env M' var), exists (mu : env M var),
+        [[ M' # [] # mu' '|= ctx_to_form Gamma ]] /\
+          (forall (F : Form), [[ M # [] # mu '|= F ]] -> [[ M' # [] # mu' '|= F ]]) /\
+          (forall (F : Form), [[ M' # [] # mu' '|= Neg (All F)  ]] -> [[ M # [] # mu '|= Neg (All F) ]]) /\
+          (M <> M' ->
+           forall (Gamma : Con) (symbs : sko_record sko) (t : Term) (F : Form) (c : M),
+             sko t (Neg (All F)) symbs Gamma = true ->
+             [[  M # [c] # mu '|= Neg F ]] -> [[ M' # [] # mu' '|= Neg F {0 \to t} ]]).
+    { destruct T.
+      1-6: exists M; intro mu; exists mu; repeat split; auto; now intro.
+      have h : forall (mu : env M var), exists (c : M), [[ M # [c] # mu '|= Neg F ]].
+      { intro; specialize (hinterp mu).
+        have hnF := in_form_list_interp H hinterp. apply NNPP => save; apply hnF.
+        intros c; apply NNPP => hG. apply save; now exists c. }
+      admit. }
+    apply NNPP => save; apply save; exists M; intro mu; exfalso; apply save; clear save.
+
+    destruct h as (M' & hM'). exists M'; intro mu'.
+    specialize (hM' mu'); destruct hM' as (mu & hG' & f & f' & hM'); clear hinterp; induction T.
+
+    - exfalso. have contra := in_form_list_interp i hG'.
       now cbn in contra.
     - now apply satisfiable_hasTableauContr.
-    - constructor. apply IHT. eapply extend_with_equiv_form; eauto. apply neg_neg_equiv.
-    - constructor. apply IHT. apply interp_list_commute.
-      eapply extend_with_equiv_form; eauto.
-      apply neg_equiv. etransitivity.
-      + apply or_comm.
-      + apply or_equiv; symmetry; apply neg_neg_equiv.
-    - have hinterp' := in_form_list_interp i hinterp.
+    - constructor; apply IHT; auto;
+        eapply extend_with_equiv_form; eauto; apply neg_neg_equiv.
+    - constructor; apply IHT; auto;
+      apply interp_list_commute; eapply extend_with_equiv_form; eauto; apply neg_equiv;
+        etransitivity; [apply or_comm|apply or_equiv; symmetry; apply neg_neg_equiv].
+    - have hinterp' := in_form_list_interp i hG'.
       destruct hinterp'.
-      + apply satisfiable_hasTableauOr1. apply IHT1.
+      + apply satisfiable_hasTableauOr1. apply IHT1; auto.
         cbn. intros [hnF1 | hnG]; auto.
-      + apply satisfiable_hasTableauOr2. apply IHT2.
+      + apply satisfiable_hasTableauOr2. apply IHT2; auto.
         cbn. intros [hnF2 | hnG]; auto.
-    - constructor. apply IHT.
+    - constructor. apply IHT; auto.
       eapply extend_with_imply_form; eauto.
       apply instantiate_imply_all. now cbn.
-    - constructor. apply IHT.
-      have hdelta := in_form_list_interp i hinterp.
-      cbn in hdelta; apply NNPP => hsave. apply hdelta; intro c; apply NNPP => hnF.
-      have h' : exists M' mu', [[ M' # [] # mu' '|= F{0 \to t} ]] /\
-                            ([[ M' # [] # mu' '|= F{0 \to t} ]] -> [[ M #  [c] # mu  '|= F ]]) by
-          eapply is_sko_sound; eauto.
-      destruct h' as (M' & mu' & hF & contra).
-      now apply contra in hF.
-  Qed.
+    - constructor. apply IHT; auto.
+      have hdelta := in_form_list_interp i hG'.
+      apply f' in hdelta. cbn in hdelta; apply NNPP => hsave.
+      apply hdelta; intro c; apply NNPP => hnF.
+      set G := Neg F. have hG : interpret_form_ M [c] mu G by apply hnF.
+      cbn in hsave; apply NNPP in hsave; destruct hsave; auto. apply H.
+      change [[ M' # [] # mu' '|= G {0 \to t} ]]. eapply hM'; eauto.
+   Admitted.
 
   (** Of course, no tableau is satisfiable. We start by showing 2 small lemmas: *)
   Lemma in_ctx_in_substituted_ctx :
@@ -378,12 +402,13 @@ Section TableauxSoundness.
   Proof using Type.
     intros ??? hclosedGamma htab.
     rewrite models_iff. intros M. left. intro hsat.
-    have hsat' : interpret_form_ M [] (subst_to_env M sigma) (ls_to_form (Neg F :: Gamma)).
-    { change [[ M # [] # subst_to_env M sigma '|= ls_to_form (Neg F :: Gamma) ]].
-      rewrite -subst_commutes_with_env_forms.
-      rewrite isClosed_subst_form; auto.
+    have hsat' : exists (M : Model pred func), forall (mu : env M var),
+        interpret_form_ M [] mu (ls_to_form (Neg F :: Gamma)).
+    { exists M; intro mu; change [[ M # [] # mu '|= ls_to_form (Neg F :: Gamma) ]].
+      rewrite (isClosed_interp_form_env_eq _ _ _ _ (empty_env M var)); auto.
       rewrite isClosedList_isClosedFormList //. }
-    clear hsat. eapply hasTableau_satisfiable with (sigma := sigma) (T := htab) in hsat'.
+    eapply hasTableau_satisfiable with (T := htab) in hsat'.
+    destruct hsat' as (M' & hsat'). specialize (hsat' (subst_to_env M' sigma)).
     eapply hasTableau_not_satisfiable; eauto.
   Qed.
 End TableauxSoundness.

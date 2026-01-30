@@ -148,6 +148,45 @@ Section FVTerms.
       end.
 End FVTerms.
 
+(** ** Subterms *)
+Fixpoint is_subterm {func var : Atom} (t u : Term_ func var) : Prop :=
+  let fix f_ls (l : list (Term_ func var)) : Prop :=
+    match l with
+    | [] => False
+    | x :: xs => is_subterm t x \/ f_ls xs
+    end in
+  t = u \/
+    match u with
+    | Free _ | Bound _ => False
+    | Fun f l => f_ls l
+    end.
+
+Lemma is_subterm_trans :
+  forall {func var : Atom} (t0 t1 t2 : Term_ func var),
+    is_subterm t0 t1 -> is_subterm t1 t2 -> is_subterm t0 t2.
+Proof.
+  intros ?????. induction t2 using term_ind; cbn in *.
+  1-2: intros hsub [ e | contra ]; auto; left; rewrite e in hsub; cbn in hsub;
+    now destruct hsub.
+  intros hsub [ e | rec ].
+  - rewrite e in hsub; now cbn in hsub.
+  - right. induction l as [| u us IHus]; cbn in *; auto.
+    destruct rec.
+    + left. apply Forall_inv in X; now apply X.
+    + right; apply IHus; auto.
+      now apply Forall_tail in X.
+Qed.
+
+Lemma subterm_not_subterm_not_subterm :
+  forall {func var : Atom} (t0 t1 t2 : Term_ func var),
+    is_subterm t0 t2 -> ~is_subterm t1 t2 -> ~is_subterm t1 t0.
+Proof.
+  intros ????? hsub hnsub hsub'.
+  have htrans := is_subterm_trans _ _ _ hsub' hsub.
+  now apply hnsub.
+Qed.
+#[global] Opaque is_subterm.
+
 (** ** Minimal first-order logic formulas *)
 Inductive Form_ {pred func var : Atom} : Type :=
 | Bot  : Form_
@@ -264,6 +303,19 @@ Section SubstOpeningLemmas.
     - right. apply IHl; auto. cbn in H.
       now apply is_empty_union2 in H.
     - subst. now left.
+  Qed.
+
+  Lemma isLocallyClosed_Fun_isLocallyClosed_list' :
+    forall (f : func) (l : list Term),
+      isLocallyClosed (Fun f l) ->
+      isLocallyClosed l.
+  Proof using Type.
+    intros ?? hclosed; apply isLocallyClosed_Fun_isLocallyClosed_list in hclosed;
+      induction l as [|t ts IHts]; unfold isLocallyClosed in *; cbn.
+    - reflexivity.
+    - apply is_empty_union; split.
+      + now apply Forall_inv in hclosed.
+      + apply IHts; now apply Forall_tail in hclosed.
   Qed.
 
   Lemma term_locally_closed_inst :

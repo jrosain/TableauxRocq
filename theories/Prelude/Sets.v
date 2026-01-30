@@ -29,6 +29,7 @@ Class set {A : Type} :=
   ; set_ext : forall (s1 s2 : car), s1 = s2 <-> (forall (x : A), set_in x s1 <-> set_in x s2)
 
   (** *** Properties of defined operations *)
+  ; set_in_dec : forall (x : A) (s : car), set_in x s \/ ~set_in x s
   ; empty_spec : forall (x : A), set_in x empty_set -> False
   ; mem_spec : forall (x : A) (s : car), mem x s = true <-> set_in x s
   ; singleton_spec : forall (x y : A), set_in x (singleton y) <-> x = y
@@ -457,6 +458,11 @@ Module SetComputationalInstances.
       - exact SetOfX_equal_eq.
     Defined.
 
+    Lemma SetOfX_in_dec :
+      forall (x : X.t) (s : SetOfX_.t),
+        SetOfX_.In x s \/ ~SetOfX_.In x s.
+    Proof. apply SetOfXProps.Dec.MSetDecideAuxiliary.dec_In. Qed.
+
     #[global] Instance set_of_ordered : set X.t :=
       {| car := SetOfX_.t
 
@@ -472,6 +478,7 @@ Module SetComputationalInstances.
 
       ;  set_ext := SetOfX_set_ext
 
+      ;  set_in_dec := SetOfX_in_dec
       ;  empty_spec := SetOfX_empty_spec
       ;  singleton_spec := SetOfX_singleton_spec
       ;  mem_spec x s := SetOfX_.mem_spec s x
