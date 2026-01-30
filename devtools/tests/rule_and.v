@@ -1,4 +1,3 @@
-
 Set Warnings "-native-compiler".
 From Tableaux Require Import All.
 
@@ -13,12 +12,11 @@ Definition T_Proof : ExtendedRuleTree.
 Proof.
 apply (mkUnaryNode ( AlphaNegNeg (Neg (Neg [[ EAnd (EPred "a" []) (ENeg (EPred "a" [])) ]])) ) ).
 apply (mkUnaryNode ( AlphaAnd [[ EAnd (EPred "a" []) (ENeg (EPred "a" [])) ]] ) ).
-exact Leaf.
+exact (mkClosure [[ EPred "a" [] ]] [[ ENeg (EPred "a" []) ]]).
 Defined.
 
 Theorem hasTableau_T_Proof :
-	hasTableau InnerSkolemization [  Neg (translate_EForm T) ] subst.
+	hasTableau OuterSkolemization [  Neg (translate_EForm T) ] subst.
 Proof.
 tableaux T_Proof.
 Qed.
-

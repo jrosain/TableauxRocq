@@ -1,4 +1,3 @@
-
 Set Warnings "-native-compiler".
 From Tableaux Require Import All.
 
@@ -14,16 +13,15 @@ Proof.
 apply (mkUnaryNode ( AlphaNegNeg (Neg (Neg [[ EImp (ETop) (EBot) ]])) ) ).
 apply (mkBinaryNode ( BetaImp [[ EImp (ETop) (EBot) ]] ) ).
 {
-exact Leaf.
+exact mkTrivialClosure.
 }
 {
-exact Leaf.
+exact mkTrivialClosure.
 }
 Defined.
 
 Theorem hasTableau_T_Proof :
-	hasTableau InnerSkolemization [  Neg (translate_EForm T) ] subst.
+	hasTableau OuterSkolemization [  Neg (translate_EForm T) ] subst.
 Proof.
 tableaux T_Proof.
 Qed.
-
