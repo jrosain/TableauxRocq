@@ -817,9 +817,9 @@ Proof. intros. eapply auxiliary_GuidedTableauSearch_sound; eauto. Qed.
 (** Using the algorithm together with the soundness theorem, we provide a tactic [tableaux]
     that gives a proof [hasTableau sko Gamma sigma] if possible, or fails with an error otherwise. *)
 Ltac tableaux tree :=
-  try (apply (GuidedTableauSearch_sound _ _ _ tree); native_compute;
-       match goal with
-       | [ |- (false, [?err]) = (true, []) ] =>
-           idtac "tableaux failed with the following error message: " err; fail
-       | _ => reflexivity
-       end).
+  progress (apply (GuidedTableauSearch_sound _ _ _ tree); native_compute;
+            lazymatch goal with
+            | [ |- (false, [?err]) = (true, []) ] =>
+                fail 0 "tableaux failed with the following error message: " err
+            | _ => reflexivity
+            end).
