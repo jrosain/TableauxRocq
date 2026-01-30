@@ -195,7 +195,7 @@ Section TableauxProofs.
 
   | satisfiable_hasTableauContr :
     forall (P P' : Form) (hin : P \in Gamma) (hin' : P' \in Gamma) (e : Neg P@[sigma] = P'@[sigma]),
-      [[ M # [] # mu '\models ctx_to_form Gamma ]] ->
+      [[ M # [] # mu '|= ctx_to_form Gamma ]] ->
       is_tableau_satisfiable M mu (hasTableauContr Gamma symbs sigma P P' hin hin' e)
 
   | satisfiable_hasTableauNegNeg :
@@ -278,8 +278,10 @@ Section TableauxProperties.
       have Hsko' := Hsko. rewrite (sko_con_fv _ Gamma') in Hsko'; auto.
       apply hasTableauNegAll with (t := t) (Hsko := Hsko'); eauto.
       have esym : symbol sko Hsko = symbol sko Hsko'.
-      { 
-apply EqDec_UIP. }
+      { have e0 : get_symbol t = Some (symbol sko Hsko) by apply symbol_sound.
+        have e1 : get_symbol t = Some (symbol sko Hsko') by apply symbol_sound.
+        destruct t; try inversion e0.
+        cbn in e0, e1; injection e0 => e0'; injection e1 => e1'. now destruct e0', e1'. }
       rewrite -esym. apply IHhtab.
       + cbn. now rewrite efv.
       + now apply extend_sub_ctx.
@@ -300,7 +302,7 @@ Section TableauxSoundness.
   Lemma hasTableau_satisfiable :
     forall (M : Model pred func) {Gamma : Con} {symbs : sko_record sko}
       {sigma : Substitution var Term} (T : hasTableau_ sko Gamma symbs sigma) (mu : env M var),
-      [[ M # [] # mu '\models ctx_to_form Gamma ]] ->
+      [[ M # [] # mu '|= ctx_to_form Gamma ]] ->
       is_tableau_satisfiable M mu T.
   Proof using Type.
     intros ?????? hinterp. induction T.
@@ -322,10 +324,14 @@ Section TableauxSoundness.
     - constructor. apply IHT.
       eapply extend_with_imply_form; eauto.
       apply instantiate_imply_all. now cbn.
-    - constructor. apply IHT. eapply extend_with_imply_form'.
-      3: apply i.
-      all: auto.
-      eapply is_sko_sound; eauto.
+    - constructor. apply IHT.
+      have hdelta := in_form_list_interp i hinterp.
+      cbn in hdelta; apply NNPP => hsave. apply hdelta; intro c; apply NNPP => hnF.
+      have h' : exists M' mu', [[ M' # [] # mu' '|= F{0 \to t} ]] /\
+                            ([[ M' # [] # mu' '|= F{0 \to t} ]] -> [[ M #  [c] # mu  '|= F ]]) by
+          eapply is_sko_sound; eauto.
+      destruct h' as (M' & mu' & hF & contra).
+      now apply contra in hF.
   Qed.
 
   (** Of course, no tableau is satisfiable. We start by showing 2 small lemmas: *)
@@ -368,12 +374,12 @@ Section TableauxSoundness.
   Theorem hasTableau_sound :
     forall (sigma : Substitution var Term) (Gamma : Con) (F : Form),
       isClosed (Gamma ,, Neg F) ->
-      hasTableau sko (Gamma ,, Neg F) sigma -> Gamma \models F.
+      hasTableau sko (Gamma ,, Neg F) sigma -> Gamma |= F.
   Proof using Type.
     intros ??? hclosedGamma htab.
     rewrite models_iff. intros M. left. intro hsat.
     have hsat' : interpret_form_ M [] (subst_to_env M sigma) (ls_to_form (Neg F :: Gamma)).
-    { change [[ M # [] # subst_to_env M sigma '\models ls_to_form (Neg F :: Gamma) ]].
+    { change [[ M # [] # subst_to_env M sigma '|= ls_to_form (Neg F :: Gamma) ]].
       rewrite -subst_commutes_with_env_forms.
       rewrite isClosed_subst_form; auto.
       rewrite isClosedList_isClosedFormList //. }

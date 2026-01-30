@@ -120,12 +120,10 @@ Section SkolemizationDef.
         is_sko data t F symbs Gamma = is_sko data t F symbs Gamma'
     ; is_sko_sound :
       forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
-        (Hsko : is_sko data t (Neg (All F)) symbs Gamma = true) (M : Model pred func)
+        (Hsko : is_sko data t (Neg (All F)) symbs Gamma = true) (M : Model pred func) (c : M)
         (mu : env M var),
-        [[ M # [] # mu '\models ls_to_form Gamma]] -> List.In (Neg (All F)) Gamma ->
-        exists (M' : Model pred func) (mu' : env M' var),
-          ~ [[M # [] # mu '\models Neg F {0 \to t}]] ->
-          ~ [[M' # [] # mu' '\models Neg (All F)]] /\ [[M' # [] # mu' '\models ls_to_form Gamma]] }.
+      exists M' mu', [[ M' # [] # mu' '|= F{0 \to t} ]] /\
+                  ([[ M' # [] # mu' '|= F{0 \to t} ]] -> [[ M #  [c] # mu  '|= F ]]) }.
 
   Record Skolemization_ :=
     { skoData :> SkolemizationData
@@ -310,12 +308,13 @@ Section SkolemizationInstances.
       + apply IHts; intros; apply hfv; now right.
     - intros; cbn. unfold SkoWrapper_symbol. destruct t; cbn; try inversion hsko;
         reflexivity.
-    - admit.
-    - intros ???? hsko M mu hinterp hin.
+    - intros; cbn. destruct t; auto; cbn.
+      unfold OuterSkolemization_is_sko_pred. admit. (* TODO *)
+    - intros ???? hsko ???.
       set f := symbol OuterSkolemizationData hsko.
       set l0 := args OuterSkolemizationData hsko.
       set l := map (interpret_term M [] mu) l0.
-      (* exists (ReplacementModel f l  *)
+      exists (ReplacementModel f l c), mu.
   Admitted.
 
   Definition OuterSkolemization : Skolemization_ pred func var.
