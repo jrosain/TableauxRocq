@@ -1,4 +1,4 @@
-(** * ATPCompat: helper functions and lemmas for easy ATP output *)
+(** * ExtendedSyntax: full first-order logic syntax *)
 
 From Corelib Require Import Classes.RelationClasses.
 
@@ -19,7 +19,7 @@ Export ConcreteProofInstances.
       3. a translation function from this syntax to the internal one,
       4. a proof that the two syntaxes are semantically equivalent,
       5. helper functions for transforming finite substitutions into internal substitutions,
-      6. helper lemmas to build a tableau more easily *)
+      6. a notation system for the extended syntax. *)
 
 (** ** 1. Extended syntax *)
 Section ESyntax.
@@ -779,7 +779,7 @@ Section ValidityEquivalence.
 
     Lemma gen_translation_equivalidity :
       forall (M : Model string string) (F : EForm) (bvs : list string) (rho : list M) (sigma : env M string),
-        [[ M # rho # sigma |- translate_EForm_ bvs F ]] <->
+        [[ M # rho # sigma '\models translate_EForm_ bvs F ]] <->
           interpret_eform M (extended_environment bvs rho sigma) F.
     Proof.
       intros M F; induction F.
@@ -844,13 +844,13 @@ Section ValidityEquivalence.
   (** We can use the lemma we just proved to yield the result on closed formulas. *)
   Lemma translation_equivalidity :
     forall (F : EForm) (M : Model string string),
-      ([[ M # [] # (empty_env M string) |- [[F]]]]) <->
+      ([[ M # [] # (empty_env M string) '\models [[F]]]]) <->
         (interpret_eform M (empty_env M string) F).
   Proof. intros. apply gen_translation_equivalidity. Qed.
 
   Lemma ls_to_eform_ls_to_form :
     forall (Gamma : list EForm) (M : Model string string) (rho : list M) (sigma : env M string),
-      ([[ M # rho # sigma |- [[ls_to_eform Gamma]]]]) <->
+      ([[ M # rho # sigma '\models [[ls_to_eform Gamma]]]]) <->
         (interpret_form_ M rho sigma (ls_to_form [[Gamma]])).
   Proof.
     intros. induction Gamma as [|F Fs IHFs]; cbn.
@@ -953,331 +953,25 @@ Section TranslateSubst.
   Defined.
 End TranslateSubst.
 
-(** ** 6. Helpers for [hasTableau] with the full first-order free-variable tableau calculus. *)
-Module ExtendedRules.
-  Section HasTableauLemmas.
-    Context (sko : Skolemization).
+(** ** 6. Notation system for the extended syntax *)
+Module ExtendedSyntaxNotation.
+  Notation "' x" := (EVar x) (at level 0).
+  Notation "f '()" := (EFun f []).
+  Notation "f '( t1 )" := (EFun f [t1]).
+  Notation "f '( t1 ,, t2 ,, .. ,, tn )" :=
+    (EFun f (cons t1 (cons t2 .. (cons tn nil) ..))).
 
-    Let sko_record := sko_record sko.
-
-    Lemma con_nth_in :
-      forall (Gamma : Con) (i : nat) (F : Form),
-        Gamma.(i) = Some F -> F \in Gamma.
-    Proof using Type.
-      intros ??? e. unfold in_ctx. revert e. set l := Gamma; clearbody l.
-      generalize dependent i. induction l as [|x xs IHxs]; cbn in *;
-        intros i e.
-      - rewrite nth_error_nil in e; inversion e.
-      - destruct i.
-        + rewrite nth_error_cons_0 in e.
-          injection e => e'. now left.
-        + right. apply IHxs with (i := i).
-          now rewrite nth_error_cons_succ in e.
-    Qed.
-
-    Lemma hasTableauBot :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record) (i : nat),
-        Gamma.(i) = Some [[ EBot ]] -> hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ???? e. apply hasTableauBot.
-      eapply con_nth_in; eauto.
-    Qed.
-
-    Lemma hasTableauNegTop :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record) (i : nat),
-        Gamma.(i) = Some [[ ENeg ETop ]] -> hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ???? e. eapply hasTableauNegNeg.
-      - cbn in e. eapply con_nth_in; eauto.
-      - unshelve eapply hasTableauBot; cbn. exact 0. now cbn.
-    Qed.
-
-    Lemma hasTableauContr :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record)
-        (i j : nat) (F G : EForm),
-        Gamma.(i) = Some [[ F ]] -> Gamma.(j) = Some [[ G ]] ->
-        (etranslation_eform (ENeg F))@[sigma] = (etranslation_eform G)@[sigma] ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ??????? e0 e1 e.
-      eapply hasTableauContr; cbn in *.
-      - eapply con_nth_in. exact e0.
-      - eapply con_nth_in. exact e1.
-      - auto.
-    Qed.
-
-    Lemma hasTableauNegNeg :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record)
-        (i : nat) (F : EForm),
-        Gamma.(i) = Some [[ ENeg (ENeg F) ]] ->
-        hasTableau_ sko (Gamma ,, [[ F ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ????? e htab. eapply hasTableauNegNeg; eauto.
-      cbn in e; eapply con_nth_in; eauto.
-    Qed.
-
-    Lemma hasTableauAnd :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record) (i : nat) (F G : EForm),
-        Gamma.(i) = Some [[ EAnd F G ]] ->
-        hasTableau_ sko (Gamma ,, Neg (Neg [[ F ]]) ,, Neg (Neg [[ G ]]) ,, [[ F ]] ,, [[ G ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ?????? e htab. eapply hasTableauNegOr.
-      - cbn in e. eapply con_nth_in; eauto.
-      - unshelve eapply hasTableauNegNeg.
-        + exact 1.
-        + exact F.
-        + now cbn.
-        + unshelve eapply hasTableauNegNeg.
-          * exact 1.
-          * exact G.
-          * reflexivity.
-          * assumption.
-    Qed.
-
-    Lemma hasTableauNegOr :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record) (i : nat) (F G : EForm),
-        Gamma.(i) = Some [[ ENeg (EOr F G) ]] ->
-        hasTableau_ sko (Gamma ,, [[ ENeg F ]] ,, [[ ENeg G ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ?????? e htab. eapply hasTableauNegOr.
-      - cbn in e; eapply con_nth_in; eauto.
-      - assumption.
-    Qed.
-
-    Lemma hasTableauNegImp :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record)
-        (i : nat) (F G : EForm),
-        Gamma.(i) = Some [[ ENeg (EImp F G) ]] ->
-        hasTableau_ sko (Gamma ,, [[ ENeg (ENeg F) ]] ,, [[ ENeg G ]] ,, [[ F ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ?????? e htab. eapply hasTableauNegOr.
-      - cbn in *; change (Neg [[ F ]]) with ([[ ENeg F ]]) in e; eauto.
-      - unshelve eapply hasTableauNegNeg.
-        + exact 1.
-        + exact F.
-        + now cbn.
-        + assumption.
-    Qed.
-
-    Lemma hasTableauOr :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record) (i : nat) (F G : EForm),
-        Gamma.(i) = Some [[ EOr F G ]] ->
-        hasTableau_ sko (Gamma ,, [[ F ]]) symbs sigma ->
-        hasTableau_ sko (Gamma ,, [[ G ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ?????? e htab1 htab2. eapply hasTableauOr.
-      - eapply con_nth_in; eauto.
-      - assumption.
-      - assumption.
-    Qed.
-
-    Lemma hasTableauImp :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record) (i : nat) (F G : EForm),
-        Gamma.(i) = Some [[ EImp F G ]] ->
-        hasTableau_ sko (Gamma ,, [[ ENeg F ]]) symbs sigma ->
-        hasTableau_ sko (Gamma ,, [[ G ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ?????? e htab1 htab2.
-      eapply hasTableauOr.
-      1: cbn in *; change (Neg [[ F ]]) with ([[ ENeg F ]]) in e; eassumption.
-      all: eauto.
-    Qed.
-
-    Lemma hasTableauNegAnd :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record) (i : nat) (F G : EForm),
-        Gamma.(i) = Some [[ ENeg (EAnd F G) ]] ->
-        hasTableau_ sko (Gamma ,, (Or [[ ENeg F ]] [[ ENeg G ]]) ,, [[ ENeg F ]]) symbs sigma ->
-        hasTableau_ sko (Gamma ,, (Or [[ ENeg F ]] [[ ENeg G ]]) ,, [[ ENeg G ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ?????? e htab1 htab2. eapply hasTableauNegNeg.
-      - cbn in *. change (Or (Neg [[ F ]]) (Neg [[ G ]])) with ([[ EOr (ENeg F) (ENeg G) ]]) in e.
-        eassumption.
-      - unshelve eapply hasTableauOr.
-        1: exact 0.
-        1-2: shelve.
-        1: reflexivity.
-        all: eauto.
-    Qed.
-
-    Lemma hasTableauEqu :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record) (i : nat) (F G : EForm),
-        Gamma.(i) = Some [[ (EEqu F G) ]] ->
-        hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (EImp F G)) ]] ,, [[ ENeg (ENeg (EImp G F)) ]] ,,
-                           [[ EImp F G ]] ,, [[ EImp G F ]] ,, [[ ENeg F ]] ,, [[ ENeg G ]])
-          symbs sigma ->
-        hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (EImp F G)) ]] ,, [[ ENeg (ENeg (EImp G F)) ]] ,,
-                           [[ EImp F G ]] ,, [[ EImp G F ]] ,, [[ G ]] ,, [[ F ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ?????? e htab1 htab2. unshelve eapply hasTableauNegOr.
-      - exact i.
-      - exact (ENeg (EImp F G)).
-      - exact (ENeg (EImp G F)).
-      - now cbn in *.
-      - unshelve eapply hasTableauNegNeg.
-        + exact 1.
-        + exact (EImp F G).
-        + now cbn.
-        + unshelve eapply hasTableauNegNeg.
-          * exact 1.
-          * exact (EImp G F).
-          * now cbn.
-          * unshelve eapply hasTableauOr.
-            -- exact 1.
-            -- exact (ENeg F).
-            -- exact G.
-            -- now cbn.
-            -- unshelve eapply hasTableauOr.
-               ++ exact 1.
-               ++ exact (ENeg G).
-               ++ exact F.
-               ++ now cbn.
-               ++ auto.
-               ++ unshelve eapply hasTableauContr.
-                  ** exact 0.
-                  ** exact 1.
-                  ** exact F.
-                  ** exact (ENeg F).
-                  ** now cbn.
-                  ** now cbn.
-                  ** reflexivity.
-            -- unshelve eapply hasTableauOr.
-               ++ exact 1.
-               ++ exact (ENeg G).
-               ++ exact F.
-               ++ now cbn.
-               ++ unshelve eapply hasTableauContr.
-                  ** exact 1.
-                  ** exact 0.
-                  ** exact G.
-                  ** exact (ENeg G).
-                  ** now cbn.
-                  ** now cbn.
-                  ** reflexivity.
-               ++ eassumption.
-    Qed.
-
-    Lemma hasTableauNegEqu :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record) (i : nat) (F G : EForm),
-        Gamma.(i) = Some [[ ENeg (EEqu F G) ]] ->
-        hasTableau_ sko (Gamma ,, [[ EOr (ENeg (EImp F G)) (ENeg (EImp G F)) ]] ,, [[ ENeg (EImp F G) ]]
-                           ,, [[ ENeg (ENeg F) ]] ,, [[ ENeg G ]] ,, [[ F ]]) symbs sigma ->
-        hasTableau_ sko (Gamma ,, [[ EOr (ENeg (EImp F G)) (ENeg (EImp G F)) ]] ,, [[ ENeg (EImp G F) ]]
-                           ,, [[ ENeg (ENeg G) ]] ,, [[ ENeg F ]] ,, [[ G ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ?????? e htab1 htab2. unshelve eapply hasTableauNegNeg.
-      - exact i.
-      - exact (EOr (ENeg (EImp F G)) (ENeg (EImp G F))).
-      - now cbn in *.
-      - unshelve eapply hasTableauOr.
-        1: exact 0.
-        3: reflexivity.
-        + unshelve eapply hasTableauNegImp.
-          1: exact 0.
-          3: reflexivity.
-          assumption.
-        + unshelve eapply hasTableauNegImp.
-          1: exact 0.
-          3: reflexivity.
-          assumption.
-    Qed.
-
-    Lemma hasTableauAll :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record)
-        (i : nat) (F : EForm) (x : string) (y : string),
-        Gamma.(i) = Some [[ EAll x F ]] ->
-        mem y (bv_eform F) = false -> 
-        hasTableau_ sko (Gamma ,, [[ instantiate_eform x (EVar y) F ]]) symbs sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ??????? e hmem htab. unshelve eapply hasTableauAll.
-      1: exact y.
-      1: shelve.
-      - cbn in e. eapply con_nth_in; eauto.
-      - replace [x] with (List.app [] [x]).
-        2: now cbn.
-        rewrite (instantiate_eform_commutes_instantiate_form x (EVar y) F []); auto.
-        + now cbn.
-        + cbn. now rewrite mem_spec' in hmem.
-    Qed.
-
-    Existing Instance fv_ctx.
-
-    Lemma hasTableauNegAll :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record)
-        (i : nat) (F : EForm) (x : string) (t : ETerm)
-        (hsko : is_sko (translate_ETerm [] t) (Neg (All (translate_EForm_ [x] F))) (fv Gamma) symbs
-                = true),
-        Gamma.(i) = Some [[ ENeg (EAll x F) ]] ->
-        closed_in (fun x s => ~ set_in x s) (bv_eform F) t ->
-        hasTableau_ sko (Gamma ,, [[ instantiate_eform x t (ENeg F) ]])
-          (add_symbol (symbol sko [[t]] hsko) (Neg (All (translate_EForm_ [x] F))) symbs) sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ???????? e hclosed htab.
-      apply (hasTableauNegAll sko Gamma symbs sigma [[F]] [[ t ]] hsko).
-      - cbn in e |- *; eapply con_nth_in; eauto.
-      - have e' : (translate_EForm_ [x] (ENeg F)) {0 \to [[t]]} =
-                    [[instantiate_eform x t (ENeg F)]].
-        { replace [x] with (List.app [] [x]).
-          2: now cbn.
-          rewrite (instantiate_eform_commutes_instantiate_form x t (ENeg F) []); auto; cbn.
-          apply closed_in_nil. }
-        rewrite -e' in htab. now cbn in htab.
-    Qed.
-
-    Lemma hasTableauEx :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record)
-        (i : nat) (F : EForm) (x : string) (t : ETerm)
-        (hsko : is_sko (translate_ETerm [] t) (Neg (All (Neg (translate_EForm_ [x] F)))) (fv Gamma)
-                  symbs = true),
-        Gamma.(i) = Some [[ EEx x F ]] ->
-        closed_in (fun x s => ~ set_in x s) (bv_eform F) t ->
-        hasTableau_ sko (Gamma ,, [[ ENeg (ENeg (instantiate_eform x t F)) ]] ,,
-                           [[ instantiate_eform x t F ]])
-          (add_symbol (symbol sko [[t]] hsko) (Neg (All (Neg (translate_EForm_ [x] F)))) symbs) sigma ->
-        hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ???????? e hclosed htab. eapply hasTableauNegAll.
-      Unshelve.
-      4: exact i.
-      4: exact (ENeg F).
-      1: apply e.
-      all: eauto.
-      change [[instantiate_eform x t (ENeg (ENeg F))]] with
-        [[ENeg (ENeg (instantiate_eform x t F))]].
-      unshelve eapply hasTableauNegNeg.
-      1: exact 0.
-      1: shelve.
-      1: reflexivity.
-      assumption.
-    Qed.
-
-    Lemma hasTableauNegEx :
-      forall (Gamma : Con) (sigma : Substitution string Term) (symbs : sko_record)
-        (i : nat) (F : EForm) (x : string) (y : string),
-        Gamma.(i) = Some [[ ENeg (EEx x F) ]] ->
-        mem y (bv_eform (ENeg F)) = false ->
-        hasTableau_ sko (Gamma ,, [[EAll x (ENeg F)]] ,, [[ instantiate_eform x (EVar y) (ENeg F) ]])
-          symbs sigma -> hasTableau_ sko Gamma symbs sigma.
-    Proof using Type.
-      intros ??????? e hmem htab. unshelve eapply hasTableauNegNeg.
-      - exact i.
-      - exact (EAll x (ENeg F)).
-      - now cbn in e |- *.
-      - unshelve eapply hasTableauAll.
-        1: exact 0.
-        4: reflexivity.
-        1: shelve.
-        all: eauto.
-    Qed.
-  End HasTableauLemmas.
-End ExtendedRules.
+  Notation "'Top" := ETop.
+  Notation "'Bot" := EBot.
+  Notation "P ''()" := (EPred P []).
+  Notation "P ''( t1 )" := (EPred P [t1]).
+  Notation "P ''( t1 ,, t2 ,, .. ,, tn )" :=
+    (EPred P (cons t1 (cons t2 .. (cons tn nil) ..))).
+  Notation "'~ P" := (ENeg P) (at level 2).
+  Notation "P '|| Q" := (EOr P Q) (at level 10).
+  Notation "P '&& Q" := (EAnd P Q) (at level 5).
+  Notation "P '=> Q" := (EImp P Q) (at level 6).
+  Notation "P '<=> Q" := (EEqu P Q) (at level 7).
+  Notation "'? x :( P )" := (EEx x P) (at level 12).
+  Notation "'! x :( P )" := (EAll x P) (at level 12).
+End ExtendedSyntaxNotation.

@@ -1,7 +1,7 @@
 (** * Reflect: sound and complete algorithm to "search" for tableaux proofs *)
 
 From Tableaux Require Import Core.
-From Tableaux Require Import ATPCompat.
+From Tableaux Require Import ExtendedSyntax.
 
 (** In this file, we implement a guided tableau proof-search procedure. It is named
     "guided" as the rules to apply and the substitution are given.
@@ -612,8 +612,8 @@ Proof.
   - destruct (auxiliary_GuidedTableauSearch_Leaf_sound e) as [hin | h].
     + now apply hasTableauBot.
     + destruct h as [ hin | [ P [ P' [ hin [ hin' e' ] ] ] ] ].
-      * apply In_nth_error in hin. destruct hin as (n & e').
-        eapply ExtendedRules.hasTableauNegTop; eauto.
+      * cbn in hin. eapply hasTableauNegNeg; eauto.
+        apply hasTableauBot. now left.
       * eapply hasTableauContr.
         -- apply hin'.
         -- apply hin.
@@ -817,9 +817,9 @@ Proof. intros. eapply auxiliary_GuidedTableauSearch_sound; eauto. Qed.
 (** Using the algorithm together with the soundness theorem, we provide a tactic [tableaux]
     that gives a proof [hasTableau sko Gamma sigma] if possible, or fails with an error otherwise. *)
 Ltac tableaux tree :=
-  try (apply (GuidedTableauSearch_sound _ _ _ tree); native_compute;
-       match goal with
-       | [ |- (false, [?err]) = (true, []) ] =>
-           idtac "tableaux failed with the following error message: " err; fail
-       | _ => reflexivity
-       end).
+  progress (apply (GuidedTableauSearch_sound _ _ _ tree); native_compute;
+            lazymatch goal with
+            | [ |- (false, [?err]) = (true, []) ] =>
+                fail 0 "tableaux failed with the following error message: " err
+            | _ => reflexivity
+            end).

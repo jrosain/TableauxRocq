@@ -10,10 +10,10 @@ theories/Prelude/Utils.v
 theories/Prelude/LocallyNamelessClasses.v
 
 theories/All.v
-theories/ATPCompat.v
+theories/Checker.v
 theories/Core.v
+theories/ExtendedSyntax.v
 theories/Proofs.v
-theories/Reflect.v
 theories/Semantics.v
 theories/Skolemization.v
 theories/Syntax.v

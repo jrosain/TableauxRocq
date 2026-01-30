@@ -62,7 +62,7 @@ it should work out of the box.
 If you develop a tableau-based automated theorem prover, you can certify your proofs using
 TableauxRocq. TableauxRocq's core is based on a minimal syntax and proof system, but we
 provide an extended syntax, semantics and tableau proofs in the
-[ATPCompat](theories/ATPCompat.v) file, that supports the full first-order syntax. Then,
+[ExtendedSyntax](theories/ExtendedSyntax.v) file, that supports the full first-order syntax. Then,
 to get started on developing an output, a showcase of the different types of rules are
 done in the following files:
 

@@ -195,7 +195,7 @@ Section TableauxProofs.
 
   | satisfiable_hasTableauContr :
     forall (P P' : Form) (hin : P \in Gamma) (hin' : P' \in Gamma) (e : Neg P@[sigma] = P'@[sigma]),
-      [[ M # [] # mu |- ctx_to_form Gamma ]] ->
+      [[ M # [] # mu '\models ctx_to_form Gamma ]] ->
       is_tableau_satisfiable M mu (hasTableauContr Gamma symbs sigma P P' hin hin' e)
 
   | satisfiable_hasTableauNegNeg :
@@ -299,7 +299,7 @@ Section TableauxSoundness.
   Lemma hasTableau_satisfiable :
     forall (M : Model pred func) {Gamma : Con} {symbs : sko_record sko}
       {sigma : Substitution var Term} (T : hasTableau_ sko Gamma symbs sigma) (mu : env M var),
-      [[ M # [] # mu |- ctx_to_form Gamma ]] ->
+      [[ M # [] # mu '\models ctx_to_form Gamma ]] ->
       is_tableau_satisfiable M mu T.
   Proof.
     intros ?????? hinterp. induction T.
@@ -325,9 +325,9 @@ Section TableauxSoundness.
       3: apply i.
       all: auto.
       exists M, mu. intros hF. apply NNPP in hF.
-      change ([[ M # [] # mu |- F { 0 \to t } ]]) in hF; split.
+      change ([[ M # [] # mu '\models F { 0 \to t } ]]) in hF; split.
       + intros hnAll; apply hnAll. intro c.
-        change [[M # [c] # mu |- F]]. admit.
+        change [[M # [c] # mu '\models F]]. admit.
       + admit.
   Admitted.
 
@@ -376,7 +376,7 @@ Section TableauxSoundness.
     intros ??? hclosedGamma htab.
     rewrite models_iff. intros M. left. intro hsat.
     have hsat' : interpret_form_ M [] (subst_to_env M sigma) (ls_to_form (Neg F :: Gamma)).
-    { change [[ M # [] # subst_to_env M sigma |- ls_to_form (Neg F :: Gamma) ]].
+    { change [[ M # [] # subst_to_env M sigma '\models ls_to_form (Neg F :: Gamma) ]].
       rewrite -subst_commutes_with_env_forms.
       rewrite isClosed_subst_form; auto.
       rewrite isClosedList_isClosedFormList //. }

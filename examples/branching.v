@@ -1,4 +1,5 @@
 From Tableaux Require Import All.
+Import ExtendedSyntaxNotation.
 
 (** In this file, we give an example of a tableau proof of the following branching
     formula:
@@ -7,14 +8,13 @@ From Tableaux Require Import All.
 
     We start by defining the drinker formula using the extended syntax: *)
 Definition branching : EForm :=
-  EEx "x" (EImp (EPred "P" [EVar "x"])
-             (EAnd (EPred "P" [ EFun "a" [] ]) (EPred "P" [ EFun "b" [] ]))).
+  '? "x" :(("P" ''('"x")) '=> ("P" ''("a" '())) '&& ("P" ''("b" '()))).
 
 (** In the proofs (be it in outer or in inner), we create two metavariables by instantiating
     the formula twice, and replace one of them by [a] and the other one by [b].
 
     Here, we do not create any new skolem symbol. *)
-Definition subst := translate_substitution [("X", EFun "a" []) ; ("X2", EFun "b" [])].
+Definition subst := translate_substitution [("X", "a" '()) ; ("X2", "b" '())].
 
 Definition outer_branching_proof : ExtendedRuleTree.
 Proof.
@@ -26,8 +26,7 @@ Proof.
 
   (** Now, we have a branching rule with the negation of the conjunction. Therefore, we have
       to apply [mkBinaryNode] instead, and we will have two goals left. *)
-  apply (mkBinaryNode
-           (BetaNegAnd (Neg [[ EAnd (EPred "P" [ EFun "a" [] ]) (EPred "P" [ EFun "b" [] ]) ]]))).
+  apply (mkBinaryNode (BetaNegAnd (Neg [[ ("P" ''("a" '())) '&& ("P" ''("b" '())) ]]))).
 
   (** The first branch is the one where the formula _on the left_ is, i.e., here, it will
       be [Neg P(a)]. *)
