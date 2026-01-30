@@ -133,7 +133,7 @@ Arguments Interpret {_ _ _} _ _ _.
 Arguments interpret {_ _ _} _ {_ _ _} _ _ _.
 
 Notation "\models F" := (is_valid F) (at level 40).
-Notation "[[ M # rho # sigma |- F ]]" := (interpret M rho sigma F).
+Notation "[[ M # rho # sigma '\models F ]]" := (interpret M rho sigma F).
 Notation "F \equiv G" := (equiv F G) (at level 30).
 Notation "Gamma \models F" := (is_valid (Or (Neg (ls_to_form Gamma)) F)) (at level 40).
 
@@ -227,7 +227,7 @@ Section SemanticsFacts.
   Lemma in_form_list_interp :
     forall {F : Form} {Gamma : list Form} {M : Model pred func}
       {rho : list M} {sigma : env M var},
-      List.In F Gamma -> [[ M # rho # sigma |- ls_to_form Gamma ]] -> [[ M # rho # sigma |- F ]].
+      List.In F Gamma -> [[ M # rho # sigma '\models ls_to_form Gamma ]] -> [[ M # rho # sigma '\models F ]].
   Proof using Type.
     intros ????? hin hinterp; induction Gamma as [|G Gs IHGs]; inversion hin; subst.
     - cbn in hinterp |- *. apply NNPP => save. apply hinterp; now left.
@@ -237,8 +237,8 @@ Section SemanticsFacts.
   Lemma extend_with_equiv_form :
     forall (F G : Form) (Gamma : list Form) (M : Model pred func)
       (rho : list M) (sigma : env M var),
-      [[ M # rho # sigma |- ls_to_form Gamma ]] -> F \equiv G -> List.In G Gamma ->
-      [[ M # rho # sigma |- ls_to_form (F :: Gamma) ]].
+      [[ M # rho # sigma '\models ls_to_form Gamma ]] -> F \equiv G -> List.In G Gamma ->
+      [[ M # rho # sigma '\models ls_to_form (F :: Gamma) ]].
   Proof using Type.
     intros ?????? hinterp hequiv hin. cbn. intros [hnF | hnG]; auto.
     have hG := in_form_list_interp hin hinterp.
@@ -249,8 +249,8 @@ Section SemanticsFacts.
   Lemma extend_with_imply_form :
     forall (F G : Form) (Gamma : list Form) (M : Model pred func)
       (sigma : env M var),
-      [[ M # [] # sigma |- ls_to_form Gamma ]] -> imply G F -> List.In G Gamma ->
-      [[ M # [] # sigma |- ls_to_form (F :: Gamma) ]].
+      [[ M # [] # sigma '\models ls_to_form Gamma ]] -> imply G F -> List.In G Gamma ->
+      [[ M # [] # sigma '\models ls_to_form (F :: Gamma) ]].
   Proof using Type.
     intros ????? hinterp himply hin. cbn. intros [hnF | hnG]; auto.
     have hG := in_form_list_interp hin hinterp.
@@ -260,12 +260,12 @@ Section SemanticsFacts.
   Lemma extend_with_imply_form' :
     forall (F G : Form) (Gamma : list Form) (M : Model pred func)
       (sigma : env M var),
-      [[ M # [] # sigma |- ls_to_form Gamma ]] ->
+      [[ M # [] # sigma '\models ls_to_form Gamma ]] ->
       (exists M' sigma',
-          (~ [[ M # [] # sigma |- F ]]) ->
-          (~ [[ M' # [] # sigma' |- G ]]) /\
-            [[ M' # [] # sigma' |- ls_to_form Gamma ]]) ->
-      List.In G Gamma -> [[ M # [] # sigma |- ls_to_form (F :: Gamma) ]].
+          (~ [[ M # [] # sigma '\models F ]]) ->
+          (~ [[ M' # [] # sigma' '\models G ]]) /\
+            [[ M' # [] # sigma' '\models ls_to_form Gamma ]]) ->
+      List.In G Gamma -> [[ M # [] # sigma '\models ls_to_form (F :: Gamma) ]].
   Proof using Type.
     intros ????? hinterp himply hin. cbn. intros [hnF | hnG]; auto.
     have hG := in_form_list_interp hin hinterp.
@@ -278,8 +278,8 @@ Section SemanticsFacts.
   Lemma interp_list_commute :
     forall (F G : Form) (Gamma : list Form) (M : Model pred func)
       (rho : list M) (sigma : env M var),
-      [[ M # rho # sigma |- ls_to_form (Neg (Or (Neg F) (Neg G)) :: Gamma) ]] ->
-      [[ M # rho # sigma |- ls_to_form (F :: G :: Gamma) ]].
+      [[ M # rho # sigma '\models ls_to_form (Neg (Or (Neg F) (Neg G)) :: Gamma) ]] ->
+      [[ M # rho # sigma '\models ls_to_form (F :: G :: Gamma) ]].
   Proof using Type.
     intros ?????? hinterp. cbn in *. intros [hnF | hinterp'].
     - apply hinterp. left. intros h; apply h. now left.
@@ -345,7 +345,7 @@ Section SemanticsFacts.
     forall (M : Model pred func) (rho : list M) (sigma : env M var) (t u : Term),
       isLocallyClosed u ->
       interpret_term M rho sigma (t {#|rho| \to u}) =
-        interpret_term M (rho ++ [ [[ M # rho # sigma |- u ]] ])%list sigma t.
+        interpret_term M (rho ++ [ [[ M # rho # sigma '\models u ]] ])%list sigma t.
   Proof using Type.
     intros ??????. induction t using term_ind.
     - cbn. rewrite -match_eq_dec_eq_bool; destruct (#|rho| == n).
@@ -361,7 +361,7 @@ Section SemanticsFacts.
             cbn in H0. lia. }
           rewrite nth_error_app1; auto.
           now rewrite e.
-        * have hgt : #|rho ++ [ [[ M # rho # sigma |- u ]] ]|  <= n.
+        * have hgt : #|rho ++ [ [[ M # rho # sigma '\models u ]] ]|  <= n.
           { rewrite nth_error_None in e.
             have hlt : #|rho| < n by lia.
             rewrite last_length. lia. }
@@ -370,7 +370,7 @@ Section SemanticsFacts.
     - now cbn.
     - cbn. rewrite map_map.
       have hmap : (map (fun x : Term_ func var => interpret_term M rho sigma x {#| rho | \to u}) l) =
-                    (map (interpret_term M (rho ++ [ [[M # rho # sigma |- u]] ])%list sigma) l).
+                    (map (interpret_term M (rho ++ [ [[M # rho # sigma '\models u]] ])%list sigma) l).
       { induction l as [|v vs IHvs]; auto; cbn.
         rewrite IHvs.
         - now apply Forall_tail in X.
@@ -384,12 +384,12 @@ Section SemanticsFacts.
     forall (M : Model pred func) (rho : list M) (sigma : env M var) (F : Form) (t : Term),
       isLocallyClosed t ->
       interpret_form_ M rho sigma (F {#|rho| \to t}) =
-        interpret_form_ M (rho ++ [ [[ M # rho # sigma |- t ]] ])%list sigma F.
+        interpret_form_ M (rho ++ [ [[ M # rho # sigma '\models t ]] ])%list sigma F.
   Proof using Type.
     intros ??????. revert rho. induction F; auto; cbn; intros rho.
     - rewrite map_map.
       have hmap : (map (fun u => interpret_term M rho sigma u {#|rho| \to t}) l) =
-                    (map (interpret_term M (rho ++ [ [[ M # rho # sigma |- t ]] ])%list sigma) l).
+                    (map (interpret_term M (rho ++ [ [[ M # rho # sigma '\models t ]] ])%list sigma) l).
       { induction l as [|v vs IHvs]; auto; cbn.
         rewrite IHvs term_env_inst_commutes; auto. }
       rewrite hmap //.
@@ -416,12 +416,12 @@ Section SemanticsFacts.
 
   Definition subst_to_env (M : Model pred func)
     (sigma : Substitution var Term) : env M var :=
-    fun x => Some ([[ M # [] # empty_env M var |- sigma x ]]).
+    fun x => Some ([[ M # [] # empty_env M var '\models sigma x ]]).
 
   Lemma subst_commutes_with_env_terms :
     forall (M : Model pred func) (t : Term) (rho : list M) (sigma : Substitution var Term),
-      [[ M # rho # empty_env M var |- t@[sigma] ]] =
-        [[ M # rho # subst_to_env M sigma |- t ]].
+      [[ M # rho # empty_env M var '\models t@[sigma] ]] =
+        [[ M # rho # subst_to_env M sigma '\models t ]].
   Proof using Type.
     intros. induction t using term_ind; cbn; try reflexivity.
     - apply isLocallyClosed_interp_env. apply isSubst.
@@ -433,8 +433,8 @@ Section SemanticsFacts.
 
   Lemma subst_commutes_with_env_forms :
     forall (M : Model pred func) (F : Form) (rho : list M) (sigma : Substitution var Term),
-      [[ M # rho # empty_env M var |- F@[sigma] ]] <->
-        [[ M # rho # subst_to_env M sigma |- F ]].
+      [[ M # rho # empty_env M var '\models F@[sigma] ]] <->
+        [[ M # rho # subst_to_env M sigma '\models F ]].
   Proof using Type.
     intros M F. induction F; cbn.
     - reflexivity.
@@ -443,8 +443,8 @@ Section SemanticsFacts.
                  map (interpret_term M rho (subst_to_env M sigma)) l.
       { induction l as [|t ts IHts]; cbn; auto.
         rewrite IHts. f_equal.
-        change ([[ M # rho # empty_env M var |- t@[sigma] ]] =
-                  [[ M # rho # subst_to_env M sigma |- t ]]).
+        change ([[ M # rho # empty_env M var '\models t@[sigma] ]] =
+                  [[ M # rho # subst_to_env M sigma '\models t ]]).
         apply subst_commutes_with_env_terms. }
       now rewrite e.
     - intros ??. rewrite IHF //.
