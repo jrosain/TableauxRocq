@@ -100,31 +100,19 @@ Section SemanticsDef.
 
   (** The same model but where a function is replaced by another element. *)
   Section ReplacementModel.
-    Context {M : Model} (c c' : M).
+    Context {M : Model} (f : func) (l : list M) (c : M).
 
     Existing Instance eqb_atom.
 
-    Definition interp_func' (f : func) (l : list M) : M :=
-      let c0 := @interp_func M f l in
-      match c0 == c with
-      | left _ => c'
-      | right _ => c0
-      end.
-
-    Definition interp_pred' (p : pred) (l' : list M) : Prop :=
-      @interp_pred M p (list_replace l' c c').
-
-    Definition non_empty' :=
-      match non_empty == c with
-      | left _ => c'
-      | right _ => non_empty
-      end.
+    Definition interp_func' (f' : func) (l' : list M) : M :=
+      if eqb f f' && eqb l l' then c
+      else @interp_func M f' l'.
 
     Definition ReplacementModel : Model :=
       {| car := M
       ;  interp_func := interp_func'
-      ;  interp_pred := interp_pred'
-      ;  non_empty := non_empty' |}.
+      ;  interp_pred := interp_pred
+      ;  non_empty := non_empty |}.
   End ReplacementModel.
 End SemanticsDef.
 
@@ -261,16 +249,16 @@ Section SemanticsFacts.
     forall (F G : Form) (Gamma : list Form) (M : Model pred func)
       (sigma : env M var),
       [[ M # [] # sigma '\models ls_to_form Gamma ]] ->
-      (exists M' sigma',
-          (~ [[ M # [] # sigma '\models F ]]) ->
-          (~ [[ M' # [] # sigma' '\models G ]]) /\
-            [[ M' # [] # sigma' '\models ls_to_form Gamma ]]) ->
+      ((~ [[ M # [] # sigma '\models F ]]) ->
+       exists M' sigma',
+         (~ [[ M' # [] # sigma' '\models G ]]) /\
+           [[ M' # [] # sigma' '\models ls_to_form Gamma ]]) ->
       List.In G Gamma -> [[ M # [] # sigma '\models ls_to_form (F :: Gamma) ]].
   Proof using Type.
     intros ????? hinterp himply hin. cbn. intros [hnF | hnG]; auto.
     have hG := in_form_list_interp hin hinterp.
-    destruct himply as (M' & sigma' & h); auto.
-    specialize (h hnF). destruct h as (hnG & hGamma) .
+    specialize (himply hnF). destruct himply as (M' & sigma' & h); auto.
+    destruct h as (hnG & hGamma) .
     have h := in_form_list_interp hin hGamma.
     now apply hnG.
   Qed.

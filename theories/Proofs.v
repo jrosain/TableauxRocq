@@ -175,9 +175,9 @@ Section TableauxProofs.
    (** Delta rule *)
   | hasTableauNegAll :
     forall (Gamma : Con) (symbs : sko_record) (sigma : Substitution var Term)
-      (F : Form) (t : Term) (Hsko : is_sko t (Neg (All F)) (fv Gamma) symbs = true),
+      (F : Form) (t : Term) (Hsko : sko t (Neg (All F)) symbs Gamma = true),
       (Neg (All F)) \in Gamma ->
-      hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) (Neg (All F)) symbs) sigma ->
+      hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko Hsko) (Neg (All F)) symbs) sigma ->
       hasTableau_ Gamma symbs sigma.
   Set Elimination Schemes.
   Scheme hasTableau__ind := Induction for hasTableau_ Sort Prop.
@@ -226,9 +226,9 @@ Section TableauxProofs.
       is_tableau_satisfiable M mu (hasTableauAll Gamma symbs sigma x F hin htab)
 
   | satisfiable_hasTableauNegAll :
-    forall (F : Form) (t : Term) (Hsko : is_sko t (Neg (All F)) (fv Gamma) symbs = true)
+    forall (F : Form) (t : Term) (Hsko : sko t (Neg (All F)) symbs Gamma = true)
       (hin : (Neg (All F)) \in Gamma)
-      (htab : hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko t Hsko) (Neg (All F)) symbs) sigma),
+      (htab : hasTableau_ (Gamma ,, Neg F{0 \to t}) (add_symbol (symbol sko Hsko) (Neg (All F)) symbs) sigma),
       is_tableau_satisfiable M mu htab ->
       is_tableau_satisfiable M mu (hasTableauNegAll Gamma symbs sigma F t Hsko hin htab).
 End TableauxProofs.
@@ -275,10 +275,11 @@ Section TableauxProperties.
       2: now apply extend_sub_ctx.
       cbn. now rewrite efv.
     - apply hsubset in i.
-      have Hsko' := Hsko. rewrite efv in Hsko'.
+      have Hsko' := Hsko. rewrite (sko_con_fv _ Gamma') in Hsko'; auto.
       apply hasTableauNegAll with (t := t) (Hsko := Hsko'); eauto.
-      have esym : symbol sko t Hsko = symbol sko t Hsko'.
-      { destruct efv. f_equal. apply EqDec_UIP. }
+      have esym : symbol sko Hsko = symbol sko Hsko'.
+      { 
+apply EqDec_UIP. }
       rewrite -esym. apply IHhtab.
       + cbn. now rewrite efv.
       + now apply extend_sub_ctx.
@@ -301,7 +302,7 @@ Section TableauxSoundness.
       {sigma : Substitution var Term} (T : hasTableau_ sko Gamma symbs sigma) (mu : env M var),
       [[ M # [] # mu '\models ctx_to_form Gamma ]] ->
       is_tableau_satisfiable M mu T.
-  Proof.
+  Proof using Type.
     intros ?????? hinterp. induction T.
     - exfalso. have contra := in_form_list_interp i hinterp.
       now cbn in contra.
@@ -324,12 +325,8 @@ Section TableauxSoundness.
     - constructor. apply IHT. eapply extend_with_imply_form'.
       3: apply i.
       all: auto.
-      exists M, mu. intros hF. apply NNPP in hF.
-      change ([[ M # [] # mu '\models F { 0 \to t } ]]) in hF; split.
-      + intros hnAll; apply hnAll. intro c.
-        change [[M # [c] # mu '\models F]]. admit.
-      + admit.
-  Admitted.
+      eapply is_sko_sound; eauto.
+  Qed.
 
   (** Of course, no tableau is satisfiable. We start by showing 2 small lemmas: *)
   Lemma in_ctx_in_substituted_ctx :

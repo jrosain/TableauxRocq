@@ -460,6 +460,51 @@ Definition get_symbol {func var : Atom} (t : Term_ func var) : option func :=
   | Fun f _ => Some f
   end.
 
+Definition is_free {func var : Atom} (t : Term_ func var) : bool :=
+  match t with
+  | Bound _ | Fun _ _ => false
+  | Free _ => true
+  end.
+
+Lemma is_free_sound :
+  forall {func var : Atom} (t : Term_ func var),
+    is_free t = true -> exists (x : var), t = Free x.
+Proof.
+  intros ??? e; destruct t; try inversion e.
+  now exists a.
+Qed.
+
+(** ** Function symbols *)
+Section FunctionSymbols.
+  Context {pred func var : Atom}.
+
+  Let Term := Term_ func var.
+  Let Form := Form_ pred func var.
+
+  Class GetFunctSymbols (A : Type) :=
+    function_symbols: A -> set_atom func.
+
+  #[global] Instance GetFunctSymbols_term : GetFunctSymbols Term :=
+    fix F (t : Term) : set_atom func :=
+      match t with
+      | Bound _ | Free _ => \{ \}
+      | Fun f l => fold_left (fun s t => s \union (F t)) l (singleton f)
+      end.
+
+  #[global] Instance GetFunctSymbols_list {A : Type} `{GetFunctSymbols A} :
+    GetFunctSymbols (list A) :=
+    fun l => fold_left (fun s t => s \union (function_symbols t)) l \{\}.
+
+  #[global] Instance GetFunctSymbols_form : GetFunctSymbols Form :=
+    fix rec (F : Form) : set_atom func :=
+      match F with
+      | Bot => \{ \}
+      | Pred _ l => function_symbols l
+      | Neg F | All F => rec F
+      | Or F1 F2 => rec F1 \union rec F2
+      end.
+End FunctionSymbols.
+
 (** ** Concrete instances *)
 Module ConcreteSyntaxInstances.
   Export AtomComputationalInstances.
