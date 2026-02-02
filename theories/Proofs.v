@@ -3,7 +3,6 @@
 From Stdlib Require Import Classical.
 From Stdlib Require Import Lia.
 
-From Tableaux Require Import Choice.
 From Tableaux Require Import Semantics.
 From Tableaux Require Import Skolemization.
 From Tableaux Require Import Syntax.
@@ -501,9 +500,16 @@ Section TableauxExpansion.
 
       (* Case: [Neg (All F)] *)
       + destruct IHj as (M & hsat0).
+        have h : forall (mu : env M var), interpret_form_ M [] mu (Neg (All F)) \/
+                                      ~ interpret_form_ M [] mu (Neg (All F)).
+        { intro. apply classic. }
+        (* Use the thing above to define the model (to be given by the Skolemization).
+           In the interpretation function, define [xi |-> ci] as the interpretation,
+           and if [interpret_form_ M [] mu (Neg (All F))], then "choose" the right symbol
+           and otherwise return an arbitrary one (e.g., [non_empty]).
 
-        (* TODO: define [M'].
-                 We can arbitrarily pick the values of the arguments of [t] *)
+           Then, everything should work out as we want and we don't even need any other
+           assumption. *)
   Admitted.
 
   (** An [ExpansionSequence] that has a [closed] [ExpansionTableau] as its last element
