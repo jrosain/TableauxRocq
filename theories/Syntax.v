@@ -411,6 +411,30 @@ Section FVForms.
       end.
 End FVForms.
 
+(** *** Subformulas *)
+
+Class HasSubformulas (pred func var : Atom) (A : Type) :=
+  is_subformula : Form_ pred func var -> A -> Prop.
+
+#[global] Instance HasSubformulas_list {pred func var : Atom} {A : Type}
+  `{@HasSubformulas pred func var A} : HasSubformulas pred func var (list A) :=
+  fix rec (F : Form_ pred func var) (l : list A) : Prop :=
+    match l with
+    | [] => False
+    | G :: Gs => is_subformula F G \/ rec F Gs
+    end.
+
+#[global] Instance HasSubformulas_Form {pred func var : Atom} :
+  HasSubformulas pred func var (Form_ pred func var) :=
+  fun F G =>
+    let fix rec (F G : Form_ pred func var) : Prop :=
+      match G with
+      | Neg G | All G => rec F G
+      | Or G1 G2 => rec F G1 \/ rec F G2
+      | _ => False
+      end in
+    F = G \/ rec F G.
+
 Fixpoint ls_to_form {pred func var : Atom} (Gamma : list (Form_ pred func var))
   : Form_ pred func var :=
   match Gamma with
@@ -418,6 +442,7 @@ Fixpoint ls_to_form {pred func var : Atom} (Gamma : list (Form_ pred func var))
   | F :: Fs => Neg (Or (Neg F) (Neg (ls_to_form Fs)))
   end.
 
+(** *** Closedness *)
 Section isClosedLemmas.
   Context {pred func var : Atom} `{set_nat : set nat}.
 

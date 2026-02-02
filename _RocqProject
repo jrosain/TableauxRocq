@@ -11,6 +11,7 @@ theories/Prelude/LocallyNamelessClasses.v
 
 theories/All.v
 theories/Checker.v
+theories/Choice.v
 theories/Core.v
 theories/ExtendedSyntax.v
 theories/Proofs.v

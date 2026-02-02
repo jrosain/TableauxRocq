@@ -91,19 +91,19 @@ Section SemanticsDef.
     - apply equiv_trans.
   Qed.
 
+  Lemma equiv_imply :
+    forall (F G : Form_ pred func var),
+      equiv F G -> imply F G.
+  Proof using Type.
+    intros ?? hequiv M sigma. specialize (hequiv M [] sigma). apply hequiv.
+  Qed.
+
   #[global] Instance equiv_proper_interp (M : Model) :
     Proper (equiv ==> iff) (interpret_form_ M [] (empty_env M var)).
   Proof using Type.
     intros F G hequ.
     now specialize (hequ M).
   Qed.
-
-  Definition update_model_interp (M : Model) (i_fun : func -> list M -> M)
-    (i_pred : pred -> list M -> Prop) : Model :=
-    {| car := M
-    ;  interp_func := i_fun
-    ;  interp_pred := i_pred
-    ;  non_empty := non_empty |}.
 End SemanticsDef.
 
 Arguments Model : clear implicits.
@@ -472,13 +472,10 @@ Section ReplacementModel.
     if eqb f f' && eqb l0 l' then c
     else @interp_func _ _ M f' l'.
 
-  Definition interp_pred' (p : pred) (l' : list M) : Prop :=
-    interp_pred p (replace_in_list c (interp_func f l0) l').
-
   Definition ReplacementModel : Model pred func :=
     {| car := M
     ;  interp_func := interp_func'
-    ;  interp_pred := interp_pred'
+    ;  interp_pred := interp_pred
     ;  non_empty := non_empty |}.
 
   Lemma fresh_symbol_same_interp :
@@ -550,18 +547,4 @@ Section ReplacementModel.
       + erewrite isLocallyClosed_interp_env; eauto.
         now apply is_empty_union1 in hclosed.
   Qed.
-
-  Lemma interp_form_replacement_model :
-    forall (rho : list M) (F : Form_ pred func var),
-      interpret_form_ M rho mu F = interpret_form_ ReplacementModel rho mu F.
-  Proof.
-    intros ??; generalize dependent rho. induction F;
-      intros rho; auto; cbn.
-    - unfold interp_pred'. apply f_equal.
-      induction l1 as [|u us IHus]; cbn; auto.
-      rewrite IHus; f_equal. admit.
-    - rewrite IHF //.
-    - rewrite IHF1 IHF2 //.
-    - apply prodext=>c'. rewrite IHF //.
-  Admitted.
 End ReplacementModel.

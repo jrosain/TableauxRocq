@@ -4,7 +4,7 @@ From Tableaux Require Import Init.
 From Tableaux Require Import Ind.
 From Tableaux Require Import Classes.
 
-From Corelib Require Import Program.Wf.
+From Stdlib Require Import FunInd.
 
 From Stdlib Require Import Lia.
 From Stdlib Require Import Numbers.DecimalString.
@@ -90,3 +90,52 @@ Fixpoint replace_in_list {A : Type} `{EqBool A} (x y : A) (l : list A) : list A 
       (if eqb x z then y
        else z) :: replace_in_list x y zs
   end.
+
+Fixpoint replace_nth {A : Type} (n : nat) (x : A) (l : list A) : list A :=
+  match l with
+  | [] => []
+  | y :: ys =>
+      match n with
+      | 0 => x :: ys
+      | S n => y :: replace_nth n x ys
+      end
+  end.
+Functional Scheme replace_nth__ind := Induction for replace_nth Sort Prop.
+
+Lemma get_replace_nth :
+  forall {A : Type} (n : nat) (x0 x : A) (l : list A),
+    l.(n) = Some x0 ->
+    (replace_nth n x l).(n) = Some x.
+Proof.
+  intros ????? e; generalize dependent n; induction l as [|y ys IHys]; intros n e; cbn.
+  - rewrite nth_error_nil in e; inversion e.
+  - destruct n as [|n']; cbn in e |- *.
+    + reflexivity.
+    + now specialize (IHys n' e).
+Qed.
+
+Lemma In_replace_nth :
+  forall {A : Type} (n : nat) (x0 x : A) (l : list A),
+    l.(n) = Some x0 ->
+    List.In x (replace_nth n x l).
+Proof. intros; eapply nth_error_In. eapply get_replace_nth; eauto. Qed.
+
+Lemma In_replace_nth' :
+  forall {A : Type} (n m : nat) (x0 x1 : A) (l : list A),
+    l.(n) = Some x0 -> n <> m ->
+    List.In x0 (replace_nth m x1 l).
+Proof.
+  intros ?????? e ne. generalize dependent n.
+  functional induction (replace_nth m x1 l) using replace_nth__ind; intros i ei ne.
+  - rewrite nth_error_nil in ei; inversion ei.
+  - destruct i.
+    + exfalso; now apply ne.
+    + cbn in ei. apply nth_error_In in ei.
+      now right.
+  - destruct i.
+    + left; cbn in ei; injection ei => -> //.
+    + cbn in ei. have ne' : i <> n0.
+      { intro. apply ne. now subst. }
+      specialize (IHl0 i ei ne').
+      now right.
+Qed.

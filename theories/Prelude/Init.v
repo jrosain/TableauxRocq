@@ -11,6 +11,7 @@ Open Scope string_scope.
 Notation "#| l |" := (List.length l).
 Notation "l .( i )" := (List.nth_error l i).
 
+(** We freely suppose functional and product extensionnality. *)
 Axiom funext :
   forall {A : Type} {B : A -> Type} {f g : forall (x : A), B x},
     (forall (x : A), f x = g x) -> f = g.

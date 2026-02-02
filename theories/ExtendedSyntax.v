@@ -779,7 +779,7 @@ Section ValidityEquivalence.
 
     Lemma gen_translation_equivalidity :
       forall (M : Model string string) (F : EForm) (bvs : list string) (rho : list M) (sigma : env M string),
-        [[ M # rho # sigma '\models translate_EForm_ bvs F ]] <->
+        [[ M # rho # sigma '|= translate_EForm_ bvs F ]] <->
           interpret_eform M (extended_environment bvs rho sigma) F.
     Proof.
       intros M F; induction F.
@@ -844,13 +844,13 @@ Section ValidityEquivalence.
   (** We can use the lemma we just proved to yield the result on closed formulas. *)
   Lemma translation_equivalidity :
     forall (F : EForm) (M : Model string string),
-      ([[ M # [] # (empty_env M string) '\models [[F]]]]) <->
+      ([[ M # [] # (empty_env M string) '|= [[F]]]]) <->
         (interpret_eform M (empty_env M string) F).
   Proof. intros. apply gen_translation_equivalidity. Qed.
 
   Lemma ls_to_eform_ls_to_form :
     forall (Gamma : list EForm) (M : Model string string) (rho : list M) (sigma : env M string),
-      ([[ M # rho # sigma '\models [[ls_to_eform Gamma]]]]) <->
+      ([[ M # rho # sigma '|= [[ls_to_eform Gamma]]]]) <->
         (interpret_form_ M rho sigma (ls_to_form [[Gamma]])).
   Proof.
     intros. induction Gamma as [|F Fs IHFs]; cbn.
@@ -864,7 +864,7 @@ Section ValidityEquivalence.
 
   Lemma is_valid_translation_is_valid :
     forall (Gamma : list EForm) (F : EForm),
-      @translate _ (list Form) _ Gamma \models [[ F ]]  <->
+      @translate _ (list Form) _ Gamma |= [[ F ]]  <->
         is_evalid (EImp (ls_to_eform Gamma) F).
   Proof.
     intros Gamma F; split; intros H M; specialize (H M).
