@@ -14,7 +14,7 @@ Lemma EqDec_UIP :
   forall {A : Type} `{EqDec A} {x y : A} (p q : x = y), p = q.
 Proof.
   intros.
-  set g := fun x y (p : x = y) => match eqDec x y with
+  set g := fun x y (p : x = y) => match x == y with
     | left e => e
     | right n => False_ind (x = y) (n p)
     end.

@@ -20,3 +20,27 @@ Axiom prodext :
   forall {A : Type} {P Q : A -> Prop},
     (forall x : A, P x = Q x) ->
     (forall x : A, P x) = (forall x : A, Q x).
+
+(** ** Rocq's default behaviour *)
+
+(** Make the usage of bullets mandatory. *)
+#[export] Set Default Goal Selector "!".
+
+(** Remove indexes of constructor in pattern matches. *)
+#[export] Set Asymmetric Patterns.
+
+(** Simplify some proofs by avoiding [unfold]s using [Declare Equivalent Keys]. *)
+#[export] Set Keyed Unification.
+
+(** We always want our records to have primitive projections. *)
+#[export] Set Primitive Projections.
+
+(** Automatically declare the implicit arguments. *)
+#[export] Set Strongly Strict Implicit.
+#[export] Set Maximal Implicit Insertion.
+
+(** Make contextual implicit arguments be implicit. *)
+#[export] Set Contextual Implicit.
+
+(** Makes typeclasses search fail instead of loop infinitely. *)
+#[export] Set Typeclasses Depth 1000.

@@ -351,7 +351,7 @@ Section TableauxExpansion.
         List.Forall
           (fun B => branch_contains B Bot \/
                    exists (P P' : Form),
-                     branch_contains B P /\ branch_contains B (Neg P') /\
+                     branch_contains B P /\ branch_contains B P' /\
                        (Neg P')@[sigma] = P@[sigma]) T.
 
     (** If a context is satisfiable, then so is its associated [ExpansionTableau]. *)
@@ -469,7 +469,7 @@ Section TableauxExpansion.
       hd_error seq = Some T -> is_satisfiable_ExpansionTableau T ->
       forall (i : nat) (T' : ExpansionTableau), nth_error seq i = Some T' ->
                                          is_satisfiable_ExpansionTableau T'.
-  Proof.
+  Proof using set_nat.
     intros (seq & hisSeq) T e hsat i; cbn in *. induction i as [|j IHj]; intros T' e'.
     - rewrite nth_error_0 e in e'. injection e' => <- //.
     - have h : exists (T0 : ExpansionTableau), seq.(j) = Some T0.
@@ -500,30 +500,202 @@ Section TableauxExpansion.
 
       (* Case: [Neg (All F)] *)
       + destruct IHj as (M & hsat0).
-        have h : forall (mu : env M var), interpret_form_ M [] mu (Neg (All F)) \/
-                                      ~ interpret_form_ M [] mu (Neg (All F)).
-        { intro. apply classic. }
-        (* Use the thing above to define the model (to be given by the Skolemization).
-           In the interpretation function, define [xi |-> ci] as the interpretation,
-           and if [interpret_form_ M [] mu (Neg (All F))], then "choose" the right symbol
-           and otherwise return an arbitrary one (e.g., [non_empty]).
+        destruct (is_sko_sound H M) as (interp & hinterpsko & hinterp).
+        exists (ReplacementModel M interp); intro mu.
+        specialize (hsat0 mu). destruct hsat0 as (B0 & hin & hinterp0).
+        apply In_nth_error in hin; destruct hin as (k & ek).
+        destruct (i == k); subst.
+        * exists (B ,, Neg F {0 \to t}); split.
+          -- unfold add_in_branch. rewrite H0.
+             eapply In_replace_nth; eauto.
+          -- have eB0 : B = B0.
+             { unfold nth_branch_of in H0; rewrite H0 in ek; now injection ek. }
+             intros [hnF | hB].
+             ++ apply hnF, hinterpsko.
+                eapply in_form_list_interp; eauto.
+                now rewrite eB0.
+             ++ rewrite eB0 in hB; now apply hB, hinterp.
+        * exists B0; split.
+          -- unfold add_in_branch. rewrite H0.
+             eapply In_replace_nth'; eauto.
+          -- now apply hinterp.
+  Qed.
 
-           Then, everything should work out as we want and we don't even need any other
-           assumption. *)
-  Admitted.
+  Lemma isSequence_singleton :
+    forall (i : nat) (T T' : ExpansionTableau) (Gamma : Con),
+      [mkExpansionTableau Gamma].(i) = Some T ->
+      [mkExpansionTableau Gamma].(S i) = Some T' -> T |> T'.
+  Proof using Type.
+    intros ????? contra. cbn in contra; rewrite nth_error_nil in contra.
+    inversion contra.
+  Qed.
+
+  Lemma isSequence_cons :
+    forall (i : nat) (T0 T T' : ExpansionTableau) (Gamma : Con) (seq : ExpansionSequence),
+      hd_error seq = Some T0 ->
+      (mkExpansionTableau Gamma |> T0) ->
+      (mkExpansionTableau Gamma :: seq).(i) = Some T ->
+      (mkExpansionTableau Gamma :: seq).(S i) = Some T' -> T |> T'.
+  Proof using Type.
+    intros ?????? e hexpand eT eT'.
+    destruct i as [|j].
+    - cbn in eT. rewrite nth_error_cons_succ nth_error_0 in eT'.
+      rewrite e in eT'; injection eT => <-; injection eT' => <- //.
+    - have h := isSequence seq0; eapply h; eauto.
+  Qed.
+
+  Lemma expand_NegNeg :
+    forall (Gamma : Con) (F : Form),
+      Neg (Neg F) \in Gamma ->
+      mkExpansionTableau Gamma |> mkExpansionTableau (Gamma,, F).
+  Proof using Type.
+    intros ?? hin. apply (expansion_NegNeg (mkExpansionTableau Gamma) Gamma F 0); auto.
+  Qed.
+
+  Lemma expand_NegOr :
+    forall (Gamma : Con) (F1 F2 : Form),
+      Neg (Or F1 F2) \in Gamma ->
+      mkExpansionTableau Gamma |> mkExpansionTableau ((Gamma,, Neg F1),, Neg F2).
+  Proof using Type.
+    intros ??? hin. apply (expansion_NegOr (mkExpansionTableau Gamma) Gamma F1 F2 0); auto.
+  Qed.
+
+  Lemma expand_All :
+    forall (Gamma : Con) (F : Form) (x : var),
+      All F \in Gamma ->
+      mkExpansionTableau Gamma |> mkExpansionTableau (Gamma ,, F{0 \to Free x}).
+  Proof using Type.
+    intros ??? hin. apply (expansion_All (mkExpansionTableau Gamma) Gamma F 0 x); auto.
+  Qed.
+
+  Lemma expand_NegAll :
+    forall (Gamma : Con) (F : Form) (t : Term) (symbs : sko_record sko),
+      sko t (Neg (All F)) symbs Gamma = true -> Neg (All F) \in Gamma ->
+      mkExpansionTableau Gamma |> mkExpansionTableau (Gamma ,, Neg F{0 \to t}).
+  Proof using Type.
+    intros ???? hsko hin. apply (expansion_NegAll (mkExpansionTableau Gamma) Gamma F 0 t symbs hsko); auto.
+  Qed.
 
   (** An [ExpansionSequence] that has a [closed] [ExpansionTableau] as its last element
       is actually a tableau proof. *)
-  Lemma hasTableau_iff_ExpansionSequence :
+  Lemma hasTableau_has_ExpansionSequence :
     forall (Gamma : Con),
-      (exists (sigma : Substitution var Term), hasTableau sko Gamma sigma) <->
+      (exists (sigma : Substitution var Term), hasTableau sko Gamma sigma) ->
         (exists (seq : ExpansionSequence),
             hd_error seq = Some (mkExpansionTableau Gamma) /\
-              is_closed_ExpansionTableau (List.last seq (mkExpansionTableau Gamma))).
+              is_closed_ExpansionTableau (List.last seq [])).
   Proof.
-    intro Gamma; split.
-    - intros (sigma & htab); induction htab.
-      + (* exists [mkExpansionTableau Gamma]. *)
+    intros Gamma (sigma & htab); induction htab.
+
+    (* Case: [Bot] *)
+    - unshelve eexists.
+      + unshelve econstructor.
+        * exact [mkExpansionTableau Gamma].
+        * intros ???; eapply isSequence_singleton; eauto.
+      + split; cbn; auto.
+        exists sigma. apply ListDef.Forall_cons.
+        * now left.
+        * apply ListDef.Forall_nil.
+
+    (* Case: contradiction *)
+    - unshelve eexists.
+      + unshelve econstructor.
+        * exact [mkExpansionTableau Gamma].
+        * intros ???; eapply isSequence_singleton; eauto.
+      + split; cbn; auto.
+        exists sigma. apply ListDef.Forall_cons.
+        * right. exists P', P; repeat split; auto.
+        * apply ListDef.Forall_nil.
+
+    (* Case: [Neg (Neg F)] *)
+    - destruct IHhtab as (seq & hhd & hclosed).
+      unshelve eexists.
+      + unshelve econstructor.
+        * exact (mkExpansionTableau Gamma :: seq).
+        * intros; eapply isSequence_cons; eauto. now apply expand_NegNeg.
+      + split; auto; cbn.
+        have h : exists l, TableauxExpansion.seq seq = mkExpansionTableau (Gamma,, F) :: l.
+        { exists (List.tl seq). rewrite -hd_error_tl_repr; split; auto. }
+        destruct h as (l & el); rewrite el -el //.
+
+    (* Case: [Neg (Or F1 F2)] *)
+    - destruct IHhtab as (seq & hhd & hclosed).
+      unshelve eexists.
+      + unshelve econstructor.
+        * exact (mkExpansionTableau Gamma :: seq).
+        * intros; eapply isSequence_cons; eauto. now apply expand_NegOr.
+      + split; auto; cbn.
+        have h : exists l, TableauxExpansion.seq seq = mkExpansionTableau ((Gamma ,, Neg F1) ,, Neg F2) :: l.
+        { exists (List.tl seq). rewrite -hd_error_tl_repr; split; auto. }
+        destruct h as (l & el); rewrite el -el //.
+
+    (* Case: [Or F1 F2] *)
+    - destruct IHhtab1 as (seq1 & hhd1 & hclosed1),
+          IHhtab2 as (seq2 & hhd2 & hclosed2).
+      (* This is true: we can merge the two sequences as one and apply the expansion rule
+         on the relevant branch that (i) comes from either [seq1] or [seq2] if it's not on
+         the branch [Gamma ,, F1] & [Gamma ,, F2], or (ii) that comes from [seq1] if it's applied
+         on the branch [Gamma ,, F1] and comes from [seq2] if applied on the branch [Gamma ,, F2]. *)
+      admit.
+
+    (* Case: [All F] *)
+    - destruct IHhtab as (seq & hhd & hclosed).
+      unshelve eexists.
+      + unshelve econstructor.
+        * exact (mkExpansionTableau Gamma :: seq).
+        * intros; eapply isSequence_cons; eauto. now apply expand_All.
+      + split; auto; cbn.
+        have h : exists l, TableauxExpansion.seq seq = mkExpansionTableau (Gamma ,, F{0 \to Free x}) :: l.
+        { exists (List.tl seq). rewrite -hd_error_tl_repr; split; auto. }
+        destruct h as (l & el); rewrite el -el //.
+
+    (* Case: [Neg (All F)] *)
+    - destruct IHhtab as (seq & hhd & hclosed).
+      unshelve eexists.
+      + unshelve econstructor.
+        * exact (mkExpansionTableau Gamma :: seq).
+        * intros; eapply isSequence_cons; eauto. eapply expand_NegAll; eauto.
+      + split; auto; cbn.
+        have h : exists l, TableauxExpansion.seq seq = mkExpansionTableau (Gamma ,, Neg F{0 \to t}) :: l.
+        { exists (List.tl seq). rewrite -hd_error_tl_repr; split; auto. }
+        destruct h as (l & el); rewrite el -el //.
+    Admitted.
+
+  (* Actually, the above sequence needs to really be defined w.r.t. [T]..
+     Or we should do both at the same time? *)
+  Lemma satisfiable_ExpansionSequence_hasTableau_satisfiable :
+    forall (Gamma : Con) (seq : ExpansionSequence) (sigma : Substitution var Term) (T : hasTableau sko Gamma sigma),
+      hd_error seq = Some (mkExpansionTableau Gamma) ->
+      is_satisfiable (ctx_to_form Gamma) ->
+      exists (M : Model pred func), forall (mu : env M var),
+        is_tableau_satisfiable M mu T.
+  Proof.
+    intros ???? eseq hsat.
+    have hsatT : is_satisfiable_ExpansionTableau (mkExpansionTableau Gamma).
+    { destruct hsat as (M & hsat). exists M. intro mu. exists Gamma; split; auto.
+      - now left.
+      - apply hsat. }
+    have hsatseq := satisfiable_ExpansionSequence seq0 (mkExpansionTableau Gamma) eseq hsatT.
+    clear hsat hsatT. have ehead : seq0.(0) = Some (mkExpansionTableau Gamma).
+    { rewrite -eseq nth_error_0 //. } clear eseq. generalize dependent seq0.
+    induction T; intros seq0 hsatseq ehead.
+    - specialize (hsatseq 0 (mkExpansionTableau Gamma) ehead).
+      destruct hsatseq as (M & hsat0). exists M. intro mu.
+      specialize (hsat0 mu). destruct hsat0 as (B & hB & h).
+      inversion hB.
+      + rewrite -H in h. have hbot := in_form_list_interp i h. now cbn in hbot.
+      + inversion H.
+    - specialize (hsatseq 0 (mkExpansionTableau Gamma) ehead).
+      destruct hsatseq as (M & hsat0). exists M. intro mu.
+      specialize (hsat0 mu). destruct hsat0 as (B & hB & h).
+      inversion hB.
+      + rewrite -H in h. now apply satisfiable_hasTableauContr.
+      + inversion H.
+    - (* Good, feed the tail of [seq0] to the IHT *) admit.
+    - (* Good, feed the tail of [seq0] to the IHT *) admit.
+    - admit.
+    - (* Good, feed the tail of [seq0] to the IHT *) admit.
+    - (* Good, feed the tail of [seq0] to the IHT *) admit.
     Admitted.
 End TableauxExpansion.
 
@@ -533,26 +705,6 @@ Section TableauxSoundness.
   Let Con := Con_ pred func var.
   Let Form := Form_ pred func var.
   Let Term := Term_ func var.
-
-  Definition is_canonical (M : Model pred func) (mu : env M var) (F : Form) :=
-    forall (t : Term) (Gamma : Con) (symbs : sko_record sko),
-      sko t (Neg (All F)) symbs Gamma = true ->
-      (forall (mu : env M var), [[ M # [] # mu '|= Neg (All F) ]]) ->
-      [[ M # [] # mu '|= F {0 \to t} ]].
-
-  Definition super_model :
-    forall (M : Model pred func),
-    exists (M' : Model pred func),
-    forall (F : Form) (mu : env M' var),
-      ((forall (mu0 : env M var), [[ M # [] # mu0 '|= F]]) -> [[ M' # [] # mu '|= F ]]) /\
-        is_canonical M' mu F.
-  Proof.
-    intro M. apply upper_bound_choice with (x := M).
-    intros F hncan. apply NNPP => save.
-    apply hncan; clear hncan. intros mu0; split.
-    + now intro.
-    + intros ??? hsko hdelta. exfalso; apply save; clear save.
-      Admitted.
 
   (** We start by showing that if the root formula of a tableau is satisfiable, then this
       tableau is also satisfiable.
@@ -568,60 +720,11 @@ Section TableauxSoundness.
     intros ???? hinterp.
 
     have htab : exists (sigma : Substitution var Term), hasTableau sko Gamma sigma by exists sigma.
-    rewrite hasTableau_iff_ExpansionSequence in htab.
+    apply hasTableau_has_ExpansionSequence in htab.
     destruct htab as (seq & e & _).
-
-    (* We then proceed by induction. *)
-    (* induction T. *)
-    (* - exists M; intro mu; exfalso. have contra := in_form_list_interp i (hinterp mu). *)
-    (*   now cbn in contra. *)
-    (* - exists M; intro mu; now apply satisfiable_hasTableauContr. *)
-    (* - destruct IHT as (M' & IHT). *)
-    (*   + intro; eapply extend_with_equiv_form; eauto. apply neg_neg_equiv. *)
-    (*   + exists M'; intro mu; constructor; apply IHT. *)
-    (* - destruct IHT as (M' & IHT). *)
-    (*   + intro; apply interp_list_commute; eapply extend_with_equiv_form; eauto; apply neg_equiv; *)
-    (*       etransitivity; [apply or_comm|apply or_equiv; symmetry; apply neg_neg_equiv]. *)
-    (*   + exists M'; intro mu; constructor; apply IHT. *)
-        
-
-    (*     constructor; apply IHT. *)
-    (*   + apply interp_list_commute; eapply extend_with_equiv_form; eauto; apply neg_equiv; *)
-    (*       etransitivity; [apply or_comm|apply or_equiv; symmetry; apply neg_neg_equiv]. *)
-    (*   + intros G hrank; apply hcan. transitivity (con_rank (Gamma ,, Neg F1 ,, Neg F2)); auto; *)
-    (*                                 transitivity (con_rank (Gamma ,, Neg F1)). *)
-    (*     * apply con_rank_extend with (G := (Neg (Or F1 F2))). *)
-    (*       -- now right. *)
-    (*       -- cbn; lia. *)
-    (*     * apply con_rank_extend with (G := (Neg (Or F1 F2))); auto. *)
-    (*       cbn; lia. *)
-    (*  - have hinterp' := in_form_list_interp i hinterp; destruct hinterp'. *)
-    (*   + apply satisfiable_hasTableauOr1. apply IHT1; auto. *)
-    (*     * intros [hnF1 | hnG]; auto. *)
-    (*     * intros G hrank; apply hcan. *)
-    (*       transitivity (con_rank (Gamma ,, F1)); auto; *)
-    (*         eapply con_rank_extend; eauto; cbn; lia. *)
-    (*   + apply satisfiable_hasTableauOr2. apply IHT2; auto. *)
-    (*     * intros [hnF2 | hnG]; auto. *)
-    (*     * intros G hrank; apply hcan. *)
-    (*       transitivity (con_rank (Gamma ,, F2)); auto; *)
-    (*         eapply con_rank_extend; eauto; cbn; lia. *)
-    (* - constructor; apply IHT; auto. *)
-    (*   + eapply extend_with_imply_form; eauto. *)
-    (*     apply instantiate_imply_all. now cbn. *)
-    (*   + intros G hrank; apply hcan. transitivity (con_rank (Gamma ,, F {0 \to Free x})); auto. *)
-    (*     eapply con_rank_extend; eauto; cbn. rewrite rank_of_opening; lia. *)
-    (* - constructor; apply IHT; auto. *)
-    (*   + have hdelta := in_form_list_interp i hinterp. *)
-    (*     intros [hnG | contra]; auto. apply hnG. *)
-    (*     change [[ M' # [] # mu '|= Neg F {0 \to t} ]]. *)
-    (*     have hrankF : rank F <= con_rank Gamma. *)
-    (*     { transitivity (rank (Neg (All F))); [cbn; lia|]. *)
-    (*       apply con_rank_in; auto. } *)
-    (*     specialize (hcan F hrankF). eapply hcan; eauto. *)
-    (*   + intros G hrank; apply hcan. transitivity (con_rank (Gamma ,, Neg F {0 \to t})); auto. *)
-    (*     eapply con_rank_extend; eauto; cbn. rewrite rank_of_opening; lia. *)
-  Admitted.
+    have h0 : is_satisfiable (ctx_to_form Gamma) by now exists M.
+    eapply satisfiable_ExpansionSequence_hasTableau_satisfiable; eauto.
+  Qed.
 
   (** Of course, no tableau is satisfiable. We start by showing 2 small lemmas: *)
   Lemma in_ctx_in_substituted_ctx :

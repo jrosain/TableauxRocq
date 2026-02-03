@@ -517,8 +517,9 @@ Module SetComputationalInstances.
     Proof.
       split.
       - intros? H. induction x; red in H; auto.
-        destruct H. apply BinNat.N.lt_strorder in H; auto.
-        destruct H as (_ & H). apply IHx, H.
+        destruct H.
+        + apply BinNat.N.lt_strorder in H; auto.
+        + destruct H as (_ & H). apply IHx, H.
       - intros x; induction x; cbn; intros; destruct y, z; auto.
         + inversion H.
         + destruct H, H0.

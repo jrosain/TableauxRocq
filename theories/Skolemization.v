@@ -117,11 +117,12 @@ Section SkolemizationDef.
         is_sko data t F symbs Gamma = is_sko data t F symbs Gamma'
     ; is_sko_sound :
       forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
-        (Hsko : is_sko data t (Neg (All F)) symbs Gamma = true) (M : Model pred func) (c : M)
-        (mu : env M var),
-        [[M # [] # mu '|= F {0 \to t}]] ->
-        exists M' mu', [[ M' # [] # mu' '|= F{0 \to t} ]] /\
-                    ([[ M' # [] # mu' '|= F{0 \to t} ]] -> [[ M #  [c] # mu  '|= F ]]) }.
+        (hsko : is_sko data t (Neg (All F)) symbs Gamma = true) (M : Model pred func),
+      exists (f : func -> list M -> M),
+        (forall (mu : env M var), [[ M # [] # mu '|= Neg (All F) ]] ->
+                            [[ ReplacementModel M f # [] # mu '|= Neg F{0 \to t} ]]) /\
+          (forall (F : Form) (mu : env M var), [[ M # [] # mu '|= F ]] ->
+                                         [[ ReplacementModel M f # [] # mu '|= F ]]) }.
 
   Record Skolemization_ :=
     { skoData :> SkolemizationData
@@ -290,6 +291,28 @@ Section SkolemizationInstances.
     - intros t ??? hsko. apply (SkoWrapper_args t hsko).
   Defined.
 
+  Lemma OuterSkolemization_args_vars :
+    forall {Gamma : Con} {t : Term} {F : Form} {symbs : sko_record_unit}
+      (hsko : OuterSkolemizationData t F symbs Gamma = true),
+    exists (l : list var), args OuterSkolemizationData hsko =
+                        map (fun v => Free v) l.
+  Proof using Type.
+    intros ?????. set largs := args OuterSkolemizationData hsko.
+    destruct t; try inversion hsko; cbn in hsko.
+    have eargs : largs = l by reflexivity. rewrite eargs.
+    have h := OuterSkolemization_is_sko_pred_sound Gamma a l.
+    destruct (h hsko) as (_ & _ & hargs).
+    clear largs eargs H0 hsko h.
+    induction l as [|t ts IHts].
+    - now exists [].
+    - have ht := hargs t ltac:(now left).
+      destruct ht as (x & e).
+      have H : forall t, List.In t ts -> exists x : var, t = Free x.
+      { intros; apply hargs. now right. }
+      specialize (IHts H). destruct IHts as (l0 & el0).
+      exists (x :: l0); cbn. rewrite e el0 //.
+  Qed.
+
   Lemma OuterSkolemization_isLocallyClosed :
     forall (t : Term_ func var) (F : Form_ pred func var) (symbs : sko_record OuterSkolemizationData)
       (Gamma : list (Form_ pred func var)),
@@ -337,22 +360,19 @@ Section SkolemizationInstances.
     - intros; cbn. unfold SkoWrapper_symbol. destruct t; cbn; try inversion hsko;
         reflexivity.
     - intros; cbn. destruct t; auto; cbn.
-      unfold OuterSkolemization_is_sko_pred. admit. (* TODO *)
-    - intros ???? hsko ???.
-      set f := symbol OuterSkolemizationData hsko.
-      set l := args OuterSkolemizationData hsko.
-      set M' := ReplacementModel f l mu c.
-      exists M', mu.
-      have e : interpret_term M' [] mu t = c.
-      { unfold M'. rewrite (OuterSkolemization_isFunc _ _ _ _ hsko) fresh_interp_replaced_term //.
-        - eapply isLocallyClosed_Fun_isLocallyClosed_list' with (f := f).
-          rewrite -OuterSkolemization_isFunc. eapply OuterSkolemization_isLocallyClosed; eauto.
-        - rewrite OuterSkolemization_function_symbols. intro hin; now apply empty_spec in hin. }
-      unfold interpret in H |- *; rewrite !form_env_inst_commutes in H |- *.
-      1-2: eapply OuterSkolemization_isLocallyClosed; eauto.
-      cbn in H |- *; split; unfold interpret; rewrite e.
-      + admit.
-      + admit.
+      unfold OuterSkolemization_is_sko_pred. admit.
+      (* TODO actually we need that the function symbols are the same also *)
+    - intros ???? hsko ?.
+      destruct t; try inversion hsko.
+      destruct (OuterSkolemization_args_vars hsko) as (l0 & el0).
+      cbn in el0. rewrite el0.
+      exists (replace_interp_func M F (symbol OuterSkolemizationData hsko) l0); split.
+      + intros mu hdelta; apply satisfies_opening_with_sko; auto.
+        destruct (OuterSkolemization_is_sko_pred_sound _ _ _ H0) as (hnin & _ & _).
+        (* OK if [Neg (All F)] is in [Gamma], which is the case. *)
+        admit.
+      + intros G mu hG. unfold interpret; rewrite no_skolem_same_interp_form; auto.
+        (* OK if [G] is in [Gamma], which is the case (TODO) *)
   Admitted.
 
   Definition OuterSkolemization : Skolemization_ pred func var.
