@@ -60,7 +60,6 @@ End TermInd.
 (** *** Decidable equality for terms *)
 Section DecEqTerms.
   Context {func var : Atom}.
-  Existing Instance eqb_atom.
 
   Fixpoint eqb_term (t u : Term_ func var) : bool :=
     match t, u with
@@ -104,7 +103,6 @@ End DecEqTerms.
 (** *** Opening and substitution for terms *)
 Section OpeningSubstTerms.
   Context {func var : Atom} `{set_nat : set nat}.
-  Existing Instance eqb_atom.
 
   #[global] Instance opening_term : Opening (Term_ func var) (Term_ func var) :=
     fun n u =>
@@ -218,7 +216,6 @@ Definition is_litteral  {pred func var : Atom}
 (** *** Decidable equality for formulas *)
 Section DecEqForms.
   Context {pred func var : Atom}.
-  Existing Instance eqb_atom.
   Existing Instance eq_dec_list.
 
   Fixpoint eqb_form (F G : Form_ pred func var) : bool :=

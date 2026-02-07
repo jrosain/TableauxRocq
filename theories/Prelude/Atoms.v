@@ -8,7 +8,7 @@ From Tableaux Require Import Prelude.Sets.
 
 Class Atom :=
   { atom :> Type
-  ; eqb_atom : EqBool atom
+  ; eqb_atom :: EqBool atom
   ; set_atom : set atom
   ; isFresh : atom -> set_atom -> bool }.
 Arguments set_atom : clear implicits.

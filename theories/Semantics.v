@@ -362,8 +362,6 @@ Section SemanticsFacts.
       apply isLocallyClosed_interp_env; auto.
   Qed.
 
-  Existing Instance eqb_atom.
-
   Lemma instantiate_imply_all :
     forall (F : Form) (t : Term),
       isLocallyClosed t ->
@@ -471,8 +469,6 @@ End SemanticsFacts.
 Section ReplaceInterpFunc.
   Context {pred func var : Atom} (M : Model pred func) (F : Form_ pred func var).
 
-  Existing Instance eqb_atom.
-
   Lemma satisfy_delta :
     forall (mu : env M var),
     exists (c : M), [[ M # [] # mu '|= Neg (All F) ]] -> [[ M # [c] # mu '|= Neg F ]].
@@ -520,8 +516,6 @@ Section RealReplacementModel.
 
   Let M' := ReplacementModel (replace_interp_func M F f vs).
   Let t := Fun f (map (fun v : var => Free v) vs).
-
-  Existing Instance eqb_atom.
 
   Lemma satisfying_symbol_prop :
     forall (mu : env M var),

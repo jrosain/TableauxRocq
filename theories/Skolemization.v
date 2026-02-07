@@ -107,10 +107,6 @@ Section SkolemizationDef.
       forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
         (hsko : is_sko data t F symbs Gamma = true),
         t = Fun (symbol data hsko) (args data hsko)
-    ; symbol_sound :
-      forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
-        (hsko : is_sko data t F symbs Gamma = true),
-        get_symbol t = Some (symbol data hsko)
     ; sko_con_fv :
       forall {t : Term} {F : Form} {symbs : sko_record data} (Gamma Gamma' : Con),
         fv Gamma = fv Gamma' ->
@@ -142,8 +138,6 @@ Arguments sko_record {_ _ _} _.
 Section SkoSymbolLemmas.
   Context {pred func var : Atom} {record : SkoRecord_ pred func var}.
 
-  Existing Instance eqb_atom.
-
   Definition add_symbol (f : func) (F : Form_ pred func var) (r : record) : record :=
     join (single_record record f F) r.
 
@@ -167,6 +161,20 @@ Section SkoSymbolLemmas.
     - rewrite join_spec; intros h; auto.
   Qed.
 End SkoSymbolLemmas.
+
+Section SkoDefs.
+  Context {pred func var : Atom} (sko : Skolemization_ pred func var).
+
+  Lemma symbol_sound :
+    forall {t : Term_ func var} {F : Form_ pred func var} {symbs : sko_record sko}
+      {Gamma : list (Form_ pred func var)} (hsko : is_sko sko t F symbs Gamma = true),
+      get_symbol t = Some (symbol sko hsko).
+  Proof using Type.
+    intros. etransitivity. {
+      apply f_equal. exact (is_func hsko).
+    } now cbn.
+  Qed.
+End SkoDefs.
 
 (** ** Some classic instances *)
 Section SkolemizationInstances.
@@ -357,8 +365,6 @@ Section SkolemizationInstances.
   Proof.
     constructor.
     - apply OuterSkolemization_isFunc.
-    - intros; cbn. unfold SkoWrapper_symbol. destruct t; cbn; try inversion hsko;
-        reflexivity.
     - intros; cbn. destruct t; auto; cbn.
       unfold OuterSkolemization_is_sko_pred. admit.
       (* TODO actually we need that the function symbols are the same also *)
