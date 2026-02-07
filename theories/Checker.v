@@ -373,23 +373,6 @@ Proof.
   - eapply formula_contradiction_sound_pos; eauto.
 Qed.
 
-(* Lemma auxiliary_GuidedTableauSearch_Leaf_sound : *)
-(*   forall {sko : Skolemization} {Gamma : Con} {sigma : Substitution string Term} *)
-(*     {record : sko_record sko}, *)
-(*     GuidedTableauSearch__aux sko Gamma sigma record Leaf = ret true -> *)
-(*     Bot \in Gamma \/ [[ ENeg ETop ]] \in Gamma \/ *)
-(*       exists (P P' : Form), P \in Gamma /\ P' \in Gamma /\ P@[sigma] = (Neg P')@[sigma]. *)
-(* Proof. *)
-(*   intros ???? e. cbn in e. *)
-(*   destruct (trivial_contradiction Gamma) eqn:e0. *)
-(*   - apply trivial_contradiction_sound in e0. destruct e0. *)
-(*     + now left. *)
-(*     + right; now left. *)
-(*   - destruct (formula_contradiction Gamma sigma) eqn:e1. *)
-(*     + apply formula_contradiction_sound in e1. now do 2 right. *)
-(*     + inversion e. *)
-(* Qed. *)
-
 (** *** Soundness of rule wrapper *)
 Lemma rule_wrapper_sound :
   forall {A : Type} (Gamma : Con) (F : Form) (err : string) (getter : Form -> option A)
