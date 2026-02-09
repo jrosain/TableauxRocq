@@ -114,6 +114,32 @@ Proof.
     + now specialize (IHys n' e).
 Qed.
 
+Lemma get_replace_nth' :
+  forall {A : Type} (n m : nat) (x y : A) (l : list A),
+    l.(n) = Some x -> n <> m ->
+    (replace_nth m y l).(n) = Some x.
+Proof.
+  intros ?????? en ne. generalize dependent n.
+  functional induction (replace_nth m y l) using replace_nth__ind; auto; intros n en ne.
+  - destruct n; auto.
+    exfalso. now apply ne.
+  - destruct n; cbn in *; auto.
+Qed.
+
+Lemma get_replace_nth_inv'  :
+  forall {A : Type} (n m : nat) (x y : A) (l : list A),
+    (replace_nth m y l).(n) = Some x -> n <> m ->
+    l.(n) = Some x.
+Proof.
+  intros ?????? e ne. generalize dependent n. revert m. induction l as [|z zs IHzs];
+    intro m; destruct m; intros n e ne; cbn in *.
+  - rewrite nth_error_nil in e; inversion e.
+  - rewrite nth_error_nil in e; inversion e.
+  - destruct n; try congruence. now cbn in *.
+  - destruct n; cbn in *; auto.
+    eapply IHzs; eauto.
+Qed.
+
 Lemma In_replace_nth :
   forall {A : Type} (n : nat) (x0 x : A) (l : list A),
     l.(n) = Some x0 ->
@@ -138,4 +164,60 @@ Proof.
       { intro. apply ne. now subst. }
       specialize (IHl0 i ei ne').
       now right.
+Qed.
+
+Lemma replace_nth_Some :
+  forall {A : Type} (n m : nat) (x y : A) (l : list A),
+    l.(n) = Some x ->
+    exists z, (replace_nth m y l).(n) = Some z.
+Proof.
+  intros ?????? en. generalize dependent n.
+  functional induction (replace_nth m y l) using replace_nth__ind; intros k ek.
+  - now rewrite nth_error_nil in ek.
+  - destruct k.
+    + now exists x0.
+    + exists x; cbn in ek |- *; auto.
+  - destruct k; cbn.
+    + exists y; auto.
+    + cbn in ek. now specialize (IHl0 k ek).
+Qed.
+
+Lemma replace_nth_replace_nth :
+  forall {A : Type} (n m : nat) (x y : A) (l : list A),
+    n <> m ->
+    replace_nth n x (replace_nth m y l) =
+      replace_nth m y (replace_nth n x l).
+Proof.
+  intros ?????? e. generalize dependent m. revert n. induction l as [|z zs IHzs]; cbn;
+    intros n m e.
+  - destruct n, m; now cbn.
+  - destruct n, m; cbn.
+    + exfalso; now apply e.
+    + reflexivity.
+    + reflexivity.
+    + rewrite IHzs; auto.
+Qed.
+
+Lemma In_In_replace_nth :
+  forall {A : Type} (n : nat) (x y : A) (l : list A),
+    x <> y -> List.In x (replace_nth n y l) ->
+    List.In x l.
+Proof.
+  intros ????? e hinr. generalize dependent n; induction l as [|z zs IHzs];
+    intros n hinr.
+  - destruct n; cbn in *; auto.
+  - destruct n.
+    + cbn in hinr |- *. destruct hinr; subst; auto.
+      exfalso; now apply e.
+    + cbn in hinr |- *. destruct hinr; auto.
+      right; eapply IHzs; eauto.
+Qed.
+
+Lemma hd_error_hd :
+  forall {A : Type} (x y : A) (l : list A),
+    hd_error l = Some x -> hd y l = x.
+Proof.
+  intros ???? hin; destruct l.
+  - inversion hin.
+  - cbn in hin |- *. now injection hin.
 Qed.
