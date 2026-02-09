@@ -1,4 +1,3 @@
-
 Set Warnings "-native-compiler".
 From Tableaux Require Import All.
 
@@ -14,12 +13,11 @@ Proof.
 apply (mkUnaryNode ( DeltaNegAll (Neg [[ EAll "X3" (EOr (EPred "p" [(EVar "X3")]) (ENeg (EPred "p" [(EVar "X3")]))) ]]) [[ (EFun "skolem@X3@0" []) ]] ) ).
 apply (mkUnaryNode ( AlphaNegOr (Neg [[ EOr (EPred "p" [(EFun "skolem@X3@0" [])]) (ENeg (EPred "p" [(EFun "skolem@X3@0" [])])) ]]) ) ).
 apply (mkUnaryNode ( AlphaNegNeg (Neg (Neg [[ EPred "p" [(EFun "skolem@X3@0" [])] ]])) ) ).
-exact Leaf.
+exact (mkClosure [[ EPred "p" [(EFun "skolem@X3@0" [])] ]] [[ ENeg (EPred "p" [(EFun "skolem@X3@0" [])]) ]]).
 Defined.
 
 Theorem hasTableau_T_Proof :
-	hasTableau InnerSkolemization [  Neg (translate_EForm T) ] subst.
+	hasTableau OuterSkolemization [  Neg (translate_EForm T) ] subst.
 Proof.
 tableaux T_Proof.
 Qed.
-

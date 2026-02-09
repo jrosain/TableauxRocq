@@ -1,9 +1,8 @@
-
 Set Warnings "-native-compiler".
 From Tableaux Require Import All.
 
 Definition T : EForm :=
-	ENeg (EEqu (ETop) (EBot)) 
+	EAnd (ETop) (ETop) 
 .
 
 Definition subst := translate_substitution [].
@@ -11,19 +10,17 @@ Definition subst := translate_substitution [].
 
 Definition T_Proof : ExtendedRuleTree.
 Proof.
-apply (mkUnaryNode ( AlphaNegNeg (Neg (Neg [[ EEqu (ETop) (EBot) ]])) ) ).
-apply (mkBinaryNode ( BetaEqu [[ EEqu (ETop) (EBot) ]] ) ).
+apply (mkBinaryNode ( BetaNegAnd (Neg [[ EAnd (ETop) (ETop) ]]) ) ).
 {
-exact Leaf.
+exact mkTrivialClosure.
 }
 {
-exact Leaf.
+exact mkTrivialClosure.
 }
 Defined.
 
 Theorem hasTableau_T_Proof :
-	hasTableau InnerSkolemization [  Neg (translate_EForm T) ] subst.
+	hasTableau OuterSkolemization [  Neg (translate_EForm T) ] subst.
 Proof.
 tableaux T_Proof.
 Qed.
-
