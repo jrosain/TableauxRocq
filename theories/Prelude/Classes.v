@@ -178,3 +178,13 @@ Section EqDecOtherInstances.
       + right; intro e'; injection e' => e0 e1; now apply n.
   Qed.
 End EqDecOtherInstances.
+
+(** ** Monads *)
+
+Class Monad (M : Type -> Type) :=
+  { ret  : forall {A : Type}, A -> M A
+  ; bind : forall {A B : Type}, M A -> (A -> M B) -> M B }.
+
+Arguments bind {_ _ _ _}.
+
+Notation "x >>= f" := (bind x f) (at level 20, right associativity).

@@ -277,6 +277,28 @@ Section SemanticsFacts.
     intros F G M. cbn. firstorder.
   Qed.
 
+  Lemma ls_to_form_app :
+    forall (Gamma Gamma' : list Form),
+      ls_to_form (Gamma ++ Gamma')%list \equiv Neg (Or (Neg (ls_to_form Gamma)) (Neg (ls_to_form Gamma'))).
+  Proof using Type.
+    intros ??; induction Gamma as [|F Fs IHFs].
+    - cbn; split; intro hinterp.
+      + intros [hnG | contra]; auto.
+      + apply NNPP => save; apply hinterp. now right.
+    - cbn. apply neg_equiv. etransitivity.
+      + apply or_equiv.
+        * reflexivity.
+        * apply neg_equiv, IHFs.
+      + split; intro hinterp; cbn in *.
+        * destruct hinterp; auto.
+          apply NNPP => save. apply H. intros []; auto.
+          apply save. left. intro hinterp'; apply hinterp'. now right.
+        * destruct hinterp; auto.
+          apply NNPP => hinterp. apply H. intros [].
+          -- apply hinterp; now left.
+          -- apply hinterp; right. intro h0. apply h0. now left.
+  Qed.
+
   Lemma isLocallyClosed_interp_env :
     forall (M : Model pred func) (rho0 rho1 : list M) (sigma : env M var) (t : Term),
       isLocallyClosed t ->

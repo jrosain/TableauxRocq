@@ -12,16 +12,17 @@ From Stdlib Require Import Numbers.DecimalNat.
 
 Definition nat_to_string (n: nat) := NilZero.string_of_uint (Decimal.rev (Unsigned.to_lu n)).
 
+#[global] Instance option_Monad : Monad option :=
+  {| ret := fun A x => Some x
+  ;  bind := fun A B x f => match x with
+                         | Some x => f x
+                         | None => None
+                         end |}.
+
 Definition option_get {A : Type} (def : A) (x : option A) : A :=
   match x with
   | None => def
   | Some x => x
-  end.
-
-Definition bind {A B : Type} (x : option A) (f : A -> option B) : option B :=
-  match x with
-  | Some x => f x
-  | None => None
   end.
 
 Fixpoint forallb2 {A : Type} (P : A -> A -> bool) (l1 l2 : list A) : bool :=
