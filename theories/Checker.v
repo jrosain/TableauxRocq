@@ -521,7 +521,7 @@ Module Con := MSetAVL.Make OrderedForm.
 
 (** Returns true iff [Bot] or [Neg ETop] is in the list. *)
 Definition trivial_contradiction (Gamma : Con.t) : bool :=
-  List.existsb (fun F => orb (eqb F Bot) (eqb F [[ ENeg ETop ]])) Gamma.
+  Con.exists_ (fun F => orb (eqb F Bot) (eqb F [[ ENeg ETop ]])) Gamma.
 
 Definition is_neg (F : Form) : bool :=
   match F with
@@ -529,9 +529,10 @@ Definition is_neg (F : Form) : bool :=
   | _ => false
   end.
 
-(** Returns true iff there exists two formulas [F] and [F'] such that [Neg P@[sigma] = P'@[sigma]] in [Gamma]. *)
-Definition formula_contradiction (F G : Form) (Gamma : list Form) (sigma : Substitution string Term): bool :=
-  mem_ctx F Gamma && mem_ctx G Gamma &&
+(** Returns true iff there exists two formulas [F] and [F'] such that
+    [Neg P@[sigma] = P'@[sigma]] in [Gamma]. *)
+Definition formula_contradiction (F G : Form) (Gamma : Con.t) (sigma : Substitution string Term): bool :=
+  Con.mem F Gamma && Con.mem G Gamma &&
     (match F with
      | Neg F => negb (is_neg G) && eqb F@[sigma] G@[sigma]
      | _ => is_neg G && eqb (Neg F)@[sigma] G@[sigma]
@@ -557,7 +558,7 @@ Definition get_and (F : Form) : option (list Form) :=
 
 Definition get_neg_or (F : Form) : option (list Form) :=
   match F with
-  | Neg F => Utils.bind (get_or F) (fun l => Some (List.map (fun F => Neg F) (List.app (snd l) (fst l))))
+  | Neg F => get_or F >>= fun l => Some (List.map (fun F => Neg F) (List.app (snd l) (fst l)))
   | _ => None
   end.
 
@@ -666,13 +667,15 @@ Definition pr_bool (b : bool) : string :=
   | false => "false"
   end.
 
+(** *** The algorithm *)
 Section GuidedTableauSearchAlgorithm.
   Context (sko : Skolemization).
 
-  Definition rule_wrapper {A : Type} (Gamma : Con) (F : Form) (err : string)
+  Definition rule_wrapper {A : Type} (Gamma : Con.t) (F : Form) (err : string)
     (getter : Form -> option A) (action : A -> Result bool) : Result bool :=
-    if negb (mem_ctx F Gamma)
-    then error ("Formula " ++ pr_form F ++ " not found in the context " ++ pr_context Gamma)
+    if negb (Con.mem F Gamma)
+    then error ("Formula " ++ pr_form F ++ " not found in the context " ++
+                  pr_context (Con.elements Gamma))
     else
       match getter F with
       | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
@@ -680,15 +683,16 @@ Section GuidedTableauSearchAlgorithm.
       end.
 
   Definition SearchAlgorithm :=
-    Con -> Substitution string Term -> sko_record sko -> ExtendedRuleTree -> Result bool.
+    Con.t -> Substitution string Term -> sko_record sko -> ExtendedRuleTree -> Result bool.
 
-  Definition closure_rule (search_contradiction : Con -> Substitution string Term -> bool)
-    (Gamma : Con) (sigma : Substitution string Term) :=
+  Definition closure_rule (search_contradiction : Con.t -> Substitution string Term -> bool)
+    (Gamma : Con.t) (sigma : Substitution string Term) :=
     if search_contradiction Gamma sigma
     then ret true
-    else error ("No trivial contradiction in the context: " ++ pr_context (Gamma@[sigma])).
+    else error ("No trivial contradiction in the context: " ++ pr_context ((Con.elements Gamma)@[sigma])).
 
-  Definition alpha_rule (Gamma : Con) (sigma : Substitution string Term) (T : ExtendedRuleTree)
+  (* TODO: Con.from_list *)
+  Definition alpha_rule (Gamma : Con.t) (sigma : Substitution string Term) (T : ExtendedRuleTree)
     (record : sko_record sko) (F : Form) (getter : Form -> option (list Form)) (err : string)
     (search : SearchAlgorithm)  :=
     rule_wrapper Gamma F err getter (fun l => search (List.app l Gamma) sigma record T).
