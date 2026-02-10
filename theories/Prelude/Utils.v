@@ -77,6 +77,73 @@ Proof.
   - apply eqb_list_is_eq.
 Defined.
 
+(** Comparison of lists. *)
+Fixpoint lt_list {A : Type} (lt_A : A -> A -> Prop) (l l' : list A) : Prop :=
+  match l, l' with
+  | [], [] => False
+  | [], _ :: _ => True
+  | _ :: _, [] => False
+  | x :: xs, y :: ys => lt_A x y \/ (x = y /\ lt_list lt_A xs ys)
+  end.
+
+Fixpoint ltb_list {A : Type} `{EqBool A} (ltb_A : A -> A -> bool) (l l' : list A) : bool :=
+  match l, l' with
+  | [], [] => false
+  | [], _ :: _ => true
+  | _ :: _, [] => false
+  | x :: xs, y :: ys => ltb_A x y || (eqb x y && ltb_list ltb_A xs ys)
+  end.
+
+Lemma ltb_list_lt_list :
+  forall {A : Type} `{EqBool A} (ltb_A : A -> A -> bool) (lt_A : A -> A -> Prop) (l l' : list A),
+    (forall (x : A), In x l -> forall (y : A), ltb_A x y = true <-> lt_A x y) ->
+    ltb_list ltb_A l l' = true <-> lt_list lt_A l l'.
+Proof.
+  intros ?????? equ; split; intro h.
+  - generalize dependent l'; induction l as [| x xs IHxs]; intros l' h;
+      destruct l' as [|y ys]; try easy.
+    have equ' := (equ x ltac:(now right) y); cbn in equ' |- *.
+    cbn in h. apply Bool.orb_prop in h; destruct h as [hltb | hlt].
+    + left; rewrite -equ' //.
+    + apply andb_prop in hlt; destruct hlt.
+      right; split.
+      * rewrite -eqbIsEq //.
+      * apply IHxs; auto.
+        intros. apply equ; now left.
+  - generalize dependent l'; induction l as [| x xs IHxs]; intros l' h;
+      destruct l' as [|y ys]; try easy.
+    cbn in *; destruct h as [ e | [e h] ].
+    + apply Bool.orb_true_intro. left.
+      rewrite equ; auto; now left.
+    + apply Bool.orb_true_intro. right.
+      apply andb_true_intro; split.
+      * now rewrite eqbIsEq.
+      * apply IHxs; auto.
+Qed.
+
+Lemma ltb_list_false :
+  forall {A : Type} `{EqBool A} (ltb_A : A -> A -> bool) (l l' : list A),
+    (forall (x : A), In x l -> forall (y : A), ltb_A x y = false -> x <> y -> ltb_A y x = true) ->
+    ltb_list ltb_A l l' = false -> l <> l' -> ltb_list ltb_A l' l = true.
+Proof.
+  intros ????? hltA hnltb ne.
+  generalize dependent l. induction l' as [|z zs IHzs]; intros l hltA hnltb ne;
+    destruct l as [|z' zs']; try easy.
+  cbn in *. apply Bool.orb_false_elim in hnltb; destruct hnltb as [ltbz h].
+  apply Bool.andb_false_elim in h. destruct h as [ne' | nlt]; apply Bool.orb_true_intro.
+  - left. apply hltA; try easy.
+    + now right.
+    + now rewrite -EqBool_neq in ne'.
+  - have h : z' <> z \/ (z' = z /\ zs' <> zs).
+    { destruct (z' == z); auto.
+      right; split; auto. intro; apply ne; now subst. }
+    destruct h as [ ne' | [e ne'] ].
+    + left. apply hltA; try easy. now right.
+    + right. apply andb_true_intro; split.
+      * rewrite eqbIsEq //.
+      * apply IHzs; auto.
+Qed.
+
 Lemma nth_error_Some' :
   forall {A : Type} (l : list A) (n : nat) (x : A),
     l.(n) = Some x -> n < #|l|.
