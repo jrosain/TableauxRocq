@@ -77,6 +77,12 @@ Proof.
   - apply eqb_list_is_eq.
 Defined.
 
+Fixpoint list_mem {A : Type} `{EqBool A} (x : A) (l : list A) : bool :=
+  match l with
+  | [] => false
+  | y :: ys => eqb x y || list_mem x ys
+  end.
+
 (** Comparison of lists. *)
 Fixpoint lt_list {A : Type} (lt_A : A -> A -> Prop) (l l' : list A) : Prop :=
   match l, l' with

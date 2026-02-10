@@ -984,5 +984,5 @@ Module ConcreteSyntaxInstances.
   End OrderedForm.
 
   (** Which means that we can give computational sets of formulas. *)
-  Module Con := MSetAVL.Make OrderedForm.
+  Module FormSet := MSetAVL.Make OrderedForm.
 End ConcreteSyntaxInstances.
