@@ -3,6 +3,10 @@
 From Tableaux Require Import Core.
 From Tableaux Require Import ExtendedSyntax.
 
+From Stdlib Require Import MSets.MSetAVL.
+From Stdlib Require Import Structures.Orders.
+From Stdlib Require Import Lia.
+
 (** In this file, we implement a guided tableau proof-search procedure. It is named
     "guided" as the rules to apply and the substitution are given.
 
@@ -51,18 +55,472 @@ Definition mkBinaryNode (rule : ExtendedRule) (T1 T2 : ExtendedRuleTree) : Exten
 (** A small [Result] monad that stores the issues. *)
 Definition Result (A : Type) : Type := A * list string.
 
-Definition ret {A : Type} (x : A) : Result A := (x, []).
-
-Definition bind {A B : Type} (r : Result A) (f : A -> Result B) : Result B :=
-  let (x, s) := f (fst r) in
-  (x, List.app (snd r) s).
+#[global] Instance Monad_Result : Monad Result :=
+  {| ret := fun A x => (x, [])
+  ;  bind A B r f :=
+      let (x, s) := f (fst r) in
+      (x, (snd r ++ s)%list) |}.
 
 Definition error (s : string) : Result bool := (false, [s]).
 
-Notation "r >>= f" := (bind r f) (at level 50).
+(** *** Instantiation of [MSetAVL] with formulas (for our contexts) *)
+
+Module OrderedForm <: OrderedType.
+  Definition t := Form.
+
+  Definition eq : t -> t -> Prop := eq.
+
+  Lemma eq_equiv : Equivalence eq.
+  Proof. typeclasses eauto. Qed.
+
+  Fixpoint lt_list {A : Type} (lt_A : A -> A -> Prop) (l l' : list A) : Prop :=
+    match l, l' with
+    | [], [] => False
+    | [], _ :: _ => True
+    | _ :: _, [] => False
+    | x :: xs, y :: ys => lt_A x y \/ (x = y /\ lt_list lt_A xs ys)
+    end.
+
+  Fixpoint lt_term (t u : Term) : Prop :=
+    match t, u with
+    | Bound n, Bound m => n < m
+    | Bound _, _ => True
+    | Free x, Free y => OrderedString.lt x y
+    | Free _, Bound _ => False
+    | Free _, _ => True
+    | Fun f lf, Fun g lg =>
+        OrderedString.lt f g \/
+          (f = g /\ lt_list lt_term lf lg)
+    | Fun _ _, _ => False
+    end.
+
+  Fixpoint lt_form (F G : Form) : Prop :=
+    match F, G with
+    | Bot, Bot => False
+    | Bot, _ => True
+    | _, Bot => False
+
+    | Pred p l, Pred p' l' =>
+        OrderedString.lt p p' \/
+          (p = p' /\ lt_list lt_term l l')
+    | Pred _ _, _ => True
+
+    | Neg F, Neg G => lt_form F G
+    | Neg _, Pred _ _ => False
+    | Neg _, _ => True
+
+    | Or F1 F2, Or G1 G2 =>
+        lt_form F1 G1 \/ (F1 = G1 /\ lt_form F2 G2)
+    | Or _ _, All _ => True
+    | Or _ _, _ => False
+
+    | All F, All G => lt_form F G
+    | All _, _ => False
+    end.
+
+  Definition lt := lt_form.
+
+  #[global] Instance lt_term_strorder : StrictOrder lt_term.
+  Proof.
+    constructor.
+    - intros t; induction t using term_ind; unfold complement; cbn; auto.
+      + apply PeanoNat.Nat.lt_irrefl.
+      + apply OrderedString.lt_strorder.
+      + intros [ contra | [_ contra ] ].
+        * now apply OrderedString.lt_strorder in contra.
+        * induction l as [|t l' IHl']; auto.
+          cbn in contra. destruct contra as [ contra | [ _ contra ] ].
+          -- now apply Ind.Forall_inv in X.
+          -- apply IHl'; auto. now apply Ind.Forall_tail in X.
+    - intros t0 t1 t2 hlt0 hlt1. generalize dependent t2; generalize dependent t0.
+      induction t1 using term_ind; intros t0 hlt0 t2 hlt1.
+      + destruct t0, t2; auto.
+        * cbn in *. etransitivity; eauto.
+        * cbn in *. inversion hlt0.
+        * cbn in *. inversion hlt0.
+      + destruct t0, t2; auto.
+        * cbn in *. inversion hlt1.
+        * cbn in *. etransitivity; eauto.
+        * cbn in *. inversion hlt0.
+      + destruct t0, t2; auto.
+        * cbn in *. inversion hlt1.
+        * cbn in *. inversion hlt1.
+        * cbn in *. destruct hlt0 as [ hlt0 | [ e0 hltlist0 ] ],
+              hlt1 as [ hlt1 | [ e1 hltlist1 ] ].
+          -- left; etransitivity; eauto.
+          -- rewrite e1 in hlt0. now left.
+          -- rewrite -e0 in hlt1. now left.
+          -- right; split.
+             ++ etransitivity; eauto.
+             ++ clear e0 e1 a a0. generalize dependent l; generalize dependent l1;
+                  induction l0 as [|t ts IHts];
+                  intros l1 l IHl hltlist hltlist1.
+                ** destruct l1.
+                   --- destruct l; easy.
+                   --- now cbn.
+                ** destruct l1.
+                   --- destruct l; easy.
+                   --- destruct l; try easy.
+                       cbn in *. destruct hltlist as [ hlt1 | [ e1 hlt ] ],
+                           hltlist1 as [ hlt0 | [ e0 hltl1 ] ].
+                       +++ apply Ind.Forall_inv in IHl; left; auto.
+                       +++ left. now rewrite -e0.
+                       +++ left. now rewrite e1.
+                       +++ right; split.
+                           *** etransitivity; eauto.
+                           *** apply IHts with (l := l).
+                               ---- now apply Ind.Forall_tail in IHl.
+                               ---- auto.
+                               ---- auto.
+  Qed.
+
+  #[global] Instance lt_strorder : StrictOrder lt.
+  Proof.
+    constructor.
+    - intros F; induction F; unfold complement; cbn; auto.
+      + intros [ contra | [_ contra] ].
+        * now apply OrderedString.lt_strorder in contra.
+        * induction l as [|t l' IHl'].
+          -- now cbn in contra.
+          -- cbn in contra; destruct contra.
+             ++ now apply lt_term_strorder in H.
+             ++ destruct H; auto.
+      + intros [contra | [ _ contra ] ]; auto.
+    - intros F G H hlt0 hlt1. generalize dependent H; generalize dependent F.
+      induction G; intros F hlt0 H hlt1.
+      + destruct F; easy.
+      + destruct F, H; try easy.
+        cbn in *. destruct hlt0 as [ hlt0 | [ e0 hltl0 ] ],
+            hlt1 as [ hlt1 | [ e1 hltl1 ] ].
+        * left; etransitivity; eauto.
+        * left. now rewrite -e1.
+        * left. now rewrite e0.
+        * right; split.
+          -- etransitivity; eauto.
+          -- clear e0 e1 a a0 a1. generalize dependent l; generalize dependent l1;
+               induction l0 as [|t ts IHts];
+               intros l1 l hltlist hltlist1.
+             ++ destruct l1, l; easy.
+             ++ destruct l1, l; try easy.
+                cbn in *. destruct hltlist as [ hlt1 | [ e1 hltl ] ],
+                    hltlist1 as [ hlt0 | [ e0 hltl1 ] ].
+                ** left; etransitivity; eauto.
+                ** left; now rewrite -e0.
+                ** left; now rewrite e1.
+                ** right; split.
+                   --- etransitivity; eauto.
+                   --- eapply IHts; eauto.
+      + destruct F, H; try easy.
+        cbn in *; eapply IHG; eauto.
+      + destruct F, H; try easy.
+        cbn in *. destruct hlt0 as [ hlt1' | [ e1 hlt2 ] ],
+            hlt1 as [ hlt | [ e hlt0 ] ].
+        * left; eapply IHG1; eauto.
+        * left; now rewrite -e.
+        * left; now rewrite e1.
+        * right; split.
+          -- etransitivity; eauto.
+          -- eapply IHG2; eauto.
+      + destruct F, H; try easy.
+        cbn in *; eapply IHG; eauto.
+  Qed.
+
+  #[global] Instance lt_compat : Proper (eq ==> eq ==> iff) lt.
+  Proof. intros F G ->; cbn. intros F H ->; cbn. reflexivity. Qed.
+
+  Fixpoint ltb_list {A : Type} `{EqBool A} (ltb_A : A -> A -> bool) (l l' : list A) : bool :=
+    match l, l' with
+    | [], [] => false
+    | [], _ :: _ => true
+    | _ :: _, [] => false
+    | x :: xs, y :: ys => ltb_A x y || (eqb x y && ltb_list ltb_A xs ys)
+    end.
+
+  Lemma ltb_list_lt_list :
+    forall {A : Type} `{EqBool A} (ltb_A : A -> A -> bool) (lt_A : A -> A -> Prop) (l l' : list A),
+      (forall (x : A), In x l -> forall (y : A), ltb_A x y = true <-> lt_A x y) ->
+      ltb_list ltb_A l l' = true <-> lt_list lt_A l l'.
+  Proof.
+    intros ?????? equ; split; intro h.
+    - generalize dependent l'; induction l as [| x xs IHxs]; intros l' h;
+         destruct l' as [|y ys]; try easy.
+      have equ' := (equ x ltac:(now right) y); cbn in equ' |- *.
+      cbn in h. apply Bool.orb_prop in h; destruct h as [hltb | hlt].
+      + left; rewrite -equ' //.
+      + apply andb_prop in hlt; destruct hlt.
+        right; split.
+        * rewrite -eqbIsEq //.
+        * apply IHxs; auto.
+          intros. apply equ; now left.
+    - generalize dependent l'; induction l as [| x xs IHxs]; intros l' h;
+        destruct l' as [|y ys]; try easy.
+      cbn in *; destruct h as [ e | [e h] ].
+      + apply Bool.orb_true_intro. left.
+        rewrite equ; auto; now left.
+      + apply Bool.orb_true_intro. right.
+        apply andb_true_intro; split.
+        * now rewrite eqbIsEq.
+        * apply IHxs; auto.
+  Qed.
+
+  Fixpoint ltb_term (t u : Term) : bool :=
+    match t, u with
+    | Bound n, Bound m =>
+        match PeanoNat.Nat.compare n m with
+        | Lt => true
+        | _ => false
+        end
+    | Bound _, _ => true
+    | Free x, Free y =>
+        match OrderedString.compare x y with
+        | Lt => true
+        | _ => false
+        end
+    | Free _, Bound _ => false
+    | Free _, _ => true
+    | Fun f lf, Fun g lg =>
+        match OrderedString.compare f g with
+        | Lt => true
+        | Eq => ltb_list ltb_term lf lg
+        | Gt => false
+        end
+    | Fun _ _, _ => false
+    end.
+
+  Lemma ltb_term_lt_term :
+    forall (t u : Term),
+      ltb_term t u = true <-> lt_term t u.
+  Proof.
+    intro t; induction t using term_ind; destruct u; try easy; cbn.
+    - destruct (PeanoNat.Nat.compare n n0) eqn:hcomp.
+      + apply PeanoNat.Nat.compare_eq in hcomp; subst.
+        split; intro contra.
+        * inversion contra.
+        * exfalso. now apply PeanoNat.Nat.lt_irrefl in contra.
+      + split; auto; intros _. now apply Compare_dec.nat_compare_Lt_lt.
+      + split; intro contra.
+        * inversion contra.
+        * exfalso. apply Compare_dec.nat_compare_Gt_gt in hcomp; lia.
+    - have hspec := OrderedString.compare_spec a a0.
+      destruct (OrderedString.compare a a0) eqn:hcomp.
+      + inversion hspec; subst; cbn in *.
+        split; intro contra.
+        * inversion contra.
+        * exfalso. now apply OrderedString.lt_strorder in contra.
+      + inversion hspec; split; auto.
+      + inversion hspec; split; intro contra.
+        * inversion contra.
+        * exfalso. have hcontr : OrderedString.lt a0 a0.
+          { etransitivity; eauto. }
+          now apply OrderedString.lt_strorder in hcontr.
+    - have hspec := OrderedString.compare_spec f a.
+      destruct (OrderedString.compare f a) eqn:hcomp.
+      + inversion hspec; subst. split; intro h.
+        * right; split; auto.
+          erewrite <-ltb_list_lt_list; eauto.
+          intros. eapply Ind.Forall_In in X; eauto.
+        * destruct h.
+          -- apply OrderedString.lt_strorder in H; auto.
+          -- destruct H as [_ hlt].
+             erewrite ltb_list_lt_list; eauto.
+             intros; eapply Ind.Forall_In in X; eauto.
+      + inversion hspec; split; auto.
+      + inversion hspec; split.
+        * intro contra; inversion contra.
+        * intros [ hlt | [e hlt] ].
+          -- have hlt' : OrderedString.lt a a by etransitivity; eauto.
+             now apply OrderedString.lt_strorder in hlt'.
+          -- subst. rewrite SetOfString_.SetOfXOrdProps.ME.compare_refl in hcomp; inversion hcomp.
+  Qed.
+
+  Fixpoint ltb_form (F G : Form) : bool :=
+    match F, G with
+    | Bot, Bot => false
+    | Bot, _ => true
+    | _, Bot => false
+
+    | Pred p l, Pred p' l' =>
+        match OrderedString.compare p p' with
+        | Lt => true
+        | Eq => ltb_list ltb_term l l'
+        | Gt => false
+        end
+    | Pred _ _, _ => true
+
+    | Neg F, Neg G => ltb_form F G
+    | Neg _, Pred _ _ => false
+    | Neg _, _ => true
+
+    | Or F1 F2, Or G1 G2 =>
+        ltb_form F1 G1 || (eqb F1 G1 && ltb_form F2 G2)
+    | Or _ _, All _ => true
+    | Or _ _, _ => false
+
+    | All F, All G => ltb_form F G
+    | All _, _ => false
+    end.
+
+  Lemma ltb_form_lt_form :
+    forall (F G : Form),
+      ltb_form F G = true <-> lt_form F G.
+  Proof.
+    intro F; induction F; intro G; destruct G; try easy; cbn.
+    - have hspec := OrderedString.compare_spec a a0.
+      destruct (OrderedString.compare a a0); inversion hspec.
+      + subst; split.
+        * intro hltb. right; split; auto.
+          rewrite -ltb_list_lt_list; eauto.
+          intros; apply ltb_term_lt_term.
+        * intros [ contra | [ _ hlt ] ].
+          -- now apply OrderedString.lt_strorder in contra.
+          -- rewrite ltb_list_lt_list; eauto.
+             intros; apply ltb_term_lt_term.
+      + split; auto.
+      + split.
+        * intro contra; inversion contra.
+        * intros [ hlt | [ e _ ] ].
+          -- have hlt' : OrderedString.lt a0 a0 by etransitivity; eauto.
+             now apply OrderedString.lt_strorder in hlt'.
+          -- subst; now apply OrderedString.lt_strorder in H.
+    - apply IHF.
+    - split.
+      + intros [hlt | [ e hlt ]%andb_prop ]%Bool.orb_prop.
+        * left. rewrite -IHF1 //.
+        * right; split.
+          -- now rewrite -eqbIsEq.
+          -- rewrite -IHF2 //.
+      + intros [ hlt | [ e hlt ] ]; apply Bool.orb_true_intro.
+        * left. now rewrite IHF1.
+        * right; apply andb_true_intro; split.
+          -- rewrite eqbIsEq //.
+          -- rewrite IHF2 //.
+    - apply IHF.
+  Qed.
+
+  Lemma ltb_list_false :
+    forall {A : Type} `{EqBool A} (ltb_A : A -> A -> bool) (l l' : list A),
+      (forall (x : A), In x l -> forall (y : A), ltb_A x y = false -> x <> y -> ltb_A y x = true) ->
+      ltb_list ltb_A l l' = false -> l <> l' -> ltb_list ltb_A l' l = true.
+  Proof.
+    intros ????? hltA hnltb ne.
+    generalize dependent l. induction l' as [|z zs IHzs]; intros l hltA hnltb ne;
+      destruct l as [|z' zs']; try easy.
+    cbn in *. apply Bool.orb_false_elim in hnltb; destruct hnltb as [ltbz h].
+    apply Bool.andb_false_elim in h. destruct h as [ne' | nlt]; apply Bool.orb_true_intro.
+    - left. apply hltA; try easy.
+      + now right.
+      + now rewrite -EqBool_neq in ne'.
+    - have h : z' <> z \/ (z' = z /\ zs' <> zs).
+      { destruct (z' == z); auto.
+        right; split; auto. intro; apply ne; now subst. }
+      destruct h as [ ne' | [e ne'] ].
+      + left. apply hltA; try easy. now right.
+      + right. apply andb_true_intro; split.
+        * rewrite eqbIsEq //.
+        * apply IHzs; auto.
+  Qed.
+
+  Lemma ltb_term_false :
+    forall (t u : Term),
+      ltb_term t u = false -> t <> u -> ltb_term u t = true.
+  Proof.
+    intro t; induction t using term_ind; intros ? hnlt ne; destruct u; cbn in *; try easy.
+    - have hspec := OrderedNat.compare_spec n n0.
+      destruct (PeanoNat.Nat.compare n n0); inversion hspec; try easy;
+        destruct (PeanoNat.Nat.compare n0 n) eqn:hcomp; try easy.
+      + exfalso; apply ne; now subst.
+      + apply Compare_dec.nat_compare_Gt_gt in hcomp; lia.
+      + apply PeanoNat.Nat.compare_eq in hcomp; lia.
+      + apply Compare_dec.nat_compare_Gt_gt in hcomp; lia.
+    - have hspec := OrderedString.compare_spec a a0.
+      destruct (OrderedString.compare a a0); inversion hspec; try easy;
+        destruct (OrderedString.compare a0 a) eqn:hcomp; try easy.
+      + exfalso; apply ne; now subst.
+      + rewrite SetOfString_.SetOfX_.Raw.MX.compare_gt_iff in hcomp; subst.
+        now apply OrderedString.lt_strorder in hcomp.
+      + apply SetOfString_.SetOfX_.Raw.MX.compare_eq in hcomp; subst.
+        exfalso; now apply ne.
+      + rewrite SetOfString_.SetOfX_.Raw.MX.compare_gt_iff in hcomp.
+        have contra : OrderedString.lt a0 a0 by etransitivity; eauto.
+        now apply OrderedString.lt_strorder in contra.
+    - have hspec := OrderedString.compare_spec f a.
+      destruct (OrderedString.compare f a); inversion hspec; try easy;
+        destruct (OrderedString.compare a f) eqn:hcomp; try easy.
+      + subst. have ne' : l <> l0.
+        { intro; apply ne; now subst. }
+        apply ltb_list_false; auto.
+        intros; eapply Forall_In in X; eauto.
+      + subst. rewrite SetOfString_.SetOfX_.Raw.MX.compare_refl in hcomp. inversion hcomp.
+      + apply SetOfString_.SetOfX_.Raw.MX.compare_eq in hcomp; subst.
+        now apply OrderedString.lt_strorder in H.
+      + rewrite SetOfString_.SetOfX_.Raw.MX.compare_gt_iff in hcomp.
+        have contra : OrderedString.lt a a by etransitivity; eauto.
+        now apply OrderedString.lt_strorder in contra.
+  Qed.
+
+  Lemma ltb_form_false :
+    forall (F G : Form),
+      ltb_form F G = false -> F <> G -> ltb_form G F = true.
+  Proof.
+    intro F; induction F; intros ? hnlt ne; destruct G; cbn in *; try easy.
+    - have hspec := OrderedString.compare_spec a a0.
+      destruct (OrderedString.compare a a0); inversion hspec; cbn in *.
+      + destruct (OrderedString.compare a0 a) eqn:hcomp; try easy.
+        * apply ltb_list_false; auto.
+          -- intros. apply ltb_term_false; auto.
+          -- intro; subst; now apply ne.
+        * subst. now rewrite SetOfString_.SetOfXOrdProps.ME.compare_refl in hcomp.
+      + destruct (OrderedString.compare a0 a) eqn:hcomp; try easy.
+      + destruct (OrderedString.compare a0 a) eqn:hcomp; try easy.
+        * apply SetOfString_.SetOfX_.Raw.MX.compare_eq in hcomp; subst.
+          inversion hspec. now apply OrderedString.lt_strorder in H0.
+        * rewrite SetOfString_.SetOfX_.Raw.MX.compare_gt_iff in hcomp.
+          have contra : OrderedString.lt a0 a0 by etransitivity; eauto.
+          now apply OrderedString.lt_strorder in contra.
+    - apply IHF; auto. congruence.
+    - apply Bool.orb_false_elim in hnlt; destruct hnlt as [ne0 h].
+      rewrite Bool.andb_false_iff in h; destruct h as [ne1 | ne1];
+        apply Bool.orb_true_intro.
+      + left. apply IHF1; auto. rewrite EqBool_neq //.
+      + have [hF1 | [ e1 hF2 ] ] : F1 <> G1 \/ (F1 = G1 /\ F2 <> G2).
+        { destruct (F1 == G1); auto.
+          right. split; auto. intro. apply ne; now subst. }
+        * left. apply IHF1; auto.
+        * right. apply andb_true_intro; split.
+          -- rewrite eqbIsEq //.
+          -- apply IHF2; auto.
+    - apply IHF; auto. congruence.
+  Qed.
+
+  Definition compare (F G : Form) : comparison :=
+    if eqb F G then Eq
+    else if ltb_form F G then Lt
+         else Gt.
+
+  Lemma compare_spec :
+    forall (F G : Form), CompareSpec (F = G) (lt F G) (lt G F) (compare F G).
+  Proof.
+    intros ??. destruct (F == G).
+    - subst. unfold compare. rewrite EqBool_refl. now constructor.
+    - unfold compare. rewrite EqBool_neq in n; rewrite n.
+      destruct (ltb_form F G) eqn:hlt.
+      + constructor. unfold lt; rewrite -ltb_form_lt_form //.
+      + constructor. unfold lt.
+        rewrite -ltb_form_lt_form.
+        apply ltb_form_false; auto.
+        rewrite EqBool_neq //.
+  Qed.
+
+  Definition eq_dec (F G : Form) : { F = G } + { F <> G }.
+  Proof. apply eq_dec_from_eq_bool; typeclasses eauto. Qed.
+End OrderedForm.
+
+Module Con := MSetAVL.Make OrderedForm.
+
+(** *** Utility functions *)
 
 (** Returns true iff [Bot] or [Neg ETop] is in the list. *)
-Definition trivial_contradiction (Gamma : list Form) : bool :=
+Definition trivial_contradiction (Gamma : Con.t) : bool :=
   List.existsb (fun F => orb (eqb F Bot) (eqb F [[ ENeg ETop ]])) Gamma.
 
 Definition is_neg (F : Form) : bool :=
@@ -72,7 +530,7 @@ Definition is_neg (F : Form) : bool :=
   end.
 
 (** Returns true iff there exists two formulas [F] and [F'] such that [Neg P@[sigma] = P'@[sigma]] in [Gamma]. *)
-Definition formula_contradiction (F G : Form) (Gamma : Con) (sigma : Substitution string Term): bool :=
+Definition formula_contradiction (F G : Form) (Gamma : list Form) (sigma : Substitution string Term): bool :=
   mem_ctx F Gamma && mem_ctx G Gamma &&
     (match F with
      | Neg F => negb (is_neg G) && eqb F@[sigma] G@[sigma]
