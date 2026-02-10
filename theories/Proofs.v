@@ -645,3 +645,9 @@ Section Soundness.
     apply hnsat. rewrite elast //.
   Qed.
 End Soundness.
+
+Module ConcreteProofInstances.
+  Export ConcreteSkolemizationInstances.
+
+  Definition Tableau := @Tableau_ string string string.
+End ConcreteProofInstances.

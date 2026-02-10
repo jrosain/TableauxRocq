@@ -139,7 +139,7 @@ Section ESyntaxTranslation.
     | [] => None
     | y :: ys => if eqb x y
                then Some 0
-               else bind (index_of x ys) (fun n => Some (S n))
+               else index_of x ys >>= fun n => Some (S n)
     end.
 
     Lemma index_of_spec :
@@ -514,11 +514,11 @@ Section ESyntaxTranslation.
         destruct (index_of x0 (rho ++ x :: rho')) eqn:e1; cbn.
       + have hin := index_of_In' _ _ _ e1.
         have e : n = n0.
-        { replace rho' with (List.app rho' []) in e1.
+        { replace rho' with (rho' ++ [])%list in e1.
+          2: apply app_nil_r.
           have h := index_of_prefix x0 (rho ++ x :: rho') [x] [].
           eapply h; eauto.
-          1-2: rewrite -!app_assoc in e0 e1 |- *; eauto.
-          apply app_nil_r. }
+          1-2: rewrite -!app_assoc in e0 e1 |- *; eauto. }
         have hlt : n < #|rho ++ x :: rho'|.
         { apply (index_of_length x0); rewrite e //. }
         rewrite -match_eq_dec_eq_bool.
@@ -580,21 +580,21 @@ Section ESyntaxTranslation.
         translate_ETerm rho (instantiate_eterm x u t).
   Proof.
     intros ?????. induction t using eterm_ind; cbn.
-    - rewrite -match_eq_dec_eq_bool.
-      destruct (x0 == x); cbn.
-      + destruct (x == x0); try congruence.
-        destruct (index_of x0 (rho ++ [x])) eqn:eindex; cbn; subst.
+    - destruct (x == x0); cbn.
+      + destruct (index_of x0 (rho ++ [x])) eqn:eindex; cbn; subst.
         * have e : #|rho| = n.
-          { have eindex' := index_of_rapp x rho H.
+          { have eindex' := index_of_rapp x0 rho H.
             specialize (eindex' ltac:(typeclasses eauto)).
             rewrite eindex in eindex'. injection eindex' => -> //. }
-          rewrite -match_eq_dec_eq_bool. destruct (#|rho| == n); congruence.
-        * have hin : In x (rho ++ [x]).
+          rewrite -match_eq_dec_eq_bool. destruct (#|rho| == n); try congruence.
+          rewrite EqBool_refl //.
+        * have hin : In x0 (rho ++ [x0]).
           { clear; induction rho; cbn.
             - now right.
             - now left. }
-          apply In_index_of in hin. destruct hin as (k & contra). congruence.
-      + destruct (x == x0); try congruence.
+          apply In_index_of in hin. destruct hin as (k & contra).
+          rewrite eindex in contra; inversion contra.
+      + rewrite -match_eq_dec_eq_bool; destruct (x == x0); try congruence.
         destruct (index_of x0 (rho ++ [x])) eqn:eindex; cbn; subst.
         * have hlt := index_of_rapp' x x0 rho n1 H n0 eindex.
           have hneq : n1 <> #|rho|. { lia. }
@@ -662,8 +662,8 @@ Section ESyntaxTranslation.
         have h0 := instantiate_shadowed_form F t s [] rho.
         rewrite !app_nil_l in h0. rewrite h0 //.
        + cbn in IHF. rewrite e PeanoNat.Nat.add_1_r IHF; auto.
-        intros [e' | hin']; try congruence.
-        eapply closed_in_union_closed_in_right; eauto.
+        * intros [e' | hin']; try congruence.
+        * eapply closed_in_union_closed_in_right; eauto.
     - specialize (IHF (s :: rho)). apply f_equal; cbn.
       have h : closed_in mem_list (s :: rho) t. {
         clear hin IHF. induction t using eterm_ind'; cbn in *.
@@ -689,8 +689,8 @@ Section ESyntaxTranslation.
         have h0 := instantiate_shadowed_form F t s [] rho.
         rewrite !app_nil_l in h0. rewrite h0 //.
       + cbn in IHF. rewrite e PeanoNat.Nat.add_1_r IHF; auto.
-        intros [e' | hin']; try congruence.
-        eapply closed_in_union_closed_in_right; eauto.
+        * intros [e' | hin']; try congruence.
+        * eapply closed_in_union_closed_in_right; eauto.
   Qed.
 End ESyntaxTranslation.
 
@@ -876,20 +876,19 @@ Section ValidityEquivalence.
       left. rewrite -ls_to_eform_ls_to_form //.
   Qed.
 
-  Fixpoint ls_to_econtext (Gamma : list EForm) : Con :=
+  Fixpoint to_form_list (Gamma : list EForm) : list Form :=
     match Gamma with
-    | [] => {{ }}
-    | F :: Fs => ls_to_econtext Fs ,, [[ F ]]
+    | [] => []
+    | F :: Fs => [[ F ]] :: to_form_list Fs
     end.
-
 
   Theorem hasTableau_is_evalid :
     forall (F : EForm) (sko : Skolemization) (Gamma : list EForm) (sigma : Substitution string Term),
-      @isClosed string Con _ (ls_to_econtext Gamma ,, Neg (translate_EForm F)) ->
-      hasTableau sko (ls_to_econtext Gamma ,, Neg (translate_EForm F)) sigma ->
+      @isClosed string (list Form) _ (Neg (translate_EForm F) :: to_form_list Gamma) ->
+      hasTableau sko (Neg (translate_EForm F) :: to_form_list Gamma) sigma ->
       is_evalid (EImp (ls_to_eform Gamma) F).
   Proof.
-    intros ????? htab. apply (hasTableau_sound sko sigma (ls_to_econtext Gamma) [[ F ]]) in htab; auto.
+    intros ????? htab. apply (hasTableau_sound sko sigma (to_form_list Gamma) [[ F ]]) in htab; auto.
     unfold is_valid in htab. intros M.
     specialize (htab M).
     have e : empty_env M string = extended_environment [] [] (empty_env M string).
@@ -898,7 +897,7 @@ Section ValidityEquivalence.
     cbn in htab. destruct htab as [hGamma | hF].
     - left. intro h. apply hGamma.
       have e' : (translate_EForm_ [] (ls_to_eform Gamma)) =
-                  (ls_to_form (ls_to_econtext Gamma)).
+                  (ls_to_form (to_form_list Gamma)).
       { clear. induction Gamma as [|G Gs IHGs]; cbn in *; try reflexivity.
         now rewrite -IHGs. }
       rewrite -e' //.
