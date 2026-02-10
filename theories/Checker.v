@@ -373,7 +373,7 @@ Section RuleTreeToSequence.
       exists (s : Sequence sko) (T' : Tableau), RuleTree_to_Sequence__aux B T R = Some (s, T').
   Proof.
     intros ?????? e hbranchof econ esymbs. generalize dependent Gamma. generalize dependent T.
-    induction R; intros T hbranchof symbs0 Gamma e econ.
+    revert B. induction R; intros B T hbranchof symbs0 Gamma e econ.
 
     (* Case: [Leaf] *)
     - exists [], T; auto.
@@ -383,14 +383,13 @@ Section RuleTreeToSequence.
 
       (* Case: [AlphaNegNeg] *)
       + have [ l [ eget [ hin hnext ] ] ] := alpha_rule_sound e.
-        set T' := expand_tableau_branch sko (Some (Ctx.elements Gamma)) None B T.
-        (* TODO: API *)
-        have hapi :
-          is_branch_of B T ->
-          exists T', expand_tableau_branch sko (Some (Ctx.elements Gamma)) None B T = Some T'
-            by admit.
-        destruct (hapi hbranchof) as (T0 & hexpand).
-        (* specialize (IHR1 _ hnext). *)
+        have [ T0 hexpand ] :=
+          is_branch_of_expand_tableau_branch sko (Some (Ctx.elements Gamma)) None hbranchof.
+        have hbranchof0 :=
+          is_branch_of_extend_left T T0 B (Ctx.elements Gamma) None hbranchof
+            (expand_tableau_branch_Some__aux sko hexpand).
+        (* TODO: more API *)
+        specialize (IHR1 (B ++ [Left])%list T0 hbranchof0).
   Admitted.
 
   (** Of course, we can make a [Sequence] out of a first tableau which has the single node [Gamma] *)

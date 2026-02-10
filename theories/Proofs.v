@@ -306,6 +306,33 @@ Section Tableaux.
         * cbn in e; rewrite e2 in e; inversion e.
   Qed.
 
+  Lemma is_branch_of_expand_tableau_branch :
+    forall {B : Branch} {T : Tableau_} (l l' : option (list Form)),
+      is_branch_of B T ->
+      exists (T' : Tableau_), expand_tableau_branch l l' B T = Some T'.
+  Proof using Type.
+    intros ? [T symbs ] ?? hbranchof; cbn in *. induction hbranchof; cbn.
+    - exists {| tree := Node (mkOptionalNode l) Gamma (mkOptionalNode l'); symbols := symbs |}; auto.
+    - destruct IHhbranchof as (T1' & eT1').
+      destruct (expand_tableau_branch__aux l l' B T1); cbn in *.
+      + exists {| tree := Node t Gamma T2; symbols := symbs |}; auto.
+      + inversion eT1'.
+    - destruct IHhbranchof as (T2' & eT2').
+      destruct (expand_tableau_branch__aux l l' B T2); cbn in *.
+      + exists {| tree := Node T1 Gamma t; symbols := symbs |}; auto.
+      + inversion eT2'.
+  Qed.
+
+  Lemma expand_tableau_branch_Some__aux :
+    forall {B : Branch} {T T' : Tableau_} {l l' : option (list Form)},
+      expand_tableau_branch l l' B T = Some T' ->
+      expand_tableau_branch__aux l l' B T = Some (tree T').
+  Proof using Type.
+    intros ????? e; cbn in e.
+    destruct (expand_tableau_branch__aux l l' B T); try easy.
+    destruct T'; injection e => _ -> //.
+  Qed.
+
   (** An optional list of formulas is satisfied either if it is none or if the list is
       satisfied. *)
   Definition is_optional_satisfied
