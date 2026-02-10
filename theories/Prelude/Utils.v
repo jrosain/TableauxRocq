@@ -83,6 +83,19 @@ Fixpoint list_mem {A : Type} `{EqBool A} (x : A) (l : list A) : bool :=
   | y :: ys => eqb x y || list_mem x ys
   end.
 
+Lemma list_mem_spec :
+  forall {A : Type} `{EqBool A} (x : A) (l : list A),
+    list_mem x l = true <-> List.In x l.
+Proof.
+  intros ????; induction l as [|y ys IHys]; cbn; try easy; split.
+  - intros [e | hmem]%Bool.orb_prop.
+    + left; now rewrite eqbIsEq in e.
+    + right; rewrite -IHys //.
+  - intros [e | hin]; apply Bool.orb_true_intro.
+    + left; now rewrite eqbIsEq.
+    + right; rewrite IHys //.
+Qed.
+
 (** Comparison of lists. *)
 Fixpoint lt_list {A : Type} (lt_A : A -> A -> Prop) (l l' : list A) : Prop :=
   match l, l' with
@@ -149,6 +162,16 @@ Proof.
       * rewrite eqbIsEq //.
       * apply IHzs; auto.
 Qed.
+
+(** Printing a list *)
+Definition pr_list {A : Type} (pr_A : A -> string) (l : list A) : string :=
+  let fix F (l : list A) : string :=
+    match l with
+    | [] => ""
+    | [x] => pr_A x
+    | x :: xs => pr_A x ++ " ; " ++ F xs
+    end in
+  F l.
 
 Lemma nth_error_Some' :
   forall {A : Type} (l : list A) (n : nat) (x : A),

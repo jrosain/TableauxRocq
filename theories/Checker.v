@@ -14,41 +14,32 @@ From Tableaux Require Import ExtendedSyntax.
 
 (** *** Data-structures *)
 
-(** We start by giving a data-structure that reflects the rules in [Proofs] extended for a
-    use with the extended syntax. *)
-Inductive ExtendedRule : Type :=
-| AlphaNegNeg : Form -> ExtendedRule
-| AlphaAnd : Form -> ExtendedRule
-| AlphaNegOr : Form -> ExtendedRule
-| AlphaNegImp : Form -> ExtendedRule
-| BetaOr : Form -> ExtendedRule
-| BetaImp : Form -> ExtendedRule
-| BetaNegAnd : Form -> ExtendedRule
-| BetaEqu : Form -> ExtendedRule
-| BetaNegEqu : Form -> ExtendedRule
-| GammaAll : Form -> string -> ExtendedRule
-| GammaNegEx : Form -> string -> ExtendedRule
-| DeltaEx : Form -> Term -> ExtendedRule
-| DeltaNegAll : Form -> Term -> ExtendedRule.
+(** We start by giving a data structure that reflects the rules of [ExpansionStep]. *)
+Inductive Rule : Type :=
+| AlphaNegNeg : Form -> Rule
+| AlphaNegOr : Form -> Rule
+| BetaOr : Form -> Rule
+| GammaAll : Form -> string -> Rule
+| DeltaNegAll : Form -> Term -> Rule.
 
 (** As we want a proof tree, we will take a tree of extended rules as an input of the algorithm.
-    Unary rules can be implemented by ignoring the *2nd* child of the tree. *)
-Inductive ExtendedRuleTree : Type :=
-| Leaf : option (Form * Form) -> ExtendedRuleTree
-| Node : ExtendedRuleTree -> ExtendedRule -> ExtendedRuleTree -> ExtendedRuleTree.
+    Unary rules can be implemented by ignoring the _2nd_ child of the tree. *)
+Inductive RuleTree : Type :=
+| Leaf : option (Form * Form) -> RuleTree
+| Node : RuleTree -> Rule -> RuleTree -> RuleTree.
 
-Definition mkTrivialClosure : ExtendedRuleTree := Leaf None.
+Definition mkTrivialClosure : RuleTree := Leaf None.
 
-Definition mkClosure (F G : Form) : ExtendedRuleTree :=
+Definition mkClosure (F G : Form) : RuleTree :=
   Leaf (Some (F, G)).
 
-Definition mkUnaryNode (rule : ExtendedRule) (T1 : ExtendedRuleTree) : ExtendedRuleTree :=
+Definition mkUnaryNode (rule : Rule) (T1 : RuleTree) : RuleTree :=
   Node T1 rule (Leaf None).
 
-Definition mkBinaryNode (rule : ExtendedRule) (T1 T2 : ExtendedRuleTree) : ExtendedRuleTree :=
+Definition mkBinaryNode (rule : Rule) (T1 T2 : RuleTree) : RuleTree :=
   Node T1 rule T2.
 
-(** A small [Result] monad that stores the issues. *)
+(** A small [Result] monad that stores the errors encountered. *)
 Definition Result (A : Type) : Type := A * list string.
 
 #[global] Instance Monad_Result : Monad Result :=
@@ -61,23 +52,55 @@ Definition error (s : string) : Result bool := (false, [s]).
 
 (** *** Utility functions *)
 
-(** We abstract the context as a module in order to be able to swap the usage from a list
-    to a set or another representation. *)
+(** Printers *)
+
+Definition pr_bool (b : bool) : string :=
+  match b with
+  | true => "true"
+  | false => "false"
+  end.
+
+Fixpoint pr_term (t : Term) : string :=
+  match t with
+  | Bound n => "x@" ++ nat_to_string n
+  | Free x => x
+  | Fun f l => f ++ "(" ++ pr_list pr_term l ++ ")"
+  end.
+
+Fixpoint pr_form (F : Form) : string :=
+  match F with
+  | Bot => "$false"
+  | Pred p l => p ++ "(" ++ pr_list pr_term l ++ ")"
+  | Neg F => "~(" ++ pr_form F ++ ")"
+  | Or F1 F2 => "(" ++ pr_form F1 ++ " | " ++ pr_form F2 ++ ")"
+  | All F => "! (" ++ pr_form F ++ ")"
+  end.
+
+(** We abstract the context as a module in order to be able to easily swap the implementation.
+    It is currently implemented as a list, but it would probably be better to use sets. *)
 Module Con.
   Definition t := list Form.
+  Definition eq : t -> t -> Prop := eq.
   Definition from_list (l : list Form) : t := l.
   Definition fv (Gamma : t) : SetOfString := fv Gamma.
   Definition existsb (pred : Form -> bool) (Gamma : t) : bool := List.existsb pred Gamma.
   Definition mem (F : Form) (Gamma : t) : bool := list_mem F Gamma.
+  Definition In (F : Form) (Gamma : t) : Prop := F \in Gamma.
   Definition singleton (F : Form) : t := [F].
   Definition add (F : Form) (Gamma : t) : t := F :: Gamma.
   Definition elements (Gamma : t) : list Form := Gamma.
   Definition union (Gamma1 Gamma2 : t) : t := (Gamma1 ++ Gamma2)%list.
+  Definition pr (Gamma : t) : string := "[" ++ pr_list pr_form Gamma ++ "]".
+
+  Lemma mem_spec :
+    forall (F : Form) (Gamma : t),
+      mem F Gamma = true <-> In F Gamma.
+  Proof. apply list_mem_spec. Qed.
 End Con.
 
-(** Returns true iff [Bot] or [Neg ETop] is in the list. *)
+(** Returns true iff [Bot] is in the list. *)
 Definition trivial_contradiction (Gamma : Con.t) : bool :=
-  Con.existsb (fun F => orb (eqb F Bot) (eqb F [[ ENeg ETop ]])) Gamma.
+  Con.existsb (fun F => eqb F Bot) Gamma.
 
 Definition is_neg (F : Form) : bool :=
   match F with
@@ -106,51 +129,9 @@ Definition get_or (F : Form) : option (Con.t * Con.t) :=
   | _ => None
   end.
 
-Definition get_and (F : Form) : option Con.t :=
-  match F with
-  | Neg (Or (Neg F1) (Neg F2)) => Some (Con.add F1 (Con.singleton F2))
-  | _ => None
-  end.
-
 Definition get_neg_or (F : Form) : option Con.t :=
   match F with
   | Neg (Or F1 F2) => Some (Con.add (Neg F1) (Con.singleton (Neg F2)))
-  | _ => None
-  end.
-
-Definition get_neg_imp (F : Form) : option Con.t :=
-  match F with
-  | Neg (Or (Neg F1) F2)  => Some (Con.add F1 (Con.singleton (Neg F2)))
-  | _ => None
-  end.
-
-Definition get_imp (F : Form) : option (Con.t * Con.t) :=
-  match F with
-  | (Or (Neg F1) F2) => Some (Con.singleton (Neg F1), Con.singleton F2)
-  | _ => None
-  end.
-
-Definition get_neg_and (F : Form) : option (Con.t * Con.t) :=
-  match F with
-  | Neg (Neg (Or (Neg F1) (Neg F2))) => Some (Con.singleton (Neg F1), Con.singleton (Neg F2))
-  | _ => None
-  end.
-
-Definition get_equ (F : Form) : option (Con.t * Con.t) :=
-  match F with
-  | Neg (Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F2') F1'))) =>
-      if (eqb F1 F1' && eqb F2 F2')
-      then Some (Con.add (Neg F1) (Con.singleton (Neg F2)), Con.add F2 (Con.singleton F1))
-      else None
-  | _ => None
-  end.
-
-Definition get_neg_equ (F : Form) : option (Con.t * Con.t) :=
-  match F with
-  | Neg (Neg (Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F2') F1')))) =>
-      if (eqb F1 F1' && eqb F2 F2')
-      then Some (Con.add (Neg F2) (Con.singleton F1), Con.add (Neg F1) (Con.singleton F2))
-      else None
   | _ => None
   end.
 
@@ -160,59 +141,13 @@ Definition get_all (F : Form) : option Form :=
   | _ => None
   end.
 
-Definition get_ex (F : Form) : option Form :=
-  match F with
-  | Neg (All (Neg F)) => Some F
-  | _ => None
-  end.
-
-Definition get_neg_ex (F : Form) : option Form :=
-  match F with
-  | Neg (Neg (All (Neg F))) => Some (Neg F)
-  | _ => None
-  end.
-
 Definition get_neg_all (F : Form) : option Form :=
   match F with
   | Neg (All F) => Some (Neg F)
   | _ => None
   end.
 
-Definition pr_list {A : Type} (pr_A : A -> string) (l : list A) : string :=
-  let fix F (l : list A) : string :=
-    match l with
-    | [] => ""
-    | [x] => pr_A x
-    | x :: xs => pr_A x ++ " ; " ++ F xs
-    end in
-  F l.
-
-Fixpoint pr_term (t : Term) : string :=
-  match t with
-  | Bound n => "x@" ++ nat_to_string n
-  | Free x => x
-  | Fun f l => f ++ "(" ++ pr_list pr_term l ++ ")"
-  end.
-
-Fixpoint pr_form (F : Form) : string :=
-  match F with
-  | Bot => "$false"
-  | Pred p l => p ++ "(" ++ pr_list pr_term l ++ ")"
-  | Neg F => "~(" ++ pr_form F ++ ")"
-  | Or F1 F2 => "(" ++ pr_form F1 ++ " | " ++ pr_form F2 ++ ")"
-  | All F => "! (" ++ pr_form F ++ ")"
-  end.
-
-Definition pr_context (Gamma : list Form) : string :=
-  "[ " ++ pr_list pr_form Gamma ++ " ]".
-
-Definition pr_bool (b : bool) : string :=
-  match b with
-  | true => "true"
-  | false => "false"
-  end.
-
-(** *** The algorithm *)
+(** *** The actual algorithm *)
 Section GuidedTableauSearchAlgorithm.
   Context (sko : Skolemization).
 
@@ -220,7 +155,7 @@ Section GuidedTableauSearchAlgorithm.
     (getter : Form -> option A) (action : A -> Result bool) : Result bool :=
     if negb (Con.mem F Gamma)
     then error ("Formula " ++ pr_form F ++ " not found in the context " ++
-                  pr_context (Con.elements Gamma))
+                  Con.pr Gamma)
     else
       match getter F with
       | None => error ("The formula " ++ pr_form F ++ " is not a " ++ err)
@@ -228,20 +163,21 @@ Section GuidedTableauSearchAlgorithm.
       end.
 
   Definition SearchAlgorithm :=
-    Con.t -> Substitution string Term -> sko_record sko -> ExtendedRuleTree -> Result bool.
+    Con.t -> Substitution string Term -> sko_record sko -> RuleTree -> Result bool.
 
   Definition closure_rule (search_contradiction : Con.t -> Substitution string Term -> bool)
     (Gamma : Con.t) (sigma : Substitution string Term) :=
     if search_contradiction Gamma sigma
     then ret true
-    else error ("No trivial contradiction in the context: " ++ pr_context ((Con.elements Gamma)@[sigma])).
+    else error ("No trivial contradiction in the context: " ++
+                  pr_list pr_form (Con.elements Gamma)@[sigma]).
 
-  Definition alpha_rule (Gamma : Con.t) (sigma : Substitution string Term) (T : ExtendedRuleTree)
+  Definition alpha_rule (Gamma : Con.t) (sigma : Substitution string Term) (T : RuleTree)
     (record : sko_record sko) (F : Form) (getter : Form -> option Con.t) (err : string)
     (search : SearchAlgorithm)  :=
     rule_wrapper Gamma F err getter (fun l => search (Con.union l Gamma) sigma record T).
 
-  Definition beta_rule (Gamma : Con.t) (sigma : Substitution string Term) (T1 T2 : ExtendedRuleTree)
+  Definition beta_rule (Gamma : Con.t) (sigma : Substitution string Term) (T1 T2 : RuleTree)
     (record : sko_record sko) (F : Form) (getter : Form -> option (Con.t * Con.t))
     (err : string) (search : SearchAlgorithm)  :=
     rule_wrapper Gamma F err getter
@@ -249,13 +185,13 @@ Section GuidedTableauSearchAlgorithm.
                (fun b => if b then search (Con.union (snd l) Gamma) sigma record T2
                       else ret b)).
 
-  Definition gamma_rule (Gamma : Con.t) (sigma : Substitution string Term) (T : ExtendedRuleTree)
+  Definition gamma_rule (Gamma : Con.t) (sigma : Substitution string Term) (T : RuleTree)
     (record : sko_record sko) (F : Form) (x : string) (getter : Form -> option Form)
     (err : string) (search : SearchAlgorithm)  :=
     rule_wrapper Gamma F err getter
       (fun F => search (Con.add (F{0 \to Free x}) Gamma) sigma record T).
 
-  Definition delta_rule (Gamma : Con.t) (sigma : Substitution string Term) (T : ExtendedRuleTree)
+  Definition delta_rule (Gamma : Con.t) (sigma : Substitution string Term) (T : RuleTree)
     (record : sko_record sko) (F : Form) (t : Term) (getter : Form -> option Form)
     (err : string) (search : SearchAlgorithm)  :=
     rule_wrapper Gamma F err getter
@@ -267,7 +203,7 @@ Section GuidedTableauSearchAlgorithm.
                end
              else
                error ("The term " ++ pr_term t ++ " is not a valid Skolem symbol in the context "
-                        ++ pr_context (Con.elements Gamma))).
+                        ++ Con.pr Gamma)).
 
   (** The guided proof-search is the following algorithm:
       - on a leaf: it tries to search for a closure [Bot] or [Neg Top] or a contradiction using
@@ -276,7 +212,7 @@ Section GuidedTableauSearchAlgorithm.
         algorithm recursively. *)
   Fixpoint GuidedTableauSearch__aux
     (Gamma : Con.t) (sigma : Substitution string Term)
-    (record : sko_record sko) (tree : ExtendedRuleTree) : Result bool :=
+    (record : sko_record sko) (tree : RuleTree) : Result bool :=
     match tree with
     | Leaf None => closure_rule (fun Gamma _ => trivial_contradiction Gamma) Gamma sigma
 
@@ -298,30 +234,192 @@ Section GuidedTableauSearchAlgorithm.
 
         match rule with
         | AlphaNegNeg F => alpha_rule F get_neg_neg "double negation"
-        | AlphaAnd F => alpha_rule F get_and "conjunction"
         | AlphaNegOr F => alpha_rule F get_neg_or "negated disjunction"
-        | AlphaNegImp F => alpha_rule F get_neg_imp "negated implication"
 
         | BetaOr F => beta_rule F get_or "disjunction"
-        | BetaImp F => beta_rule F get_imp "implication"
-        | BetaNegAnd F => beta_rule F get_neg_and "negated conjunction"
-        | BetaEqu F => beta_rule F get_equ "equivalence"
-        | BetaNegEqu F => beta_rule F get_neg_equ "negated equivalence"
 
         | GammaAll F x => gamma_rule F x get_all "universal formula"
-        | GammaNegEx F x => gamma_rule F x get_neg_ex "negated existential formula"
 
-        | DeltaEx F t => delta_rule F t get_ex "existential formula"
         | DeltaNegAll F t => delta_rule F t get_neg_all "negated universal formula"
         end
     end.
-
-  Definition GuidedTableauSearch (Gamma : list Form) (sigma : Substitution string Term)
-    (tree : ExtendedRuleTree) : Result bool :=
-    GuidedTableauSearch__aux (Con.from_list Gamma) sigma empty_record tree.
 End GuidedTableauSearchAlgorithm.
 
 (** ** 2. Soundness *)
+
+(** *** Soundness of the rules *)
+
+(** Rule wrapper *)
+Lemma rule_wrapper_sound :
+  forall {A : Type} (Gamma : Con.t) (F : Form) (err : string) (getter : Form -> option A)
+    (action : A -> Result bool),
+    rule_wrapper Gamma F err getter action = ret true ->
+    exists (x : A), getter F = Some x /\ Con.In F Gamma /\ action x = ret true.
+Proof.
+  intros ?????? e. unfold rule_wrapper in e.
+  destruct (negb (Con.mem F Gamma)) eqn:ein.
+  - inversion e.
+  - destruct (getter F) eqn:egetter.
+    + rewrite Bool.negb_false_iff Con.mem_spec in ein. exists a; auto.
+    + inversion e.
+Qed.
+
+(** alpha rules *)
+Lemma alpha_rule_sound :
+  forall {sko : Skolemization} {Gamma : Con.t} {sigma : Substitution string Term}
+    {record : sko_record sko} {T : RuleTree} {F : Form} {err : string}
+    {getter : Form -> option (list Form)},
+    alpha_rule sko Gamma sigma T record F getter err (GuidedTableauSearch__aux sko) = ret true ->
+    exists (l : list Form), getter F = Some l /\ F \in Gamma /\
+                         GuidedTableauSearch__aux sko (List.app l Gamma) sigma record T = ret true.
+Proof.
+  intros ???????? e. unfold alpha_rule in e.
+  now apply rule_wrapper_sound in e.
+Qed.
+
+(** To show the soundness of this algorithm, we proceed as follows:
+
+    For every [RuleTree], we can craft a [Sequence] where each tableau of the sequence is
+    obtained by applying the corresponding rule of the [RuleTree].
+
+    Then, we show that (i) if the algorithm returns [ret true], then the _last_ tableau of
+    the sequence is actually closed, and (ii) if the algorithm returns [ret true], then
+    a _specific portion_ of the [Sequence] is an expansion sequence.
+
+    In fact, this specific portion is the size of the [Sequence] returned by the algorithm
+    that transforms a [RuleTree] into a [Sequence], and for the whole [RuleTree], it is
+    the "single portion" starting at [0] of size [#|s|]. *)
+
+(** *** Making a [Sequence] out of a [RuleTree]. *)
+Section RuleTreeToSequence.
+  Context (sko : Skolemization).
+
+  Let Tableau := Tableau_ sko.
+
+  (** Of course, making a [Sequence] out of a [RuleTree] is not always possible, e.g., when
+    the formulas specified by the [Rule] is not of the right format. Hence, we work in the
+    option monad. *)
+  Fixpoint RuleTree_to_Sequence__aux (B : Branch) (T : Tableau) (R : RuleTree) :
+    option (Sequence sko * Tableau) :=
+    match R with
+
+    | Leaf _ => Some ([], T)
+
+    | Node R1 r R2 =>
+        match r with
+
+        | AlphaNegNeg F =>
+            get_neg_neg F >>=
+              fun (Gamma : Con.t) =>
+                expand_tableau_branch sko (Some (Con.elements Gamma)) None B T >>=
+                  fun (T : Tableau) =>
+                    RuleTree_to_Sequence__aux (B ++ [Left])%list T R1 >>=
+                      fun (res : Sequence sko * Tableau) =>
+                        Some (T :: fst res, snd res)
+
+        | AlphaNegOr F =>
+            get_neg_or F >>=
+              fun (Gamma : Con.t) =>
+                expand_tableau_branch sko (Some (Con.elements Gamma)) None B T >>=
+                  fun (T : Tableau) =>
+                    RuleTree_to_Sequence__aux (B ++ [Left])%list T R1 >>=
+                      fun (res : Sequence sko * Tableau) =>
+                        Some (T :: fst res, snd res)
+
+        | BetaOr F =>
+            get_or F >>=
+              fun (Gammas : Con.t * Con.t) =>
+                expand_tableau_branch sko (Some (Con.elements (fst Gammas)))
+                  (Some (Con.elements (snd Gammas))) B T >>=
+                  fun (T : Tableau) =>
+                    RuleTree_to_Sequence__aux (B ++ [Left])%list T R1 >>=
+                      fun (res : Sequence sko * Tableau) =>
+                        RuleTree_to_Sequence__aux (B ++ [Right])%list (snd res) R2 >>=
+                          fun (res' : Sequence sko * Tableau) =>
+                            Some (((T :: fst res) ++ fst res')%list, snd res')
+
+        | GammaAll F x =>
+            get_all F >>=
+              fun (G : Form) =>
+                expand_tableau_branch sko (Some [G{0 \to Free x}]) None B T >>=
+                  fun (T : Tableau) =>
+                    RuleTree_to_Sequence__aux (B ++ [Left])%list T R1 >>=
+                      fun (res : Sequence sko * Tableau) =>
+                        Some (T :: fst res, snd res)
+
+        | DeltaNegAll F t =>
+            get_neg_all F >>=
+              fun (G : Form) =>
+                get_symbol t >>=
+                  fun (f : string) =>
+                    expand_tableau_branch__aux (Some [G{0 \to t}]) None B T >>=
+                      fun (T0 : TableauTree) =>
+                        let T :=
+                          {| tree := T0; symbols := add_symbol f (Neg (All F)) (symbols T) |} in
+                        RuleTree_to_Sequence__aux (B ++ [Left])%list T R1 >>=
+                          fun (res : Sequence sko * Tableau) =>
+                            Some (T :: fst res, snd res)
+        end
+    end.
+
+  (** With this definition, a first sanity check can be done by ensuring that, whenever
+      [GuidedTableauSearch__aux] returns [ret true], [RuleTree_to_Sequence__aux] also returns
+      a [Sequence] *)
+  Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_Some :
+    forall (Gamma : list Form) (sigma : Substitution string Term) (symbs : sko_record sko) (R : RuleTree)
+      (B : Branch) (T : Tableau),
+      GuidedTableauSearch__aux sko Gamma sigma symbs R = ret true -> is_branch_of B T ->
+      get_context B T = Gamma -> symbols T = symbs ->
+      exists (s : Sequence sko) (T' : Tableau), RuleTree_to_Sequence__aux B T R = Some (s, T').
+  Proof.
+    intros ?????? e hbranchof econ esymbs. generalize dependent Gamma. generalize dependent T.
+    induction R; intros T hbranchof symbs0 Gamma e econ.
+
+    (* Case: [Leaf] *)
+    - exists [], T; auto.
+
+    (* Case: [Node] *)
+    - destruct r.
+
+      (* Case: [AlphaNegNeg] *)
+      + have [ l [ eget [ hin hnext ] ] ] := alpha_rule_sound e.
+        set T' := expand_tableau_branch sko (Some (Con.elements Gamma)) None B T.
+        (* TODO: API *)
+        have hapi : is_branch_of B T ->
+                    exists T', expand_tableau_branch sko (Some (Con.elements Gamma)) None B T = Some T'
+                      by admit.
+        destruct (hapi hbranchof) as (T0 & hexpand).
+        (* specialize (IHR1 _ hnext). *)
+  Admitted.
+
+  (** Of course, we can make a [Sequence] out of a first tableau which has the single node [Gamma] *)
+  Definition RuleTree_to_Sequence (Gamma : list Form) (R : RuleTree) : option (Sequence sko) :=
+    RuleTree_to_Sequence__aux EmptyBranch (mkTableau sko Gamma) R >>=
+      fun (res : Sequence sko * Tableau) => Some (fst res).
+End RuleTreeToSequence.
+
+
+(** ** 3. Extended Syntax *)
+
+Inductive ExtendedRule : Type :=
+| AlphaNegNeg : Form -> ExtendedRule
+| AlphaAnd : Form -> ExtendedRule
+| AlphaNegOr : Form -> ExtendedRule
+| AlphaNegImp : Form -> ExtendedRule
+| BetaOr : Form -> ExtendedRule
+| BetaImp : Form -> ExtendedRule
+| BetaNegAnd : Form -> ExtendedRule
+| BetaEqu : Form -> ExtendedRule
+| BetaNegEqu : Form -> ExtendedRule
+| GammaAll : Form -> string -> ExtendedRule
+| GammaNegEx : Form -> string -> ExtendedRule
+| DeltaEx : Form -> Term -> ExtendedRule
+| DeltaNegAll : Form -> Term -> ExtendedRule.
+
+(** TODO: we actually define this using the extended syntax *)
+Definition GuidedTableauSearch (Gamma : list Form) (sigma : Substitution string Term)
+    (tree : ExtendedRuleTree) : Result bool :=
+    GuidedTableauSearch__aux (Con.from_list Gamma) sigma empty_record tree.
 
 (* Lemma auxiliary_GuidedTableauSearch_sound : *)
 (*   forall (sko : Skolemization) (Gamma : Con.t) (sigma : Substitution string Term) *)
