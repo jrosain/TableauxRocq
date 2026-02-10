@@ -605,14 +605,22 @@ Section Soundness.
     { intro mu; change [[ M # [] # mu '|= ls_to_form (Neg F :: Gamma) ]].
       rewrite (isClosed_interp_form_env_eq _ _ _ _ (empty_env M var)); auto.
       rewrite isClosedList_isClosedFormList //. }
+
+    (* Step 1: of course, as we have a tableau, there is always an unsatisfiable branch *)
     have hnsat := hasTableau_not_satisfiable _ _ _ _ hproof.
+
+    (* But the first tableau of the sequence is satisfiable. *)
     have htab : is_tableau_satisfiable (mkTableau sko (Neg F :: Gamma)).
     { exists M. intro mu. exists []. split.
       - apply is_branch_of_nil.
       - apply hsat'. }
     destruct hproof as (hisseq & e & hclosed).
+
+    (* Step 2: it means that the whole sequence is satisfiable. *)
     have htabsat := satisfiable_tableau_satisfiable_expansion_sequence
                       sequence (mkTableau sko (Neg F :: Gamma)) hisseq e htab.
+
+    (* Step 3: in fact, even the last tableau of the sequence is satisfiable. *)
     specialize (htabsat (#|sequence| - 1)).
     have [T' eT'] : exists (T' : Tableau), sequence.(#|sequence| - 1) = Some T'.
     { destruct (sequence.(#|sequence| - 1)) eqn:elast.
@@ -632,6 +640,8 @@ Section Soundness.
         + cbn in eT |- *. injection eT => -> //.
         + apply IHseq; cbn in eT |- *. rewrite PeanoNat.Nat.sub_0_r //. }
     rewrite -elast in hisbranch. specialize (hnsat hisbranch).
+
+    (* Step 4: contradiction! *)
     apply hnsat. rewrite elast //.
   Qed.
 End Soundness.
