@@ -187,4 +187,6 @@ Class Monad (M : Type -> Type) :=
 
 Arguments bind {_ _ _ _}.
 
-Notation "x >>= f" := (bind x f) (at level 20, right associativity).
+Notation "x >>= f" := (bind x f) (at level 42, right associativity).
+
+Notation "x <- a ; b" := (a >>= fun x => b) (at level 81, right associativity, only parsing).

@@ -100,12 +100,75 @@ Section Tableaux.
         Some (Node T1 Gamma T2').
   Proof using Type. intros ??????? e; cbn; rewrite e //. Qed.
 
+  Fixpoint replace_child (B : Branch) (T T' : TableauTree) : option TableauTree :=
+    match B, T with
+    | [], _ => ret T'
+    | Left :: B, Node T1 Gamma T2 =>
+        T1 <- replace_child B T1 T';
+        ret (Node T1 Gamma T2)
+    | Right :: B, Node T1 Gamma T2 =>
+        T2 <- replace_child B T2 T';
+        ret (Node T1 Gamma T2)
+    | _, _ => None
+    end.
+
+  Fixpoint get_child_at (B : Branch) (T : TableauTree) : option TableauTree :=
+    match B, T with
+    | [], _ => ret T
+    | Left :: B, Node T1 _ _ => get_child_at B T1
+    | Right :: B, Node _ _ T2 => get_child_at B T2
+    | _, _ => None
+    end.
+
+  Lemma is_branch_of_get_child_at :
+    forall {B : Branch} {T : TableauTree},
+      is_branch_of B T -> exists T', get_child_at B T = Some T'.
+  Proof using Type.
+    intros ?? hbranchof. induction hbranchof; auto.
+    exists (Node Leaf Gamma Leaf); auto.
+  Qed.
+
+  Lemma replace_child_get_child_at :
+    forall (B : Branch) (T T' : TableauTree),
+      get_child_at B T = Some T' ->
+      replace_child B T T' = Some T.
+  Proof using Type.
+    intro B; induction B as [|b B IHB]; intros ?? e; try easy.
+    destruct b.
+    - destruct T; try easy.
+      cbn; rewrite IHB; auto.
+    - destruct T; try easy.
+      cbn; rewrite IHB; auto.
+  Qed.
+
+  Lemma replace_expand_Left :
+    forall {B : Branch} {T T0 : TableauTree} (T' : TableauTree) {l : list Form},
+      is_branch_of B T -> expand_tableau_branch__aux (Some l) None B T = Some T0 ->
+      exists T'', replace_child B T T'' =
+        replace_child (B ++ [Left])%list T0 T'.
+  Proof using Type.
+    intros ????? hbranchof; revert  T0 T' l.
+    induction hbranchof; intros ??? hexpand.
+    - cbn in *. injection hexpand => <-.
+      exists (Node T' Gamma Leaf); auto.
+    - cbn in *. destruct (expand_tableau_branch__aux (Some l) None B T1) eqn:eT1; try easy.
+      destruct (IHhbranchof _ T' _ eT1) as (T0' & ereplace).
+      exists T0'; rewrite ereplace; cbn.
+      destruct T0; try easy.
+      injection hexpand => e0 e1 e2; now subst.
+    - cbn in *. destruct (expand_tableau_branch__aux (Some l) None B T2) eqn:eT2; try easy.
+      destruct (IHhbranchof _ T' _ eT2) as (T0' & ereplace).
+      exists T0'; rewrite ereplace; cbn.
+      destruct T0; try easy.
+      injection hexpand => e0 e1 e2; now subst.
+  Qed.
+
   (** The [context] of a branch is the list of all the formulas of a branch. *)
   Fixpoint get_context (B : Branch) (T : TableauTree) : list Form :=
     match B, T with
     | [], Node Leaf Gamma Leaf => Gamma
-    | Left :: B, Node T1 Gamma _ => (Gamma ++ get_context B T1)%list
-    | Right :: B, Node _ Gamma T2 => (Gamma ++ get_context B T2)%list
+    | Left :: B, Node T1 Gamma _ => (get_context B T1 ++ Gamma)%list
+    | Right :: B, Node _ Gamma T2 => (get_context B T2 ++ Gamma)%list
     | _, _ => []
     end.
 
@@ -148,7 +211,7 @@ Section Tableaux.
   Definition mkLeaf : Tableau_ := {| tree := Leaf; symbols := empty_record |}.
 
   Lemma is_branch_of_extend_left :
-    forall (T T' : TableauTree) (B : Branch) (l : list Form) (l' : option (list Form)),
+    forall {T T' : TableauTree} {B : Branch} {l : list Form} {l' : option (list Form)},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) l' B T = Some T' ->
       is_branch_of (B ++ [Left])%list T'.
   Proof using Type.
@@ -226,9 +289,9 @@ Section Tableaux.
   Qed.
 
   Lemma get_context_extend_left :
-    forall (T T' : TableauTree) (B : Branch) (Gamma l : list Form) (l' : option (list Form)),
+    forall {T T' : TableauTree} {B : Branch} {Gamma l : list Form} {l' : option (list Form)},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) l' B T = Some T' ->
-      get_context B T = Gamma -> get_context (B ++ [Left])%list T' = (Gamma ++ l)%list.
+      get_context B T = Gamma -> get_context (B ++ [Left])%list T' = (l ++ Gamma)%list.
   Proof using Type.
     intro T. induction T; intros ????? hbranchof e eT; destruct B.
     - inversion e.
@@ -249,9 +312,9 @@ Section Tableaux.
   Qed.
 
   Lemma get_context_extend_right :
-    forall (T T' : TableauTree) (B : Branch) (Gamma l' : list Form) (l : option (list Form)),
+    forall {T T' : TableauTree} {B : Branch} {Gamma l' : list Form} {l : option (list Form)},
       is_branch_of B T -> expand_tableau_branch__aux l (Some l') B T = Some T' ->
-      get_context B T = Gamma -> get_context (B ++ [Right])%list T' = (Gamma ++ l')%list.
+      get_context B T = Gamma -> get_context (B ++ [Right])%list T' = (l' ++ Gamma)%list.
   Proof using Type.
     intro T. induction T; intros ????? hbranchof e eT; destruct B.
     - inversion e.
@@ -333,6 +396,16 @@ Section Tableaux.
     destruct T'; injection e => _ -> //.
   Qed.
 
+  Lemma expand_tableau_branch_Some_symbs :
+    forall {B : Branch} {T T' : Tableau_} {l l' : option (list Form)},
+      expand_tableau_branch l l' B T = Some T' ->
+      symbols T = symbols T'.
+  Proof using Type.
+    intros ????? e; cbn in e.
+    destruct (expand_tableau_branch__aux l l' B T); try easy.
+    destruct T'; injection e => -> _ //.
+  Qed.
+
   (** An optional list of formulas is satisfied either if it is none or if the list is
       satisfied. *)
   Definition is_optional_satisfied
@@ -372,8 +445,8 @@ Section Tableaux.
              ++ inversion e.
           -- destruct (expand_tableau_branch__aux (Some l) l' B0 T) eqn:eT.
              ++ injection e => eT'. rewrite eT' in eT. erewrite get_context_extend_left; eauto.
-                cbn. unfold interpret; rewrite (ls_to_form_app (get_context B0 T) l M' [] mu').
-                cbn. intros [hnB0 | hl]; auto. now apply hnB0, hcsv.
+                cbn. unfold interpret; rewrite (ls_to_form_app l (get_context B0 T) M' [] mu').
+                cbn. intros [hl | hnB0]; auto. now apply hnB0, hcsv.
              ++ inversion e.
         * now cbn in hsatl.
 
@@ -387,8 +460,8 @@ Section Tableaux.
           -- destruct (expand_tableau_branch__aux l (Some l0) B0 T) eqn:eT.
              ++ injection e => eT'; rewrite eT' in eT.
                 erewrite get_context_extend_right; eauto.
-                cbn; unfold interpret. rewrite (ls_to_form_app (get_context B0 T) l0 M' [] mu').
-                cbn. intros [hnB0 | hl0]; auto. now apply hnB0, hcsv.
+                cbn; unfold interpret. rewrite (ls_to_form_app l0 (get_context B0 T) M' [] mu').
+                cbn. intros [hl0 | hnB0]; auto. now apply hnB0, hcsv.
              ++ inversion e.
 
         * inversion hsatr.
@@ -423,9 +496,9 @@ Section Tableaux.
     intros ??? hbranchof honbranch. induction honbranch.
     - destruct B; cbn in *.
       + inversion hbranchof; now subst.
-      + destruct b; apply in_or_app; now left.
-    - cbn. apply in_or_app; right. apply IHhonbranch. now inversion hbranchof.
-    - cbn. apply in_or_app; right. apply IHhonbranch. now inversion hbranchof.
+      + destruct b; apply in_or_app; now right.
+    - cbn. apply in_or_app; left. apply IHhonbranch. now inversion hbranchof.
+    - cbn. apply in_or_app; left. apply IHhonbranch. now inversion hbranchof.
   Qed.
 
   Lemma is_on_satisfiable_branch :
