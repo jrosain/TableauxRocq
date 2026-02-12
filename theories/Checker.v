@@ -622,13 +622,13 @@ Section RuleTreeToSequence.
       {B : Branch} {T : Tableau} {record record' : sko_record sko},
       GuidedTableauSearch__aux sko Gamma sigma record R = ret {| status := true; symbs := record' |} ->
       is_branch_of B T -> get_context B T = Gamma ->
-      exists (s : Sequence sko) (T' : Tableau), RuleTree_to_Sequence__aux B T R = Some (s, T').
+      exists (s : Sequence sko), RuleTree_to_Sequence__aux B T R = Some s.
   Proof using Type.
     intros ??????? e hbranchof econ. generalize dependent Gamma. generalize dependent T.
     revert B record record'. induction R; intros B record record' T hbranchof Gamma e econ.
 
     (* Case: [Leaf] *)
-    - exists [], T; auto.
+    - exists [T]; auto.
 
     (* Case: [Node]. TODO: factor out the boilerplate code. *)
     - destruct r.
@@ -645,8 +645,8 @@ Section RuleTreeToSequence.
                        (expand_tableau_branch_Some__aux sko hexpand) econ.
 
         destruct (IHR1 (B ++ [Left])%list record record' T0 hbranchof0 (Ctx.union l Gamma) hnext ectx)
-          as (s & T' & hseq).
-        exists (T0 :: s), T'; cbn.
+          as (s & hseq).
+        exists (T :: s); cbn.
         rewrite eget (expand_tableau_branch_Some__aux sko hexpand) esymbs hseq.
         reflexivity.
 
@@ -662,8 +662,8 @@ Section RuleTreeToSequence.
                        (expand_tableau_branch_Some__aux sko hexpand) econ.
 
         destruct (IHR1 (B ++ [Left])%list record record' T0 hbranchof0 (Ctx.union l Gamma) hnext ectx)
-          as (s & T' & hseq).
-        exists (T0 :: s), T'; cbn.
+          as (s & hseq).
+        exists (T :: s); cbn.
         rewrite eget (expand_tableau_branch_Some__aux sko hexpand) esymbs hseq.
         reflexivity.
 
@@ -683,26 +683,27 @@ Section RuleTreeToSequence.
         have ectx2 := get_context_extend_right hbranchof
                         (expand_tableau_branch_Some__aux sko hexpand) econ.
         destruct (IHR1 (B ++ [Left])%list record symbs T0 hbranchof1 (Ctx.union l Gamma) hnext1 ectx1)
-          as (s1 & T1 & hseq1).
+          as (s1 & hseq1).
 
         have [T1' ereplace] := RuleTree_to_Sequence_branch hbranchof1 hseq1.
         have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
         { clear; induction B; cbn; intro; congruence. }
 
-        have hbranchof2' : is_branch_of (B ++ [Right])%list T1.
+        have hbranchof2' : is_branch_of (B ++ [Right])%list (last s1 (mkLeaf sko)).
         { eapply is_branch_of_replace_child_oth.
           3: eassumption.
           all: eauto. }
-        have ectx2' : get_context (B ++ [Right])%list T0 = get_context (B ++ [Right])%list T1.
+        have ectx2' : get_context (B ++ [Right])%list T0 = get_context (B ++ [Right])%list
+                                                             (last s1 (mkLeaf sko)).
         { eapply get_context_replace_child_oth.
           3: eassumption.
           all: eauto.}
         rewrite ectx2' in ectx2; auto.
 
-        destruct (IHR2 (B ++ [Right])%list symbs record' T1 hbranchof2'
-                    (Ctx.union l' Gamma) hnext2 ectx2) as (s2 & T2 & hseq2).
+        destruct (IHR2 (B ++ [Right])%list symbs record' (last s1 (mkLeaf sko)) hbranchof2'
+                    (Ctx.union l' Gamma) hnext2 ectx2) as (s2 & hseq2).
 
-        exists (T0 :: s1 ++ s2), T2; cbn.
+        exists (T :: s1 ++ s2); cbn.
         rewrite eget (expand_tableau_branch_Some__aux sko hexpand) esymbs hseq1 hseq2 //.
 
       (* Case: [GammaAll] *)
@@ -718,8 +719,8 @@ Section RuleTreeToSequence.
 
         destruct (IHR1 (B ++ [Left])%list record record' T0 hbranchof0 (Ctx.add (F{0 \to Free s}) Gamma)
                     hnext ectx)
-          as (seq & T' & hseq).
-        exists (T0 :: seq), T'; cbn.
+          as (seq & hseq).
+        exists (T :: seq); cbn.
         rewrite eget (expand_tableau_branch_Some__aux sko hexpand) esymbs hseq.
         reflexivity.
 
@@ -737,8 +738,8 @@ Section RuleTreeToSequence.
         destruct (IHR1 (B ++ [Left])%list (add_symbol f0 f record) record'
                        {| tree := T0; symbols := (add_symbol f0 f (symbols T0)) |}
                        hbranchof0 (Ctx.add (F{0 \to t}) Gamma) hnext ectx)
-          as (seq & T' & hseq).
-        exists ({| tree := T0; symbols := (add_symbol f0 f (symbols T0)) |} :: seq), T'; cbn.
+          as (seq & hseq).
+        exists (T :: seq); cbn.
         rewrite eget (expand_tableau_branch_Some__aux sko hexpand) esymbol esymbs hseq.
         reflexivity.
   Qed.
@@ -754,13 +755,8 @@ Section RuleTreeToSequence.
       exists (s : Sequence sko), RuleTree_to_Sequence Gamma R = Some s.
   Proof using Type.
     intros ????? e. cbn.
-    have [ s [ T' es ] ] :
-      exists s T', RuleTree_to_Sequence__aux EmptyBranch (mkTableau sko Gamma) R = ret (s, T').
-    { eapply GuidedTableauSearch_Some_RuleTree_to_Sequence_Some__aux; eauto.
-      apply is_branch_of_nil. }
-    destruct R.
-    - cbn. exists [mkTableau sko Gamma]; auto.
-    - exists s. unfold RuleTree_to_Sequence. rewrite es; now cbn.
+    eapply GuidedTableauSearch_Some_RuleTree_to_Sequence_Some__aux; eauto.
+    apply is_branch_of_nil.
   Qed.
 
   Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_closed :
