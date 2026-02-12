@@ -318,3 +318,17 @@ Proof.
   - inversion hin.
   - cbn in hin |- *. now injection hin.
 Qed.
+
+Lemma last_cons :
+  forall {A : Type} (x y : A) (l : list A),
+    l <> [] -> last (x :: l) y = last l y.
+Proof. intros ???? ne; destruct l; easy. Qed.
+
+Lemma last_app :
+  forall {A : Type} (x : A) (l l' : list A),
+    l' <> [] -> last (l ++ l') x = last l' x.
+Proof.
+  intros ???? ne; induction l; try easy.
+  rewrite -IHl -app_comm_cons last_cons //.
+  intros [ e0 e1 ]%app_eq_nil; now apply ne.
+Qed.

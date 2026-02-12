@@ -109,6 +109,25 @@ Section Tableaux.
     | _, _ => None
     end.
 
+  Lemma expand_tableau_branch_Some_is_branch_of :
+    forall {B : Branch} {T T' : TableauTree}
+      {left_forms right_forms : option (list Form)},
+      expand_tableau_branch__aux left_forms right_forms B T = Some T' ->
+      is_branch_of B T.
+  Proof using Type.
+    intros B; induction B as [|b B IHB]; intros ???? e.
+    - destruct T; try easy.
+      destruct T1, T2; try easy.
+      apply is_branch_of_nil.
+    - destruct b, T; try easy.
+      + cbn in e; destruct (expand_tableau_branch__aux left_forms right_forms B T1) eqn:eexp;
+          try easy.
+        eapply is_branch_of_left, IHB; eauto.
+      + cbn in e; destruct (expand_tableau_branch__aux left_forms right_forms B T2) eqn:eexp;
+          try easy.
+        eapply is_branch_of_right, IHB; eauto.
+  Qed.
+
   Lemma expand_tableau_branch_left :
     forall (Gamma : list Form) (T1 T1' T2 : TableauTree) (B : Branch)
       (left_forms right_forms : option (list Form)),
@@ -138,6 +157,22 @@ Section Tableaux.
     - destruct (expand_tableau_branch__aux (Some l) l' B T2) eqn:eT'.
       + injection e => <-; cbn. apply is_branch_of_right; auto.
       + inversion e.
+  Qed.
+
+  Lemma is_branch_of_extend_left' :
+    forall {T T' : TableauTree} {B : Branch} {l : list Form} {l' : option (list Form)},
+      is_branch_of B T -> expand_tableau_branch__aux (Some l) l' B T = Some T' ->
+      ~is_branch_of B T'.
+  Proof using Type.
+    intros ????? hbranchof e hbranchof'.
+    generalize dependent T'; induction hbranchof; intros T' e hbranchof'; cbn in *.
+    - injection e => eT; rewrite -eT in hbranchof'; inversion hbranchof'.
+    - destruct (expand_tableau_branch__aux (Some l) l' B T1) eqn:eT'; try easy.
+      injection e => eT; rewrite -eT in hbranchof'; inversion hbranchof'; subst.
+      now specialize (IHhbranchof t eq_refl H1).
+    -  destruct (expand_tableau_branch__aux (Some l) l' B T2) eqn:eT'; try easy.
+      injection e => eT; rewrite -eT in hbranchof'; inversion hbranchof'; subst.
+      now specialize (IHhbranchof t eq_refl H1).
   Qed.
 
   Lemma is_branch_of_extend_right :
@@ -400,14 +435,17 @@ Section Tableaux.
   (** A [Sequence] is a list of tableaux. *)
   Definition Sequence := list Tableau_.
 
+  Definition is_branch_closed (T : Tableau_) (sigma : Substitution var (Term_ func var))
+    (B : Branch) : Prop :=
+    is_branch_of B T ->
+    Bot \in get_context B T \/
+      (exists (F G : Form),
+          F \in get_context B T /\ G \in get_context B T /\
+            F@[sigma] = Neg G@[sigma]).
+
   (** A [Tableau_] is said closed under a substitution if every branch has a contradiction. *)
   Definition is_tableau_closed (T : Tableau_) (sigma : Substitution var (Term_ func var)) : Prop :=
-    forall (B : Branch),
-      is_branch_of B T ->
-      Bot \in get_context B T \/
-        (exists (F G : Form),
-            F \in get_context B T /\ G \in get_context B T /\
-              F@[sigma] = Neg G@[sigma]).
+    forall (B : Branch), is_branch_closed T sigma B.
 
   (** A [Branch] of a [Tableau_] is satisfied if its context is satisfied. *)
   Definition exists_satisfied_branch (M : Model pred func) (mu : env M var) (T : Tableau_) : Prop :=
@@ -702,6 +740,12 @@ Section ExpansionRules.
   Definition is_expansion_sequence (s : Sequence sko) : Prop :=
     forall (i : nat) (T T' : Tableau),
       s.(i) = Some T -> s.(S i) = Some T' -> T |> T'.
+
+  Lemma is_expansion_sequence_nil :
+    is_expansion_sequence [].
+  Proof using Type.
+    intros ??? contra. rewrite nth_error_nil in contra; easy.
+  Qed.
 
   (** A sequence is a tableau proof if there it is an expansion sequence s.t. the first
       tableau of the sequence has a simple node labelled by this list of formulas and the
