@@ -486,11 +486,13 @@ Section RuleTreeToSequence.
         end
     end.
 
+  (** First, we show that [RuleTree_to_Sequence__aux] only affects the subtree starting at
+      the branch [B] in [T]. *)
   Lemma RuleTree_to_Sequence_branch :
     forall {R : RuleTree} {B : Branch} {T T' : Tableau} {s : Sequence sko},
       is_branch_of B T -> RuleTree_to_Sequence__aux B T R = Some (s, T') ->
       exists (T'' : TableauTree), replace_child B T T'' = Some (tree T').
-  Proof.
+  Proof using Type.
     intros R. induction R as [ l | R1 IHR1 r R2 IHR2 ];
       intros ???? hbranchof e.
 
@@ -527,23 +529,84 @@ Section RuleTreeToSequence.
                     T' (fst p) hbranchof0 etree) as (T'' & hreplace).
         rewrite -hreplace.
         eapply replace_expand_Left; eauto.
+
       + destruct (get_or f) eqn:ef; try easy.
         destruct (expand_tableau_branch__aux (Some (Ctx.elements (fst p)))
                     (Some (Ctx.elements (snd p))) B T) eqn:hexpand; try easy.
         destruct (RuleTree_to_Sequence__aux _ _ _) eqn:etree1; try easy.
         destruct (RuleTree_to_Sequence__aux _ _ R2) eqn:etree2; try easy.
-  Admitted.
 
-  (** With this definition, a first sanity check can be done by ensuring that, whenever
-      [GuidedTableauSearch__aux] returns [true], [RuleTree_to_Sequence__aux] also returns
-      a [Sequence] *)
+        (* We replace the _current_ node. To do so, we first get the two trees yielded by
+           the induction hypotheses. *)
+        have hbranchof1 := is_branch_of_extend_left hbranchof hexpand.
+        have hbranchof2 := is_branch_of_extend_right hbranchof hexpand.
+        destruct p0 as (s1 & T1); cbn in etree2.
+        destruct p1 as (s2 & T2); cbn in *.
+        have [Gamma eGamma] := is_subbranch_of_has_label hbranchof.
+        revert etree1; set T0 := {| tree := t; symbols := symbols T |}; intro etree1.
+        change (is_branch_of (B ++ [Left])%list T0) in hbranchof1.
+        change (is_branch_of (B ++ [Right])%list T0) in hbranchof2.
+
+        (* The tree that replaces the left child. *)
+        destruct (IHR1 (B ++ [Left])%list T0 T1 s1 hbranchof1 etree1)
+          as (T1' & hreplace1).
+
+        have hneq : (B ++ [Right])%list <> (B ++ [Left])%list.
+        { clear. induction B; try easy.
+          cbn; intro e; apply IHB; injection e => -> //. }
+        have hbranchof2' := is_branch_of_replace_child_oth hbranchof2 hbranchof1 hneq hreplace1.
+
+        (* The tree that replaces the right child. *)
+        destruct (IHR2 (B ++ [Right])%list T1 T2 s2 hbranchof2' etree2)
+          as (T2' & hreplace2).
+
+        exists (Proofs.Node T1' Gamma T2').
+        injection e => <- _.
+
+        rewrite replace_child_Node; auto.
+        erewrite replace_child_sequence_expand; eauto.
+        now rewrite hreplace1; cbn.
+
+      + destruct (get_all f) eqn:ef; try easy.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand;
+          try easy.
+        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:etree; try easy.
+        have hbranchof0 := is_branch_of_extend_left hbranchof hexpand.
+        injection e => eT' es.
+        have ep : p = (fst p, T') by rewrite -eT'; now destruct p.
+        rewrite ep in etree.
+
+        destruct (IHR1 (B ++ [Left])%list {| tree := t; symbols := symbols T |}
+                    T' (fst p) hbranchof0 etree) as (T'' & hreplace).
+        rewrite -hreplace.
+        eapply replace_expand_Left; eauto.
+
+      + destruct (get_neg_all f) eqn:ef; try easy.
+        destruct (get_symbol t) eqn:esymbol; try easy.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand;
+          try easy.
+        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:etree; try easy.
+        have hbranchof0 := is_branch_of_extend_left hbranchof hexpand.
+        injection e => eT' es.
+        have ep : p = (fst p, T') by rewrite -eT'; now destruct p.
+        rewrite ep in etree.
+
+        destruct (IHR1 (B ++ [Left])%list {| tree := t0; symbols := add_symbol a f (symbols T) |}
+                    T' (fst p) hbranchof0 etree) as (T'' & hreplace).
+        rewrite -hreplace.
+        eapply replace_expand_Left; eauto.
+  Qed.
+
+  (** Then, we can show that whenever the [GuidedTableauSearch__aux] algorithm finds a result,
+      then the algorithm [RuleTree_to_Sequence__aux] converts the [RuleTree] to a [Sequence]
+      successfully. *)
   Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_Some__aux :
     forall {Gamma : list Form} {sigma : Substitution string Term} {R : RuleTree}
       {B : Branch} {T : Tableau} {record record' : sko_record sko},
       GuidedTableauSearch__aux sko Gamma sigma record R = ret {| status := true; symbs := record' |} ->
       is_branch_of B T -> get_context B T = Gamma ->
       exists (s : Sequence sko) (T' : Tableau), RuleTree_to_Sequence__aux B T R = Some (s, T').
-  Proof.
+  Proof using Type.
     intros ??????? e hbranchof econ. generalize dependent Gamma. generalize dependent T.
     revert B record record'. induction R; intros B record record' T hbranchof Gamma e econ.
 
@@ -595,7 +658,7 @@ Section RuleTreeToSequence.
           is_branch_of_extend_left hbranchof
             (expand_tableau_branch_Some__aux sko hexpand).
         have hbranchof2 :=
-          is_branch_of_extend_right T T0 B (Some l) l' hbranchof
+          is_branch_of_extend_right hbranchof
             (expand_tableau_branch_Some__aux sko hexpand).
         have esymbs := expand_tableau_branch_Some_symbs sko hexpand.
         have ectx1 := get_context_extend_left hbranchof
@@ -605,13 +668,22 @@ Section RuleTreeToSequence.
         destruct (IHR1 (B ++ [Left])%list record symbs T0 hbranchof1 (Ctx.union l Gamma) hnext1 ectx1)
           as (s1 & T1 & hseq1).
 
-        have h : is_branch_of (B ++ [Right])%list T1 by admit.
-        have api : get_context (B ++ [Right])%list T0 = get_context (B ++ [Right])%list T1.
-        { (* eapply get_context_extend_oth; *) admit. }
-        rewrite api in ectx2; auto.
+        have [T1' ereplace] := RuleTree_to_Sequence_branch hbranchof1 hseq1.
+        have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
+        { clear; induction B; cbn; intro; congruence. }
 
-        destruct (IHR2 (B ++ [Right])%list symbs record' T1 h (Ctx.union l' Gamma) hnext2 ectx2)
-          as (s2 & T2 & hseq2).
+        have hbranchof2' : is_branch_of (B ++ [Right])%list T1.
+        { eapply is_branch_of_replace_child_oth.
+          3: eassumption.
+          all: eauto. }
+        have ectx2' : get_context (B ++ [Right])%list T0 = get_context (B ++ [Right])%list T1.
+        { eapply get_context_replace_child_oth.
+          3: eassumption.
+          all: eauto.}
+        rewrite ectx2' in ectx2; auto.
+
+        destruct (IHR2 (B ++ [Right])%list symbs record' T1 hbranchof2'
+                    (Ctx.union l' Gamma) hnext2 ectx2) as (s2 & T2 & hseq2).
 
         exists (T0 :: s1 ++ s2), T2; cbn.
         rewrite eget (expand_tableau_branch_Some__aux sko hexpand) esymbs hseq1 hseq2 //.
@@ -652,7 +724,7 @@ Section RuleTreeToSequence.
         exists ({| tree := T0; symbols := (add_symbol f0 f (symbols T0)) |} :: seq), T'; cbn.
         rewrite eget (expand_tableau_branch_Some__aux sko hexpand) esymbol esymbs hseq.
         reflexivity.
-  Admitted.
+  Qed.
 
   (** Of course, we can make a [Sequence] out of a first tableau which has the single node [Gamma] *)
   Definition RuleTree_to_Sequence (Gamma : list Form) (R : RuleTree) : option (Sequence sko) :=
