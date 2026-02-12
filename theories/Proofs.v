@@ -676,6 +676,20 @@ Section Tableaux.
     - cbn. apply in_or_app; left. apply IHhonbranch. now inversion hbranchof.
   Qed.
 
+  Lemma in_context_is_on_branch :
+    forall {T : Tableau_} {B : Branch} {F : Form},
+      is_branch_of B T -> F \in get_context B T -> is_on_branch F B T.
+  Proof using Type.
+    intros ??? hbranchof hin. induction hbranchof.
+    - now apply is_on_branch_node.
+    - cbn in hin; apply in_app_or in hin; destruct hin as [ hT1 | hG ].
+      + now apply is_on_branch_left, IHhbranchof.
+      + now apply is_on_branch_node.
+    - cbn in hin; apply in_app_or in hin; destruct hin as [ hT2 | hG ].
+      + now apply is_on_branch_right, IHhbranchof.
+      + now apply is_on_branch_node.
+  Qed.
+
   Lemma is_on_satisfiable_branch :
     forall {T : Tableau_} {B : Branch} {F : Form} {M : Model pred func} {mu : env M var},
       is_branch_of B T -> is_on_branch F B T -> [[ M # [] # mu '|= ls_to_form (get_context B T) ]] ->

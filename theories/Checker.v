@@ -468,7 +468,7 @@ Section RuleTreeToSequence.
                    (Some (Ctx.elements (snd Gammas))) B T;
             s1 <- RuleTree_to_Sequence__aux (B ++ [Left])%list T' R1;
             s2 <- RuleTree_to_Sequence__aux (B ++ [Right])%list (last s1 (mkLeaf sko)) R2;
-            ret (T :: s1 ++ s2)
+            ret (T :: removelast s1 ++ s2)
 
         | GammaAll F x =>
             G <- get_all F;
@@ -504,6 +504,24 @@ Section RuleTreeToSequence.
       destruct (RuleTree_to_Sequence__aux _ _ _); try easy.
       destruct (RuleTree_to_Sequence__aux _ _ _); try easy.
       injection e => <-; now intro.
+  Qed.
+
+  Lemma RuleTree_to_Sequence_hd :
+    forall {R : RuleTree} {B : Branch} {T : Tableau} {s : Sequence sko},
+      RuleTree_to_Sequence__aux B T R = Some s -> hd_error s = Some T.
+  Proof using Type.
+    intro R; induction R; intros ??? e; cbn in *.
+    - injection e => <- //.
+    - destruct r; [destruct (get_neg_neg f) | destruct (get_neg_or f) | destruct (get_or f) |
+          destruct (get_all f) | destruct (get_neg_all f), (get_symbol t)];
+      try easy.
+      1,2,4,5:
+        destruct (expand_tableau_branch__aux _ _ _ _);
+      try easy; destruct (RuleTree_to_Sequence__aux _ _ _);
+      try easy; injection e => <- //.
+      destruct (expand_tableau_branch__aux _ _ _ _); try easy.
+      do 2 (destruct (RuleTree_to_Sequence__aux _ _ _); try easy).
+      injection e => <- //.
   Qed.
 
   (** First, we show that [RuleTree_to_Sequence__aux] only affects the subtree starting at
@@ -703,7 +721,7 @@ Section RuleTreeToSequence.
         destruct (IHR2 (B ++ [Right])%list symbs record' (last s1 (mkLeaf sko)) hbranchof2'
                     (Ctx.union l' Gamma) hnext2 ectx2) as (s2 & hseq2).
 
-        exists (T :: s1 ++ s2); cbn.
+        exists (T :: removelast s1 ++ s2); cbn.
         rewrite eget (expand_tableau_branch_Some__aux sko hexpand) esymbs hseq1 hseq2 //.
 
       (* Case: [GammaAll] *)
@@ -759,6 +777,108 @@ Section RuleTreeToSequence.
     apply is_branch_of_nil.
   Qed.
 
+  (** Now, we show that, in the same setting, the sequence gotten from [RuleTree_to_Sequence]
+      is actually an expansion sequence. A small lemma that will be useful later on is that
+      the tableau with which we call the auxiliary function and the second element of the
+      sequence (if it exists) give an expansion step. *)
+  Lemma RuleTree_to_Sequence_snd_expansion :
+    forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
+      {T T' : Tableau} {record : sko_record sko} {s : Sequence sko},
+      is_branch_of B T ->
+      GuidedTableauSearch__aux sko (get_context B T) sigma (symbols T) R =
+        ret {| status := true; symbs := record |} ->
+      RuleTree_to_Sequence__aux B T R = Some s -> s.(1) = Some T' ->
+      T |> T'.
+  Proof using Type.
+    intro R; destruct R; intros ?????? hbranchof esrch eseq esnd.
+
+    - cbn in eseq. injection eseq => eseq'; rewrite -eseq' in esnd; inversion esnd.
+
+    - destruct r; cbn in eseq, esrch.
+
+      + apply alpha_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch);
+          rewrite eget in eseq.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
+        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
+        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
+        erewrite RuleTree_to_Sequence_hd in esnd; eauto.
+        injection esnd => <-.
+        do 2 (destruct f; try easy).
+        eapply expansion_NegNeg; eauto.
+        * apply in_context_is_on_branch; eauto.
+        * cbn in eget; unfold Ctx.singleton in eget. rewrite eget.
+          unfold Ctx.elements in hexpand; cbn.
+          now rewrite hexpand.
+
+      + apply alpha_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch);
+          rewrite eget in eseq.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
+        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
+        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
+        erewrite RuleTree_to_Sequence_hd in esnd; eauto.
+        injection esnd => <-.
+        do 2 (destruct f; try easy).
+        eapply expansion_NegOr; eauto.
+        * apply in_context_is_on_branch; eauto.
+        * cbn in eget; unfold Ctx.singleton in eget. rewrite eget.
+          unfold Ctx.elements in hexpand; cbn.
+          now rewrite hexpand.
+
+      + apply beta_rule_sound in esrch; destruct esrch as
+          (l & l' & rec & eget & hin & esrch1 & esrch2); rewrite eget in eseq.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
+        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
+        destruct (RuleTree_to_Sequence__aux (B ++ [Right])%list _ _) eqn:eseq2; try easy.
+        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
+        have hs0 : s0 <> []. { eapply RuleTree_to_Sequence_not_nil; eauto. }
+        destruct f; try easy. destruct s0; try easy.
+        destruct s0.
+        * erewrite RuleTree_to_Sequence_hd in esnd; eauto.
+          cbn in esnd; injection esnd => <-.
+          eapply expansion_Or; eauto.
+          -- apply in_context_is_on_branch; eauto.
+          -- cbn in eget; unfold Ctx.singleton in eget.
+             injection eget => -> ->; cbn.
+             rewrite hexpand.
+             have h := RuleTree_to_Sequence_hd eseq1. injection h => -> //.
+        * cbn in esnd. injection esnd => <-.
+          have h := RuleTree_to_Sequence_hd eseq1. injection h => -> //.
+          eapply expansion_Or; eauto.
+          -- apply in_context_is_on_branch; eauto.
+          -- cbn in eget; unfold Ctx.singleton in eget.
+             injection eget => -> ->; cbn.
+             rewrite hexpand //.
+
+      + apply gamma_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch);
+          rewrite eget in eseq.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
+        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
+        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
+        erewrite RuleTree_to_Sequence_hd in esnd; eauto.
+        injection esnd => <-.
+        destruct f; try easy.
+        eapply expansion_All with (x := s0); eauto.
+        * apply in_context_is_on_branch; eauto.
+        * cbn in eget; injection eget => ->.
+          cbn; now rewrite hexpand.
+
+      + apply delta_rule_sound in esrch;
+          destruct esrch as (f0 & F & eget & hin & hsko & esymb & esrch);
+          rewrite eget esymb in eseq.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
+        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
+        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
+        erewrite RuleTree_to_Sequence_hd in esnd; eauto.
+        injection esnd => <-.
+        do 2 (destruct f; try easy).
+        have e := symbol_sound sko hsko.
+        rewrite esymb in e; injection e => ->; eauto.
+        eapply expansion_NegAll with (hsko := hsko); eauto.
+        * apply in_context_is_on_branch; eauto.
+        * cbn in eget. change (Neg f {0 \to t}) with ((Neg f) {0 \to t}); injection eget => ->.
+          cbn; now rewrite hexpand.
+  Qed.
+
   Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_closed :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
       {T T' : Tableau} {record record' : sko_record sko} {s : Sequence sko},
@@ -766,8 +886,8 @@ Section RuleTreeToSequence.
           is_branch_of B T ->
           GuidedTableauSearch__aux sko (get_context B T) sigma record R =
             ret {| status := true; symbs := record' |}) ->
-      RuleTree_to_Sequence__aux B T R = Some (s, T') ->
-      is_tableau_closed T' sigma.
+      RuleTree_to_Sequence__aux B T R = Some s ->
+      is_tableau_closed (last s (mkLeaf sko)) sigma.
   Proof.
 (*     intros R ??????? esrch eseq B' hbranchof'; specialize (esrch B'); *)
 (*       revert sigma B T record record' s esrch eseq; induction R; *)
