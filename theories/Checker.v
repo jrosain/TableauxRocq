@@ -3,6 +3,8 @@
 From Tableaux Require Import Core.
 From Tableaux Require Import ExtendedSyntax.
 
+From Stdlib Require Import Lia.
+
 (** In this file, we implement a guided tableau proof-search procedure. It is named
     "guided" as the rules to apply and the substitution are given.
 
@@ -930,7 +932,119 @@ Section RuleTreeToSequence.
         * injection eseq => es0. rewrite -es0 nth_error_S in ei, ei'.
           eapply IHR1; eauto.
 
-      + admit.
+      + have [ l [ l' [ symbs1 [ eget [ hin [ esrch1 esrch2 ] ] ] ] ] ] := beta_rule_sound esrch.
+        have heseq := eseq. have hesrch := esrch.
+        cbn in eseq; rewrite eget in eseq.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
+        destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
+        destruct (RuleTree_to_Sequence__aux (B ++ [Right])%list _ _) eqn:eseq2; try easy.
+        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
+        have ectx2 := get_context_extend_right hbranchof hexpand eq_refl.
+        have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}
+          := is_branch_of_extend_left hbranchof hexpand.
+        have hbranchof2 := is_branch_of_extend_right hbranchof hexpand.
+        rewrite /Ctx.union /Ctx.elements in esrch1, ectx1, esrch2, ectx2.
+        rewrite -ectx1 in esrch1; rewrite -ectx2 in esrch2.
+
+        specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
+                      symbs1 s0 hbranchof1 esrch1 eseq1).
+
+        have [T1' ereplace] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
+        have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
+        { clear; induction B; cbn; intro; congruence. }
+
+        have hbranchof2' : is_branch_of (B ++ [Right])%list (last s0 (mkLeaf sko)).
+        { eapply is_branch_of_replace_child_oth.
+          3: eassumption.
+          all: eauto. }
+        have ectx2' : get_context (B ++ [Right])%list t = get_context (B ++ [Right])%list
+                                                             (last s0 (mkLeaf sko)).
+        { eapply get_context_replace_child_oth.
+          3: eassumption.
+          all: eauto.}
+        rewrite ectx2' in esrch2; auto.
+        have esymbs2 : symbols (last s0 (mkLeaf sko)) = symbs1 by admit.
+        rewrite -esymbs2 in esrch2.
+        specialize (IHR2 sigma (B ++ [Right])%list (last s0 (mkLeaf sko))
+                      record s1 hbranchof2' esrch2 eseq2).
+
+        intros i Ti Ti' ei ei'.
+
+        (* If [i] is [0], then we do as for the others cases *)
+        destruct (i == 0).
+        * subst; rewrite nth_error_0 in ei.
+          erewrite RuleTree_to_Sequence_hd in ei; eauto.
+          injection ei => <-.
+          eapply RuleTree_to_Sequence_snd_expansion; eauto.
+        * injection eseq => es; rewrite -es in ei, ei'.
+
+          (* Otherwise, there are 3 cases: either [i < #|s0| - 1] and we get the property
+             out of [s0], either [i > #|s0| - 1] and we get the property out of [s1], or
+             [i = #|s0| - 1]. *)
+          destruct (i == (#|s0| - 1)).
+
+          -- subst. have hs0 : #|s0| > 0 by lia.
+             rewrite PeanoNat.Nat.sub_1_r PeanoNat.Nat.succ_pred_pos // in ei'.
+             rewrite app_comm_cons nth_error_app1 in ei.
+             1: { cbn; rewrite removelast_length; lia. }
+             rewrite app_comm_cons nth_error_app2 in ei'.
+             1: { cbn; rewrite removelast_length; lia. }
+             cbn in ei'; rewrite removelast_length PeanoNat.Nat.succ_pred_pos //
+                           PeanoNat.Nat.sub_diag nth_error_0 in ei'.
+             erewrite RuleTree_to_Sequence_hd in ei'; eauto.
+
+             (* Then, here, either [#|s0| = 1] (and we go back to the earlier case), or
+                [#|s0| > 1], in which case [Ti] is the second-to-last element of [s0],
+                which reduces to the last one. *)
+             destruct (#|s0| == 1).
+
+             ++ injection ei' => <-. rewrite e in ei; cbn in ei. injection ei => <-.
+                have e' : Some (last s0 (mkLeaf sko)) = s0.(0).
+                { do 2 (destruct s0; try easy). }
+                eapply RuleTree_to_Sequence_snd_expansion; eauto.
+                have eremovelast : removelast s0 = [].
+                { do 2 (destruct s0; try easy). }
+                rewrite eremovelast nth_error_S app_nil_l; cbn[tl].
+                rewrite nth_error_0; erewrite RuleTree_to_Sequence_hd; eauto.
+
+             ++ have eremovelast : (T :: removelast s0).(#|s0| - 1) =
+                                     s0.(#|s0| - 2).
+                { replace (#|s0| - 1) with (S (#|s0| - 2)) by lia.
+                  cbn; transitivity ((removelast s0 ++ [last s0 (mkLeaf sko)]).(#|s0| - 2)).
+                  - rewrite nth_error_app1 //.
+                    rewrite removelast_length; lia.
+                  - rewrite -app_removelast_last //.
+                    intro; subst. rewrite length_nil in hs0; auto. }
+                rewrite eremovelast in ei.
+                have elast : Some (last s0 (mkLeaf sko)) = s0.(#|s0| - 1).
+                { rewrite -last_nth_error //; intro; subst; easy. }
+                rewrite elast in ei'.
+                eapply IHR1; eauto.
+                now replace (S (#| s0 | - 2)) with (#|s0| - 1) by lia.
+
+          (* Now, we check whether [i < #|s0| - 1] or [i > #|s0| - 1] and conclude. *)
+          -- destruct (Compare_dec.le_gt_dec i (#|s0| - 1)) as [hle | hlt].
+             ++ inversion hle; try easy.
+                have hlt : i < #|s0| - 1 by lia.
+                clear H H0 hle.
+                rewrite app_comm_cons !nth_error_app1 in ei, ei'.
+                1,2: cbn; rewrite removelast_length PeanoNat.Nat.succ_pred_pos; lia.
+                rewrite nth_error_S in ei'.
+                have hs0 : #|s0| > 1.
+                { apply Compare_dec.not_le; intro hle; inversion hle; lia. }
+                have eTi : (T :: removelast s0).(i) = s0.(i - 1).
+                { replace i with (S (i - 1)) by lia; cbn.
+                  rewrite PeanoNat.Nat.sub_0_r removelast_nth_error //.
+                  transitivity i; auto; lia. }
+                rewrite eTi in ei.
+                rewrite removelast_nth_error in ei'; auto.
+                eapply IHR1; eauto.
+                rewrite PeanoNat.Nat.sub_1_r PeanoNat.Nat.succ_pred_pos //; lia.
+             ++ rewrite app_comm_cons !nth_error_app2 in ei, ei'.
+                1,2: cbn; rewrite removelast_length; lia.
+                eapply IHR2; eauto.
+                rewrite -PeanoNat.Nat.sub_succ_l //.
+                cbn; rewrite removelast_length; lia.
 
       + have [ l [ eget [ hin esrch1 ] ] ] := gamma_rule_sound esrch.
         have heseq := eseq. have hesrch := esrch.

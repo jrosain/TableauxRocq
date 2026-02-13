@@ -332,3 +332,33 @@ Proof.
   rewrite -IHl -app_comm_cons last_cons //.
   intros [ e0 e1 ]%app_eq_nil; now apply ne.
 Qed.
+
+Lemma removelast_length :
+  forall {A : Type} (l : list A),
+    #|removelast l| = Nat.pred #|l|.
+Proof.
+  intros ??; induction l as [|x xs IHxs]; try easy.
+  destruct xs; cbn; auto.
+Qed.
+
+Lemma last_nth_error :
+  forall {A : Type} (x : A) (l : list A),
+    l <> [] -> l.(#|l| - 1) = Some (last l x).
+Proof.
+  intros ??? ne. destruct l; try easy.
+  clear ne. revert a; induction l; try easy.
+  intro y; cbn. rewrite -IHl; cbn.
+  now rewrite PeanoNat.Nat.sub_0_r.
+Qed.
+
+Lemma removelast_nth_error :
+  forall {A : Type} (n : nat) (l : list A),
+    n < #|l| - 1 -> (removelast l).(n) = l.(n).
+Proof.
+  intros ??? hlt.
+  have [ x l' ] : exists x l', l = x :: l'. { destruct l; try easy. exists a, l; auto. }
+  have el : l = (removelast l ++ [last l x])%list.
+  { apply app_removelast_last. intro; subst; easy. }
+  rewrite {2}el nth_error_app1 //.
+  rewrite removelast_length; lia.
+Qed.
