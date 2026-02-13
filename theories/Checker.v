@@ -252,8 +252,9 @@ Section GuidedTableauSearchAlgorithm.
     end.
 
   Definition GuidedTableauSearch (Gamma : list Form) (sigma : Substitution string Term)
-    (tree : RuleTree) : result :=
-    GuidedTableauSearch__aux (Ctx.from_list Gamma) sigma empty_record tree.
+    (tree : RuleTree) : Result bool :=
+    result <- GuidedTableauSearch__aux (Ctx.from_list Gamma) sigma empty_record tree;
+    ret (status result).
 End GuidedTableauSearchAlgorithm.
 Arguments status {_} _.
 Arguments symbs {_} _.
@@ -1271,39 +1272,52 @@ Section RuleTreeToSequence.
 
   Lemma GuidedTableauSearch_Some_Sequence_closed :
     forall {Gamma : list Form} {sigma : Substitution string Term} {R : RuleTree}
-      {record record' : sko_record sko},
+      {record record' : sko_record sko} {s : Sequence sko},
       GuidedTableauSearch__aux sko Gamma sigma record R = ret {| status := true; symbs := record' |} ->
-      exists (s : Sequence sko), RuleTree_to_Sequence Gamma R = Some s /\
-                              is_tableau_closed (last s (mkLeaf sko)) sigma.
+      RuleTree_to_Sequence Gamma R = Some s ->
+      is_tableau_closed (last s (mkLeaf sko)) sigma.
   Proof.
-    intros ????? e.
+    intros ????? e e'.
     have eGamma : get_context EmptyBranch (mkTableau sko Gamma) = Gamma by reflexivity.
-    rewrite -eGamma in e. destruct R.
-    
-    - cbn; exists [mkTableau sko Gamma]; split; auto.
-      eapply @GuidedTableauSearch_Some_RuleTree_to_Sequence_closed with
-        (s := []) (B := EmptyBranch) (T := mkTableau sko Gamma) (R := Leaf o); auto.
-      intros ? hbranchof. inversion hbranchof; subst; eauto; inversion H1.
-
-    - have e' := e.
-      apply @GuidedTableauSearch_Some_RuleTree_to_Sequence_Some__aux
-        with (T := mkTableau sko Gamma) (B := EmptyBranch) in e.
-      + destruct e as (s & T' & e). exists s; split.
-        * unfold RuleTree_to_Sequence; rewrite e //.
-        * eapply @GuidedTableauSearch_Some_RuleTree_to_Sequence_closed
-            with (B := EmptyBranch) (T := mkTableau sko Gamma) (s := s); eauto.
-          -- intros ? hbranchof; inversion hbranchof; subst; eauto; inversion H1.
-          -- (* TODO: in this case, [last s (mkLeaf sko)] is exactly [T']. *) admit.
-      + apply is_branch_of_nil.
-      + reflexivity.
+    (* rewrite -eGamma in e. destruct R. *)
   Admitted.
+
+  (** We can then conclude on the soundness of the algorithm. *)
+  Lemma GuidedTableauSearch_sound :
+    forall {Gamma : list Form} {sigma : Substitution string Term} {R : RuleTree},
+      GuidedTableauSearch sko Gamma sigma R = ret true ->
+      hasTableau sko Gamma sigma.
+  Proof using Type.
+    intros ??? e.
+
+    cbn in e. destruct (GuidedTableauSearch__aux sko (Ctx.from_list Gamma) sigma empty_record R) eqn:esrch;
+      try easy; cbn in *.
+    destruct a; cbn in *. injection e => estatus el; subst.
+    rewrite app_nil_r in estatus; subst.
+
+    have [s esequence] := GuidedTableauSearch_Some_RuleTree_to_Sequence_Some esrch.
+    exists s; split.
+
+    - eapply GuidedTableauSearch_Some_RuleTree_to_Sequence_is_expansion_sequence; eauto.
+      + apply is_branch_of_nil.
+      + apply esrch.
+    - split.
+      + erewrite RuleTree_to_Sequence_hd; eauto.
+      + eapply GuidedTableauSearch_Some_Sequence_closed; eauto.
+  Qed.
 End RuleTreeToSequence.
 
-(** *** The last tableau of the sequence is closed (TODO) *)
+(** ** 3. The [tableaux] tactic *)
 
-(** *** The sequence is an expansion sequence (TODO) *)
+Ltac tableaux tree :=
+  progress (apply (GuidedTableauSearch_sound _ _ _ tree); native_compute;
+            lazymatch goal with
+            | [ |- (false, [?err]) = (true, []) ] =>
+                fail 0 "tableaux failed with the following error message: " err
+            | _ => reflexivity
+            end).
 
-(** ** 3. Extended Syntax *)
+(** ** 4. Extended Syntax *)
 
 Inductive ExtendedRule : Type :=
 | AlphaNegNeg : Form -> ExtendedRule
@@ -2015,10 +2029,4 @@ Inductive ExtendedRule : Type :=
 
 (* (** Using the algorithm together with the soundness theorem, we provide a tactic [tableaux] *)
 (*     that gives a proof [hasTableau sko Gamma sigma] if possible, or fails with an error otherwise. *) *)
-(* Ltac tableaux tree := *)
-(*   progress (apply (GuidedTableauSearch_sound _ _ _ tree); native_compute; *)
-(*             lazymatch goal with *)
-(*             | [ |- (false, [?err]) = (true, []) ] => *)
-(*                 fail 0 "tableaux failed with the following error message: " err *)
-(*             | _ => reflexivity *)
-(*             end). *)
+
