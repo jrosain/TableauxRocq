@@ -1215,15 +1215,15 @@ Section Soundness.
   Qed.
 
   Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_closed :
-    forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
+    forall {R : RuleTree} {sigma : Substitution string Term} {B B' : Branch}
       {T : Tableau} {record : sko_record sko} {s : Sequence sko},
-      is_branch_of B T -> is_branch_of B (last s (mkLeaf sko)) ->
+      is_branch_of B T -> is_branch_of (B ++ B')%list (last s (mkLeaf sko)) ->
       GuidedTableauSearch__aux sko (get_context B T) sigma (symbols T) R =
         ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s ->
-      is_branch_closed sko (last s (mkLeaf sko)) sigma B.
+      is_branch_closed sko (last s (mkLeaf sko)) sigma (B ++ B')%list.
   Proof.
-    intros R; induction R; intros ????? hbranchof hbranchof' esrch eseq.
+    intros R; induction R; intros ?????? hbranchof hbranchof' esrch eseq.
 
     (* Case: [Leaf] *)
     - destruct o.
@@ -1232,12 +1232,16 @@ Section Soundness.
         unfold closure_rule in esrch;
           destruct (formula_contradiction _ _ _ _) eqn:econtr;
           try easy.
-        right; eapply formula_contradiction_sound; eauto.
+        right; eapply @formula_contradiction_sound with (F := F) (G := G); cbn; eauto.
+        (* (get_context B T) is included in (get_context (B ++ B') T) so it's true. *)
+        admit.
       + cbn in eseq, esrch. injection eseq => <-; subst.
         unfold closure_rule in esrch;
           destruct (trivial_contradiction _) eqn:econtr;
           try easy.
-        left; eapply trivial_contradiction_sound; eauto.
+        left; eapply trivial_contradiction_sound; cbn; eauto.
+        (* (get_context B T) is included in (get_context (B ++ B') T) so it's true. *)
+        admit.
 
     (* Case: [Node] *)
     - destruct r.
@@ -1255,8 +1259,12 @@ Section Soundness.
         have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}
           := is_branch_of_extend_left hbranchof hexpand.
         have [T0 [ hnleaf e ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
-        have contra := replace_expanded_child_not_branch hbranchof hnleaf hexpand e.
-        exfalso. now apply contra.
+        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
+        (* we can actually show that (B ++ B') is equal to (B ++ Left :: B0). *)
+        have [B0 eB0] : exists B0, (B ++ B')%list = ((B ++ [Left]) ++ B0)%list by admit.
+        rewrite eB0. eapply IHR1; eauto.
+        * now rewrite -eB0.
+        * rewrite ectx1; eauto.
 
       (* Case: [AlphaNegOr] *)
       + apply alpha_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch1).
@@ -1271,23 +1279,26 @@ Section Soundness.
         have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}
           := is_branch_of_extend_left hbranchof hexpand.
         have [T0 [ hnleaf e ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
-        have contra := replace_expanded_child_not_branch hbranchof hnleaf hexpand e.
-        exfalso. now apply contra.
+        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
+        (* we can actually show that (B ++ B') is equal to (B ++ Left :: B0). *)
+        have [B0 eB0] : exists B0, (B ++ B')%list = ((B ++ [Left]) ++ B0)%list by admit.
+        rewrite eB0. eapply IHR1; eauto.
+        * now rewrite -eB0.
+        * rewrite ectx1; eauto.
   Admitted.
 
   Lemma GuidedTableauSearch_Some_Sequence_closed :
     forall {R : RuleTree} {Gamma : list Form} {sigma : Substitution string Term}
-      {record record' : sko_record sko} {s : Sequence sko},
-      GuidedTableauSearch__aux sko Gamma sigma record R = ret {| status := true; symbs := record' |} ->
+      {record : sko_record sko} {s : Sequence sko},
+      GuidedTableauSearch__aux sko Gamma sigma empty_record R = ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence Gamma R = Some s ->
       is_tableau_closed (last s (mkLeaf sko)) sigma.
-  Proof.
-    intros ?????? esrch eseq B hbranchof.
+  Proof using Type.
+    intros ????? esrch eseq B hbranchof. change B with (EmptyBranch ++ B)%list.
     eapply GuidedTableauSearch_Some_RuleTree_to_Sequence_closed; eauto.
-
-    - admit. (* seems OK *)
-    - admit. (* seems also legit, use GuidedTableauSearch_Some_RuleTree_to_Sequence_Some *)
-  Admitted.
+    - apply is_branch_of_nil.
+    - cbn; eauto.
+  Qed.
 
   (** We can then conclude on the soundness of the algorithm. *)
   Lemma GuidedTableauSearch_sound :
