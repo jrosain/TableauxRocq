@@ -1260,7 +1260,10 @@ Section Soundness.
           := is_branch_of_extend_left hbranchof hexpand.
         have [T0 [ hnleaf e ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
         have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        (* we can actually show that (B ++ B') is equal to (B ++ Left :: B0). *)
+        (* TODO: destruct [B']. 3 cases: either [B] is actually a branch of the last tableau,
+                 either [B ++ Left :: B'] is the branch and we can use the induction hypothesis,
+                 either [B ++ Right :: B'] is the branch and this is actually not possible so
+                 contradiction. *)
         have [B0 eB0] : exists B0, (B ++ B')%list = ((B ++ [Left]) ++ B0)%list by admit.
         rewrite eB0. eapply IHR1; eauto.
         * now rewrite -eB0.
