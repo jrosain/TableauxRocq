@@ -437,7 +437,7 @@ End RulesSoundness.
 
 (* TODO: in this section, many proofs are "repeated". We _really_ should factorize this stuff. *)
 Section RuleTreeToSequence.
-  Context (sko : Skolemization).
+  Context {sko : Skolemization}.
 
   Let Tableau := Tableau_ sko.
 
@@ -895,6 +895,12 @@ Section RuleTreeToSequence.
         have hs0 : s0 <> [] by eapply RuleTree_to_Sequence_not_nil; eauto.
         injection eseq => <-; cbn. destruct s0; easy.
   Qed.
+End RuleTreeToSequence.
+
+Section Soundness.
+  Context (sko : Skolemization).
+
+  Let Tableau := Tableau_ sko.
 
   (** Now, we show that, in the same setting, the sequence gotten from [RuleTree_to_Sequence]
       is actually an expansion sequence. A small lemma that will be useful later on is that
@@ -1208,78 +1214,64 @@ Section RuleTreeToSequence.
 
   Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_closed :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
-      {T T' : Tableau} {record record' : sko_record sko} {s : Sequence sko},
-      (forall (B : Branch),
-          is_branch_of B T ->
-          GuidedTableauSearch__aux sko (get_context B T) sigma record R =
-            ret {| status := true; symbs := record' |}) ->
+      {T : Tableau} {record : sko_record sko} {s : Sequence sko},
+      is_branch_of B T -> is_branch_of B (last s (mkLeaf sko)) ->
+      GuidedTableauSearch__aux sko (get_context B T) sigma (symbols T) R =
+        ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s ->
-      is_tableau_closed (last s (mkLeaf sko)) sigma.
+      is_branch_closed sko (last s (mkLeaf sko)) sigma B.
   Proof.
-(*     intros R ??????? esrch eseq B' hbranchof'; specialize (esrch B'); *)
-(*       revert sigma B T record record' s esrch eseq; induction R; *)
-(*       intros ?????? esrch eseq. *)
+    intros R; induction R; intros ????? hbranchof hbranchof' esrch eseq.
 
-(*     (* Case: [Leaf] *) *)
-(*     - destruct o. *)
-(*       + cbn in eseq, esrch. injection eseq => eT _; subst. *)
-(*         destruct p as (F & G). *)
-(*         unfold closure_rule in esrch; *)
-(*           destruct (formula_contradiction F G (get_context B' T') sigma) eqn:econtr; *)
-(*           try easy. *)
-(*         right; eapply formula_contradiction_sound; eauto. *)
-(*       + cbn in eseq, esrch. injection eseq => eT _; subst. *)
-(*         unfold closure_rule in esrch; *)
-(*           destruct (trivial_contradiction (get_context B' T')) eqn:econtr; *)
-(*           try easy. *)
-(*         left; eapply trivial_contradiction_sound; eauto. *)
+    (* Case: [Leaf] *)
+    - destruct o.
+      + cbn in eseq, esrch. injection eseq => <-; subst.
+        destruct p as (F & G).
+        unfold closure_rule in esrch;
+          destruct (formula_contradiction _ _ _ _) eqn:econtr;
+          try easy.
+        right; eapply formula_contradiction_sound; eauto.
+      + cbn in eseq, esrch. injection eseq => <-; subst.
+        unfold closure_rule in esrch;
+          destruct (trivial_contradiction _) eqn:econtr;
+          try easy.
+        left; eapply trivial_contradiction_sound; eauto.
 
-(*     (* Case: [Node] *) *)
-(*     - destruct r. *)
+    (* Case: [Node] *)
+    - destruct r.
 
-(*       (* Case: [AlphaNegNeg] *) *)
-(*       + cbn in esrch. apply alpha_rule_sound in esrch; *)
-(*           destruct esrch as (l & eget & hin & esrch); *)
-(*           cbn in eseq. *)
-(*         rewrite eget in eseq. *)
-(*         destruct (expand_tableau_branch__aux _ _ _ _) eqn:et; try easy. *)
-(*         destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq'; try easy. *)
-(*         destruct p as (s1 & T1); cbn in eseq. injection eseq => eT' _. *)
-(*         rewrite -eT' in hbranchof'.  *)
-(*         * admit. *)
-(*         * cbn in eseq. *)
+      (* Case: [AlphaNegNeg] *)
+      + apply alpha_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch1).
+        have eseq0 := eseq.
+        cbn in eseq; rewrite eget in eseq.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
+        destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
+        have es : last s (mkLeaf sko) = last s0 (mkLeaf sko).
+        { injection eseq => <-.
+          rewrite last_cons //. eapply RuleTree_to_Sequence_not_nil; eauto. }
+        rewrite !es in hbranchof' |- *.
+        have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}
+          := is_branch_of_extend_left hbranchof hexpand.
+        have [T0 e] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
 
-(* cbn in esrch. apply alpha_rule_sound in esrch; *)
-(*           destruct esrch as (l & eget & hin & esrch). *)
-(*         cbn in eseq; rewrite eget in eseq. *)
-(*         destruct (expand_tableau_branch__aux _ _ _ _) eqn:et; try easy. *)
-(*         destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq'; try easy. *)
-(*         destruct p as (s1 & T1); cbn in eseq. injection eseq => eT' _. *)
-(*         rewrite -eT' in hbranchof'. *)
-(*         have hbranchof0 := expand_tableau_branch_Some_is_branch_of et. *)
-(*         have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |} *)
-(*           := is_branch_of_extend_left hbranchof0 et. *)
-        
-(*         exfalso. *)
+        have h : T0 <> Proofs.Leaf by admit. (* this is true but eh *)
 
-(*         destruct (RuleTree_to_Sequence_branch hbranchof1 eseq') as *)
-(*           (T0' & hreplace); cbn in *. *)
-(*         have hbranchof' := is_branch_of_extend_left' hbranchof0 et. *)
-
-        (* Contradiction: [B] cannot be a branch of [T1]. *)
-        (* Actually, only true if [T0'] is not a leaf. (which is the case but eh) *)
+        have contra := replace_expanded_child_not_branch hbranchof h hexpand e.
+        exfalso. now apply contra.
   Admitted.
 
   Lemma GuidedTableauSearch_Some_Sequence_closed :
-    forall {Gamma : list Form} {sigma : Substitution string Term} {R : RuleTree}
+    forall {R : RuleTree} {Gamma : list Form} {sigma : Substitution string Term}
       {record record' : sko_record sko} {s : Sequence sko},
       GuidedTableauSearch__aux sko Gamma sigma record R = ret {| status := true; symbs := record' |} ->
       RuleTree_to_Sequence Gamma R = Some s ->
       is_tableau_closed (last s (mkLeaf sko)) sigma.
   Proof.
-    intros ????? e e'.
-    have eGamma : get_context EmptyBranch (mkTableau sko Gamma) = Gamma by reflexivity.
-    (* rewrite -eGamma in e. destruct R. *)
+    intros ?????? esrch eseq B hbranchof.
+    eapply GuidedTableauSearch_Some_RuleTree_to_Sequence_closed; eauto.
+
+    - admit. (* seems OK *)
+    - admit. (* seems also legit, use GuidedTableauSearch_Some_RuleTree_to_Sequence_Some *)
   Admitted.
 
   (** We can then conclude on the soundness of the algorithm. *)
@@ -1305,7 +1297,7 @@ Section RuleTreeToSequence.
       + erewrite RuleTree_to_Sequence_hd; eauto.
       + eapply GuidedTableauSearch_Some_Sequence_closed; eauto.
   Qed.
-End RuleTreeToSequence.
+End Soundness.
 
 (** ** 3. The [tableaux] tactic *)
 

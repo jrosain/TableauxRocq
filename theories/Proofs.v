@@ -437,7 +437,6 @@ Section Tableaux.
 
   Definition is_branch_closed (T : Tableau_) (sigma : Substitution var (Term_ func var))
     (B : Branch) : Prop :=
-    is_branch_of B T ->
     Bot \in get_context B T \/
       (exists (F G : Form),
           F \in get_context B T /\ G \in get_context B T /\
@@ -445,7 +444,7 @@ Section Tableaux.
 
   (** A [Tableau_] is said closed under a substitution if every branch has a contradiction. *)
   Definition is_tableau_closed (T : Tableau_) (sigma : Substitution var (Term_ func var)) : Prop :=
-    forall (B : Branch), is_branch_closed T sigma B.
+    forall (B : Branch), is_branch_of B T -> is_branch_closed T sigma B.
 
   (** A [Branch] of a [Tableau_] is satisfied if its context is satisfied. *)
   Definition exists_satisfied_branch (M : Model pred func) (mu : env M var) (T : Tableau_) : Prop :=
@@ -579,6 +578,37 @@ Section Tableaux.
     intros ????? e; cbn in e.
     destruct (expand_tableau_branch__aux l l' B T); try easy.
     destruct T'; injection e => -> _ //.
+  Qed.
+
+  Lemma replace_expanded_child_not_branch :
+    forall {B : Branch} {T T0 T0' T' : TableauTree} {Gamma : list Form},
+      is_branch_of B T -> T0' <> Leaf ->
+      expand_tableau_branch__aux (Some Gamma) None B T = Some T0 ->
+      replace_child (B ++ [Left])%list T0 T0' = Some T' -> ~is_branch_of B T'.
+  Proof using Type.
+    intro B; induction B as [|b B IHB]; intros ????? hbranchof hnleaf hexpand hrepl hbranchof'.
+
+    - cbn in *. inversion hbranchof; subst; try easy.
+      destruct T0; try easy.
+      apply hnleaf. inversion hbranchof'; subst.
+      injection hrepl => _ _ -> //.
+
+    - destruct b; cbn in *.
+
+      + destruct T, T0; try easy.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand1; try easy.
+        destruct (replace_child _ _ _) eqn:erepl1; try easy.
+        inversion hbranchof'; subst.
+        inversion hbranchof; subst.
+        specialize (IHB T1 t T0' T0); eapply IHB; eauto.
+        injection hexpand => _ _ ->; injection hrepl => _ _ <- //.
+      + destruct T, T0; try easy.
+        inversion hbranchof; inversion hbranchof'; subst.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand1; try easy.
+        destruct (replace_child _ _ _) eqn:erepl1; try easy.
+        specialize (IHB T2); eapply IHB; eauto.
+        injection hexpand => -> _ _; rewrite erepl1.
+        injection hrepl => -> //.
   Qed.
 
   (** An optional list of formulas is satisfied either if it is none or if the list is
