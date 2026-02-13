@@ -278,10 +278,10 @@ Section Tableaux.
 
   Lemma is_branch_of_get_child_at :
     forall {B : Branch} {T : TableauTree},
-      is_branch_of B T -> exists T', get_child_at B T = Some T'.
+      is_branch_of B T -> exists T', T' <> Leaf /\ get_child_at B T = Some T'.
   Proof using Type.
     intros ?? hbranchof. induction hbranchof; auto.
-    exists (Node Leaf Gamma Leaf); auto.
+    exists (Node Leaf Gamma Leaf); split; easy.
   Qed.
 
   Lemma replace_child_get_child_at :
@@ -300,22 +300,21 @@ Section Tableaux.
   Lemma replace_expand_Left :
     forall {B : Branch} {T T0 : TableauTree} (T' : TableauTree) {l : list Form},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) None B T = Some T0 ->
-      exists T'', replace_child B T T'' =
-        replace_child (B ++ [Left])%list T0 T'.
+      exists T'', T'' <> Leaf /\ replace_child B T T'' = replace_child (B ++ [Left])%list T0 T'.
   Proof using Type.
     intros ????? hbranchof; revert  T0 T' l.
     induction hbranchof; intros ??? hexpand.
     - cbn in *. injection hexpand => <-.
-      exists (Node T' Gamma Leaf); auto.
+      exists (Node T' Gamma Leaf); split; easy.
     - cbn in *. destruct (expand_tableau_branch__aux (Some l) None B T1) eqn:eT1; try easy.
-      destruct (IHhbranchof _ T' _ eT1) as (T0' & ereplace).
+      destruct (IHhbranchof _ T' _ eT1) as (T0' & hnleaf & ereplace).
       exists T0'; rewrite ereplace; cbn.
-      destruct T0; try easy.
+      split; destruct T0; try easy.
       injection hexpand => e0 e1 e2; now subst.
     - cbn in *. destruct (expand_tableau_branch__aux (Some l) None B T2) eqn:eT2; try easy.
-      destruct (IHhbranchof _ T' _ eT2) as (T0' & ereplace).
+      destruct (IHhbranchof _ T' _ eT2) as (T0' & hnleaf & ereplace).
       exists T0'; rewrite ereplace; cbn.
-      destruct T0; try easy.
+      split; destruct T0; try easy.
       injection hexpand => e0 e1 e2; now subst.
   Qed.
 

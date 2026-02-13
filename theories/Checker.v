@@ -532,14 +532,16 @@ Section RuleTreeToSequence.
   Lemma RuleTree_to_Sequence_branch :
     forall {R : RuleTree} {B : Branch} {T : Tableau} {s : Sequence sko},
       is_branch_of B T -> RuleTree_to_Sequence__aux B T R = Some s ->
-      exists (T'' : TableauTree), replace_child B T T'' = Some (tree (last s (mkLeaf sko))).
+      exists (T'' : TableauTree), T'' <> Proofs.Leaf /\
+                               replace_child B T T'' = Some (tree (last s (mkLeaf sko))).
   Proof using Type.
     intros R. induction R as [ l | R1 IHR1 r R2 IHR2 ];
       intros ??? hbranchof e.
 
     - cbn in e. injection e => <-; cbn.
-      have [ T'' eT'' ] := is_branch_of_get_child_at hbranchof.
-      exists T''. now apply replace_child_get_child_at.
+      have [ T'' [ hnleaf eT'' ] ] := is_branch_of_get_child_at hbranchof.
+      exists T''. split; auto.
+      now apply replace_child_get_child_at.
 
     (* TODO: factor out the boilerplate code *)
     - destruct r; cbn in e.
@@ -547,28 +549,28 @@ Section RuleTreeToSequence.
       + destruct (get_neg_neg f) eqn:ef; try easy.
         destruct (expand_tableau_branch__aux (Some (Ctx.elements t)) None B T) eqn:hexpand;
           try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:etree; try easy.
+        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
         have hbranchof0 := is_branch_of_extend_left hbranchof hexpand.
         injection e => <-.
 
         destruct (IHR1 (B ++ [Left])%list {| tree := t0; symbols := symbols T |}
-                    s0 hbranchof0 etree) as (T'' & hreplace).
+                    s0 hbranchof0 eseq1) as (T'' & hnleaf & hreplace).
         rewrite last_cons.
         * eapply RuleTree_to_Sequence_not_nil; eauto.
-        * rewrite -hreplace; eapply replace_expand_Left; eauto.
+        * rewrite -hreplace. eapply replace_expand_Left; eauto.
 
       + destruct (get_neg_or f) eqn:ef; try easy.
         destruct (expand_tableau_branch__aux (Some (Ctx.elements t)) None B T) eqn:hexpand;
           try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:etree; try easy.
+        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
         have hbranchof0 := is_branch_of_extend_left hbranchof hexpand.
         injection e => <-.
 
         destruct (IHR1 (B ++ [Left])%list {| tree := t0; symbols := symbols T |}
-                    s0 hbranchof0 etree) as (T'' & hreplace).
+                    s0 hbranchof0 eseq1) as (T'' & hnleaf & hreplace).
         rewrite last_cons.
         * eapply RuleTree_to_Sequence_not_nil; eauto.
-        * rewrite -hreplace; eapply replace_expand_Left; eauto.
+        * rewrite -hreplace. eapply replace_expand_Left; eauto.
 
       + destruct (get_or f) eqn:ef; try easy.
         destruct (expand_tableau_branch__aux (Some (Ctx.elements (fst p)))
@@ -587,7 +589,7 @@ Section RuleTreeToSequence.
 
         (* The tree that replaces the left child. *)
         destruct (IHR1 (B ++ [Left])%list T0 s0 hbranchof1 etree1)
-          as (T1' & hreplace1).
+          as (T1' & hnleaf1 & hreplace1).
 
         have hneq : (B ++ [Right])%list <> (B ++ [Left])%list.
         { clear. induction B; try easy.
@@ -596,9 +598,9 @@ Section RuleTreeToSequence.
 
         (* The tree that replaces the right child. *)
         destruct (IHR2 (B ++ [Right])%list (last s0 (mkLeaf sko)) s1 hbranchof2' etree2)
-          as (T2' & hreplace2).
+          as (T2' & hnleaf2 & hreplace2).
 
-        exists (Proofs.Node T1' Gamma T2').
+        exists (Proofs.Node T1' Gamma T2'); split; try easy.
         injection e => <-.
 
         rewrite replace_child_Node; auto.
@@ -615,7 +617,7 @@ Section RuleTreeToSequence.
         injection e => <-.
 
         destruct (IHR1 (B ++ [Left])%list {| tree := t; symbols := symbols T |}
-                    s1 hbranchof0 etree) as (T'' & hreplace).
+                    s1 hbranchof0 etree) as (T'' & hnleaf & hreplace).
         rewrite last_cons.
         * eapply RuleTree_to_Sequence_not_nil; eauto.
         * rewrite -hreplace; eapply replace_expand_Left; eauto.
@@ -629,7 +631,7 @@ Section RuleTreeToSequence.
         injection e => <-.
 
         destruct (IHR1 (B ++ [Left])%list {| tree := t0; symbols := add_symbol a f (symbols T) |}
-                    s0 hbranchof0 etree) as (T'' & hreplace).
+                    s0 hbranchof0 etree) as (T'' & hnleaf & hreplace).
         rewrite last_cons.
         * eapply RuleTree_to_Sequence_not_nil; eauto.
         * rewrite -hreplace; eapply replace_expand_Left; eauto.
@@ -706,7 +708,7 @@ Section RuleTreeToSequence.
         destruct (IHR1 (B ++ [Left])%list record symbs T0 hbranchof1 (Ctx.union l Gamma) hnext1 ectx1)
           as (s1 & hseq1).
 
-        have [T1' ereplace] := RuleTree_to_Sequence_branch hbranchof1 hseq1.
+        have [ T1' [ hnleaf ereplace ] ] := RuleTree_to_Sequence_branch hbranchof1 hseq1.
         have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
         { clear; induction B; cbn; intro; congruence. }
 
@@ -850,7 +852,7 @@ Section RuleTreeToSequence.
         rewrite app_comm_cons last_app.
         { eapply RuleTree_to_Sequence_not_nil; eauto. }
 
-        have [T1' ereplace] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
+        have [ T1' [ hnleaf ereplace ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
         have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
         { clear; induction B; cbn; intro; congruence. }
 
@@ -1072,7 +1074,7 @@ Section Soundness.
         specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
                       symbs1 s0 hbranchof1 esrch1 eseq1).
 
-        have [T1' ereplace] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
+        have [T1' [ hnleaf ereplace ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
         have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
         { clear; induction B; cbn; intro; congruence. }
 
@@ -1252,11 +1254,24 @@ Section Soundness.
         rewrite !es in hbranchof' |- *.
         have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}
           := is_branch_of_extend_left hbranchof hexpand.
-        have [T0 e] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
+        have [T0 [ hnleaf e ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
+        have contra := replace_expanded_child_not_branch hbranchof hnleaf hexpand e.
+        exfalso. now apply contra.
 
-        have h : T0 <> Proofs.Leaf by admit. (* this is true but eh *)
-
-        have contra := replace_expanded_child_not_branch hbranchof h hexpand e.
+      (* Case: [AlphaNegOr] *)
+      + apply alpha_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch1).
+        have eseq0 := eseq.
+        cbn in eseq; rewrite eget in eseq.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
+        destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
+        have es : last s (mkLeaf sko) = last s0 (mkLeaf sko).
+        { injection eseq => <-.
+          rewrite last_cons //. eapply RuleTree_to_Sequence_not_nil; eauto. }
+        rewrite !es in hbranchof' |- *.
+        have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}
+          := is_branch_of_extend_left hbranchof hexpand.
+        have [T0 [ hnleaf e ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
+        have contra := replace_expanded_child_not_branch hbranchof hnleaf hexpand e.
         exfalso. now apply contra.
   Admitted.
 
