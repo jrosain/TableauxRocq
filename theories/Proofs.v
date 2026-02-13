@@ -761,6 +761,14 @@ Section ExpansionRules.
     intros ??? contra. rewrite nth_error_nil in contra; easy.
   Qed.
 
+  Lemma is_expansion_sequence_singleton :
+    forall (T : Tableau),
+      is_expansion_sequence [T].
+  Proof using Type.
+    intros ???? contra0 contra; destruct i; [inversion contra|].
+    cbn in contra0; rewrite nth_error_nil in contra0; easy.
+  Qed.
+
   (** A sequence is a tableau proof if there it is an expansion sequence s.t. the first
       tableau of the sequence has a simple node labelled by this list of formulas and the
       last is closed under a substitution [sigma]. *)
