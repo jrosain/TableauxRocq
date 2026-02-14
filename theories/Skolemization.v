@@ -107,10 +107,6 @@ Section SkolemizationDef.
       forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
         (hsko : is_sko data t F symbs Gamma = true),
         t = Fun (symbol data hsko) (args data hsko)
-    ; sko_con_fv :
-      forall {t : Term} {F : Form} {symbs : sko_record data} (Gamma Gamma' : Con),
-        fv Gamma = fv Gamma' ->
-        is_sko data t F symbs Gamma = is_sko data t F symbs Gamma'
     ; is_sko_sound :
       forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
         (hsko : is_sko data t (Neg (All F)) symbs Gamma = true) (M : Model pred func),
@@ -365,9 +361,6 @@ Section SkolemizationInstances.
   Proof.
     constructor.
     - apply OuterSkolemization_isFunc.
-    - intros; cbn. destruct t; auto; cbn.
-      unfold OuterSkolemization_is_sko_pred. admit.
-      (* TODO actually we need that the function symbols are the same also *)
     - intros ???? hsko ?.
       destruct t; try inversion hsko.
       destruct (OuterSkolemization_args_vars hsko) as (l0 & el0).
