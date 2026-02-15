@@ -460,22 +460,22 @@ Section ESyntaxTranslation.
         * apply H.
   Qed.
 
-  Fixpoint translate_EForm_ (m : list string) (F : EForm) : Form :=
+  Fixpoint translate_EForm__aux (m : list string) (F : EForm) : Form :=
     match F with
     | EBot => Bot
     | ETop => Neg Bot
     | EPred f l => Pred f (map (translate_ETerm m) l)
-    | ENeg F => Neg (translate_EForm_ m F)
-    | EOr F G => Or (translate_EForm_ m F) (translate_EForm_ m G)
-    | EAnd F G => Neg (Or (Neg (translate_EForm_ m F)) (Neg (translate_EForm_ m G)))
-    | EImp F G => Or (Neg (translate_EForm_ m F)) (translate_EForm_ m G)
-    | EEqu F G => Neg (Or (Neg (Or (Neg (translate_EForm_ m F)) (translate_EForm_ m G)))
-                      (Neg (Or (Neg (translate_EForm_ m G)) (translate_EForm_ m F))))
-    | EEx x F  => Neg (All (Neg (translate_EForm_ (x :: m) F)))
-    | EAll x F => All (translate_EForm_ (x :: m) F)
+    | ENeg F => Neg (translate_EForm__aux m F)
+    | EOr F G => Or (translate_EForm__aux m F) (translate_EForm__aux m G)
+    | EAnd F G => Neg (Or (Neg (translate_EForm__aux m F)) (Neg (translate_EForm__aux m G)))
+    | EImp F G => Or (Neg (translate_EForm__aux m F)) (translate_EForm__aux m G)
+    | EEqu F G => Neg (Or (Neg (Or (Neg (translate_EForm__aux m F)) (translate_EForm__aux m G)))
+                      (Neg (Or (Neg (translate_EForm__aux m G)) (translate_EForm__aux m F))))
+    | EEx x F  => Neg (All (Neg (translate_EForm__aux (x :: m) F)))
+    | EAll x F => All (translate_EForm__aux (x :: m) F)
     end.
 
-  Definition translate_EForm := translate_EForm_ [].
+  Definition translate_EForm := translate_EForm__aux [].
 
   Fixpoint instantiate_eterm (x : string) (u t : ETerm) : ETerm :=
     match t with
@@ -553,9 +553,9 @@ Section ESyntaxTranslation.
 
   Lemma instantiate_shadowed_form :
     forall (F : EForm) (t : ETerm) (x : string) (rho rho' : list string),
-      (translate_EForm_ (rho ++ x :: rho' ++ [x]) F)
+      (translate_EForm__aux (rho ++ x :: rho' ++ [x]) F)
         {#| rho | + #| rho' | + 1 \to translate_ETerm rho' t} =
-        translate_EForm_ (rho ++ x :: rho') F.
+        translate_EForm__aux (rho ++ x :: rho') F.
   Proof.
     intros F t. induction F; try reflexivity.
     - intros. cbn. apply f_equal. induction l; auto.
@@ -617,8 +617,8 @@ Section ESyntaxTranslation.
     forall (x : string) (t : ETerm) (F : EForm) (rho : list string),
       ~(List.In x rho) -> closed_in mem_list rho t ->
       closed_in (fun x s => ~ set_in x s) (bv_eform F) t ->
-      (translate_EForm_ (rho ++ [x]) F) {#|rho| \to translate_ETerm rho t} =
-        translate_EForm_ rho (instantiate_eform x t F).
+      (translate_EForm__aux (rho ++ [x]) F) {#|rho| \to translate_ETerm rho t} =
+        translate_EForm__aux rho (instantiate_eform x t F).
   Proof.
     intros ???. induction F; intros rho hin hclosed hclosed'; cbn in *; try reflexivity.
     - intros. rewrite !map_map.
@@ -779,7 +779,7 @@ Section ValidityEquivalence.
 
     Lemma gen_translation_equivalidity :
       forall (M : Model string string) (F : EForm) (bvs : list string) (rho : list M) (sigma : env M string),
-        [[ M # rho # sigma '|= translate_EForm_ bvs F ]] <->
+        [[ M # rho # sigma '|= translate_EForm__aux bvs F ]] <->
           interpret_eform M (extended_environment bvs rho sigma) F.
     Proof.
       intros M F; induction F.
@@ -896,7 +896,7 @@ Section ValidityEquivalence.
     rewrite e -gen_translation_equivalidity. cbn.
     cbn in htab. destruct htab as [hGamma | hF].
     - left. intro h. apply hGamma.
-      have e' : (translate_EForm_ [] (ls_to_eform Gamma)) =
+      have e' : (translate_EForm__aux [] (ls_to_eform Gamma)) =
                   (ls_to_form (to_form_list Gamma)).
       { clear. induction Gamma as [|G Gs IHGs]; cbn in *; try reflexivity.
         now rewrite -IHGs. }

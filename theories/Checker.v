@@ -174,7 +174,7 @@ Section ProofCheckerAlgorithm.
     (Gamma : Ctx.t) (sigma : Substitution string Term) (symbols : sko_record sko) : result :=
     if search_contradiction Gamma sigma
     then ret {| status := true; symbs := symbols |}
-    else error ("No trivial contradiction in the context: " ++
+    else error ("No contradiction in the context: " ++
                   pr_list pr_form (Ctx.elements Gamma)@[sigma]).
 
   Definition alpha_rule (Gamma : Ctx.t) (sigma : Substitution string Term) (T : RuleTree)
