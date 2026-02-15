@@ -79,7 +79,7 @@ Section SkolemizationDef.
         forall (f : func), @value_record RecordData f empty_record = None
       }.
 
-    Record SkoRecord_ :=
+    Record SkoRecord :=
       { data :> SkoRecordData
       ; specs :: SkoRecordSpecs data }.
   End SkoRecord.
@@ -93,7 +93,7 @@ Section SkolemizationDef.
       - and an [args] function, that should always return the arguments of the term [t] if
         it is a Skolemization. *)
   Record SkolemizationData :=
-    { sko_record : SkoRecord_
+    { sko_record : SkoRecord
     ; is_sko :> Term -> Form -> sko_record -> Con -> bool
     ; symbol :
         forall {t : Term} {F : Form} {symbs : sko_record} {Gamma : Con},
@@ -121,18 +121,18 @@ Section SkolemizationDef.
     ; is_skolemization :: isSkolemization skoData }.
 End SkolemizationDef.
 
-Coercion specs : SkoRecord_ >-> SkoRecordSpecs.
+Coercion specs : SkoRecord >-> SkoRecordSpecs.
 Coercion is_skolemization : Skolemization_ >-> isSkolemization.
 
 Arguments SkoRecordData : clear implicits.
-Arguments SkoRecord_ : clear implicits.
+Arguments SkoRecord : clear implicits.
 
 Arguments SkolemizationData : clear implicits.
 Arguments Skolemization_ : clear implicits.
 Arguments sko_record {_ _ _} _.
 
 Section SkoSymbolLemmas.
-  Context {pred func var : Atom} {record : SkoRecord_ pred func var}.
+  Context {pred func var : Atom} {record : SkoRecord pred func var}.
 
   Let Term := Term func var.
   Let Form := Form pred func var.
@@ -216,7 +216,7 @@ Section SkolemizationInstances.
     - reflexivity.
   Qed.
 
-  Definition sko_record_unit : SkoRecord_ pred func var.
+  Definition sko_record_unit : SkoRecord pred func var.
   Proof.
     unshelve econstructor.
     - exact SkoRecordData_unit.
