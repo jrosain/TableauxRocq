@@ -851,7 +851,7 @@ Section ValidityEquivalence.
   Lemma ls_to_eform_ls_to_form :
     forall (Gamma : list EForm) (M : Model string string) (rho : list M) (sigma : env M string),
       ([[ M # rho # sigma '|= [[ls_to_eform Gamma]]]]) <->
-        (interpret_form_ M rho sigma (ls_to_form [[Gamma]])).
+        (interpret_form M rho sigma (ls_to_form [[Gamma]])).
   Proof.
     intros. induction Gamma as [|F Fs IHFs]; cbn.
     - reflexivity.

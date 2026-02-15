@@ -34,17 +34,17 @@ Section SemanticsDef.
         | x :: xs => interpret rho sigma x :: F xs
         end.
 
-  #[global] Instance interpret_term (M : Model) : Interpret M (Term_ func var) M :=
+  #[global] Instance interpret_term (M : Model) : Interpret M (Term func var) M :=
     fun rho sigma =>
-      fix F (t : Term_ func var) : M :=
+      fix F (t : Term func var) : M :=
         match t with
         | Bound n => option_get non_empty (nth_error rho n)
         | Free  x => option_get non_empty (sigma x)
         | Fun f l => interp_func f (map F l)
         end.
 
-  #[global] Instance interpret_form_ (M : Model) : Interpret M (Form_ pred func var) Prop :=
-    fix rec (rho : list M) (sigma : env M var) (F : Form_ pred func var) : Prop :=
+  #[global] Instance interpret_form (M : Model) : Interpret M (Form pred func var) Prop :=
+    fix rec (rho : list M) (sigma : env M var) (F : Form pred func var) : Prop :=
       match F with
       | Bot        => False
       | Pred p l => interp_pred p (map (interpret_term M rho sigma) l)
@@ -53,20 +53,20 @@ Section SemanticsDef.
       | All F    => forall (x : M), rec (x :: rho) sigma F
       end.
 
-  Definition is_valid (F : Form_ pred func var) :=
-    forall (M : Model), interpret_form_ M [] (empty_env M var) F.
+  Definition is_valid (F : Form pred func var) :=
+    forall (M : Model), interpret_form M [] (empty_env M var) F.
 
-  Definition is_satisfiable (F : Form_ pred func var) :=
+  Definition is_satisfiable (F : Form pred func var) :=
     exists (M : Model), forall (mu : env M var),
-      interpret_form_ M [] mu F.
+      interpret_form M [] mu F.
 
-  Definition equiv (F G : Form_ pred func var) :=
+  Definition equiv (F G : Form pred func var) :=
     forall (M : Model) (rho : list M) (sigma : env M var),
-      interpret_form_ M rho sigma F <-> interpret_form_ M rho sigma G.
+      interpret_form M rho sigma F <-> interpret_form M rho sigma G.
 
-  Definition imply (F G : Form_ pred func var) :=
+  Definition imply (F G : Form pred func var) :=
     forall (M : Model) (sigma : env M var),
-      interpret_form_ M [] sigma F -> interpret_form_ M [] sigma G.
+      interpret_form M [] sigma F -> interpret_form M [] sigma G.
 
   #[global] Instance equiv_refl : Reflexive equiv.
   Proof using Type.
@@ -93,14 +93,14 @@ Section SemanticsDef.
   Qed.
 
   Lemma equiv_imply :
-    forall (F G : Form_ pred func var),
+    forall (F G : Form pred func var),
       equiv F G -> imply F G.
   Proof using Type.
     intros ?? hequiv M sigma. specialize (hequiv M [] sigma). apply hequiv.
   Qed.
 
   #[global] Instance equiv_proper_interp (M : Model) :
-    Proper (equiv ==> iff) (interpret_form_ M [] (empty_env M var)).
+    Proper (equiv ==> iff) (interpret_form M [] (empty_env M var)).
   Proof using Type.
     intros F G hequ.
     now specialize (hequ M).
@@ -119,8 +119,8 @@ Notation "Gamma |= F" := (is_valid (Or (Neg (ls_to_form Gamma)) F)) (at level 40
 Section SemanticsFacts.
   Context {pred func var : Atom} `{set_nat : set nat}.
 
-  Let Form := Form_ pred func var.
-  Let Term := Term_ func var.
+  Let Form := Form pred func var.
+  Let Term := Term func var.
 
   Lemma ls_to_form_commutes :
     forall (Gamma : list Form) (F G : Form),
@@ -352,7 +352,7 @@ Section SemanticsFacts.
           now rewrite hgt.
     - now cbn.
     - cbn. rewrite map_map.
-      have hmap : (map (fun x : Term_ func var => interpret_term M rho sigma x {#| rho | \to u}) l) =
+      have hmap : (map (fun x : Term => interpret_term M rho sigma x {#| rho | \to u}) l) =
                     (map (interpret_term M (rho ++ [ [[M # rho # sigma '|= u]] ])%list sigma) l).
       { induction l as [|v vs IHvs]; auto; cbn.
         rewrite IHvs.
@@ -366,8 +366,8 @@ Section SemanticsFacts.
   Lemma form_env_inst_commutes :
     forall (M : Model pred func) (rho : list M) (sigma : env M var) (F : Form) (t : Term),
       isLocallyClosed t ->
-      interpret_form_ M rho sigma (F {#|rho| \to t}) =
-        interpret_form_ M (rho ++ [ [[ M # rho # sigma '|= t ]] ])%list sigma F.
+      interpret_form M rho sigma (F {#|rho| \to t}) =
+        interpret_form M (rho ++ [ [[ M # rho # sigma '|= t ]] ])%list sigma F.
   Proof using Type.
     intros ??????. revert rho. induction F; auto; cbn; intros rho.
     - rewrite map_map.
@@ -489,7 +489,7 @@ End SemanticsFacts.
     This choice function is unavoidable, as in and of itself, Skolemization uses the axiom of
     choice. *)
 Section ReplaceInterpFunc.
-  Context {pred func var : Atom} (M : Model pred func) (F : Form_ pred func var).
+  Context {pred func var : Atom} (M : Model pred func) (F : Form pred func var).
 
   Lemma satisfy_delta :
     forall (mu : env M var),
@@ -530,8 +530,8 @@ Section RealReplacementModel.
     ;  interp_pred := interp_pred
     ;  non_empty := non_empty |}.
 
-  Let Form := Form_ pred func var.
-  Let Term := Term_ func var.
+  Let Form := Form pred func var.
+  Let Term := Term func var.
 
   (** Properties of [ReplacementModel] with [replace_interp_func]. *)
   Context (F : Form) (f : func) (vs : list var).
@@ -577,7 +577,7 @@ Section RealReplacementModel.
   Lemma no_skolem_same_interp_form :
     forall (rho : list M) (mu : env M var) (G : Form),
       ~set_in f (function_symbols G) ->
-      interpret_form_ M' rho mu G = interpret_form_ M rho mu G.
+      interpret_form M' rho mu G = interpret_form M rho mu G.
   Proof using F t.
     intros ??? hnin; revert rho; induction G; intro rho; cbn; auto.
     - apply f_equal; cbn in hnin. induction l as [|u us IHus]; cbn; auto.

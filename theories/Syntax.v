@@ -7,23 +7,23 @@ From Stdlib Require Import Structures.Orders.
 
 (** ** First-order logic terms *)
 
-Inductive Term_ {func var : Atom} : Type :=
-| Bound : nat -> Term_
-| Free  : var -> Term_
-| Fun   : func -> list Term_ -> Term_.
+Inductive Term {func var : Atom} : Type :=
+| Bound : nat -> Term
+| Free  : var -> Term
+| Fun   : func -> list Term -> Term.
 
-Arguments Term_ : clear implicits.
+Arguments Term : clear implicits.
 
 (** *** Better induction principles for terms *)
 Section TermInd.
   Context {func var : Atom}.
 
-  Definition term_rect (P : Term_ func var -> Type) (Pb : forall (n : nat), P (Bound n))
+  Definition term_rect (P : Term func var -> Type) (Pb : forall (n : nat), P (Bound n))
     (Pa : forall (a : var), P (Free a))
-    (Pl : forall (f : func) (l : list (Term_ func var)), Forall P l -> P (Fun f l)) :
-    forall (t : Term_ func var), P t :=
-    fix F (t : Term_ func var) : P t :=
-      let fix F_list (l : list (Term_ func var)) : Forall P l :=
+    (Pl : forall (f : func) (l : list (Term func var)), Forall P l -> P (Fun f l)) :
+    forall (t : Term func var), P t :=
+    fix F (t : Term func var) : P t :=
+      let fix F_list (l : list (Term func var)) : Forall P l :=
         match l with
         | [] => Forall_nil P
         | x :: xs => Forall_cons P x xs (F_list xs) (F x)
@@ -34,27 +34,27 @@ Section TermInd.
       | Fun f l => Pl f l (F_list l)
       end.
 
-  Definition term_ind (P : Term_ func var -> Prop) (Pb : forall (n : nat), P (Bound n))
+  Definition term_ind (P : Term func var -> Prop) (Pb : forall (n : nat), P (Bound n))
     (Pa : forall (a : var), P (Free a))
-    (Pl : forall (f : func) (l : list (Term_ func var)), Forall P l -> P (Fun f l)) :
-    forall (t : Term_ func var), P t :=
+    (Pl : forall (f : func) (l : list (Term func var)), Forall P l -> P (Fun f l)) :
+    forall (t : Term func var), P t :=
     term_rect P Pb Pa Pl.
 
-  Definition term_rect' (P : Term_ func var -> Type) (Pb : forall (n : nat), P (Bound n))
+  Definition term_rect' (P : Term func var -> Type) (Pb : forall (n : nat), P (Bound n))
     (Pa : forall (a : var), P (Free a))
-    (Pl : forall (f : func) (l : list (Term_ func var)),
-        (forall (t : Term_ func var), In t l -> P t) -> P (Fun f l)) :
-    forall (t : Term_ func var), P t.
+    (Pl : forall (f : func) (l : list (Term func var)),
+        (forall (t : Term func var), In t l -> P t) -> P (Fun f l)) :
+    forall (t : Term func var), P t.
   Proof.
     apply term_rect; auto.
     intros ?? H. apply Pl; intros. eapply Forall_In in H; eauto.
   Defined.
 
-  Definition term_ind' (P : Term_ func var -> Prop) (Pb : forall (n : nat), P (Bound n))
+  Definition term_ind' (P : Term func var -> Prop) (Pb : forall (n : nat), P (Bound n))
     (Pa : forall (a : var), P (Free a))
-    (Pl : forall (f : func) (l : list (Term_ func var)),
-        (forall (t : Term_ func var), In t l -> P t) -> P (Fun f l)) :
-    forall (t : Term_ func var), P t :=
+    (Pl : forall (f : func) (l : list (Term func var)),
+        (forall (t : Term func var), In t l -> P t) -> P (Fun f l)) :
+    forall (t : Term func var), P t :=
     term_rect' P Pb Pa Pl.
 End TermInd.
 
@@ -62,7 +62,7 @@ End TermInd.
 Section DecEqTerms.
   Context {func var : Atom}.
 
-  Fixpoint eqb_term (t u : Term_ func var) : bool :=
+  Fixpoint eqb_term (t u : Term func var) : bool :=
     match t, u with
     | Bound n, Bound m | Free n, Free m => eqb n m
     | Fun f l, Fun g l' =>
@@ -71,7 +71,7 @@ Section DecEqTerms.
     end.
 
   Lemma eqb_term_eq :
-    forall t u : Term_ func var, eqb_term t u = true <-> t = u.
+    forall t u : Term func var, eqb_term t u = true <-> t = u.
   Proof using Type.
     intros t; induction t as [n | x | f xs IHxs] using term_rect';
       intro u; destruct u as [m | y | g ys]; split; cbn.
@@ -90,14 +90,14 @@ Section DecEqTerms.
         now injection e => -> _.
   Qed.
 
-  #[global] Instance EqBool_term : EqBool (Term_ func var).
+  #[global] Instance EqBool_term : EqBool (Term func var).
   Proof.
     unshelve econstructor.
     - exact eqb_term.
     - exact eqb_term_eq.
   Defined.
 
-  #[global] Instance eqDec_Term : EqDec (Term_ func var).
+  #[global] Instance eqDec_Term : EqDec (Term func var).
   Proof using Type. typeclasses eauto. Defined.
 End DecEqTerms.
 
@@ -105,26 +105,26 @@ End DecEqTerms.
 Section OpeningSubstTerms.
   Context {func var : Atom} `{set_nat : set nat}.
 
-  #[global] Instance opening_term : Opening (Term_ func var) (Term_ func var) :=
+  #[global] Instance opening_term : Opening (Term func var) (Term func var) :=
     fun n u =>
-      fix F (t : Term_ func var) : Term_ func var :=
+      fix F (t : Term func var) : Term func var :=
       match t with
       | Bound m => if eqb n m then u else t
       | Free  _ => t
       | Fun f l => Fun f (map F l)
       end.
 
-  #[global] Instance bv_term : BV (Term_ func var) :=
-    fix F (t : Term_ func var) : set_nat :=
+  #[global] Instance bv_term : BV (Term func var) :=
+    fix F (t : Term func var) : set_nat :=
       match t with
       | Bound m => singleton m
       | Free  _ => empty_set
       | Fun _ l => @bv_list set_nat _ F l
       end.
 
-  #[global] Instance subst_term : Subst (Term_ func var) (Term_ func var) :=
+  #[global] Instance subst_term : Subst (Term func var) (Term func var) :=
     fun t sigma =>
-      (fix F (t : Term_ func var) : Term_ func var :=
+      (fix F (t : Term func var) : Term func var :=
          match t with
          | Bound _ => t
          | Free  x => sigma x
@@ -138,8 +138,8 @@ Section FVTerms.
 
   Let set_var := set_atom var.
 
-  #[global] Instance fv_term : FV (Term_ func var) :=
-    fix F (t : Term_ func var) : set_var :=
+  #[global] Instance fv_term : FV (Term func var) :=
+    fix F (t : Term func var) : set_var :=
       match t with
       | Bound _ => empty_set
       | Free  x => singleton x
@@ -148,8 +148,8 @@ Section FVTerms.
 End FVTerms.
 
 (** ** Subterms *)
-Fixpoint is_subterm {func var : Atom} (t u : Term_ func var) : Prop :=
-  let fix f_ls (l : list (Term_ func var)) : Prop :=
+Fixpoint is_subterm {func var : Atom} (t u : Term func var) : Prop :=
+  let fix f_ls (l : list (Term func var)) : Prop :=
     match l with
     | [] => False
     | x :: xs => is_subterm t x \/ f_ls xs
@@ -161,7 +161,7 @@ Fixpoint is_subterm {func var : Atom} (t u : Term_ func var) : Prop :=
     end.
 
 Lemma is_subterm_trans :
-  forall {func var : Atom} (t0 t1 t2 : Term_ func var),
+  forall {func var : Atom} (t0 t1 t2 : Term func var),
     is_subterm t0 t1 -> is_subterm t1 t2 -> is_subterm t0 t2.
 Proof.
   intros ?????. induction t2 using term_ind; cbn in *.
@@ -177,7 +177,7 @@ Proof.
 Qed.
 
 Lemma subterm_not_subterm_not_subterm :
-  forall {func var : Atom} (t0 t1 t2 : Term_ func var),
+  forall {func var : Atom} (t0 t1 t2 : Term func var),
     is_subterm t0 t2 -> ~is_subterm t1 t2 -> ~is_subterm t1 t0.
 Proof.
   intros ????? hsub hnsub hsub'.
@@ -187,31 +187,31 @@ Qed.
 #[global] Opaque is_subterm.
 
 (** ** Minimal first-order logic formulas *)
-Inductive Form_ {pred func var : Atom} : Type :=
-| Bot  : Form_
-| Pred : pred -> list (Term_ func var) -> Form_
-| Neg  : Form_ -> Form_
-| Or   : Form_ -> Form_ -> Form_
-| All  : Form_ -> Form_.
+Inductive Form {pred func var : Atom} : Type :=
+| Bot  : Form
+| Pred : pred -> list (Term func var) -> Form
+| Neg  : Form -> Form
+| Or   : Form -> Form -> Form
+| All  : Form -> Form.
 
-Arguments Form_ : clear implicits.
+Arguments Form : clear implicits.
 
 Definition is_positive_litteral {pred func var : Atom}
-  (F : Form_ pred func var) : bool :=
+  (F : Form pred func var) : bool :=
   match F with
   | Pred _ _ => true
   | _ => false
   end.
 
 Definition is_negative_litteral {pred func var : Atom}
-  (F : Form_ pred func var) : bool :=
+  (F : Form pred func var) : bool :=
   match F with
   | Neg F => is_positive_litteral F
   | _ => false
   end.
 
 Definition is_litteral  {pred func var : Atom}
-  (F : Form_ pred func var) : bool :=
+  (F : Form pred func var) : bool :=
   is_positive_litteral F || is_negative_litteral F.
 
 (** *** Decidable equality for formulas *)
@@ -219,7 +219,7 @@ Section DecEqForms.
   Context {pred func var : Atom}.
   Existing Instance eq_dec_list.
 
-  Fixpoint eqb_form (F G : Form_ pred func var) : bool :=
+  Fixpoint eqb_form (F G : Form pred func var) : bool :=
     match F, G with
     | Bot, Bot => true
     | Pred p l, Pred p' l' => eqb p p' && eqb l l'
@@ -230,7 +230,7 @@ Section DecEqForms.
     end.
 
   Lemma eqb_form_eq :
-    forall F G : Form_ pred func var, eqb_form F G = true <-> F = G.
+    forall F G : Form pred func var, eqb_form F G = true <-> F = G.
   Proof using Type.
     intros F; induction F; intros G; destruct G; split; cbn.
     all: try now intro.
@@ -246,7 +246,7 @@ Section DecEqForms.
     - intros e; injection e => <-. rewrite IHF //.
   Qed.
 
-  #[global] Instance eqbool_form : EqBool (Form_ pred func var).
+  #[global] Instance eqbool_form : EqBool (Form pred func var).
   Proof.
     unshelve econstructor.
     - exact eqb_form.
@@ -259,7 +259,7 @@ Section OpeningSubstForms.
   Context {pred func var : Atom} `{set_nat : set nat}.
   Existing Instance bv_term.
 
-  Fixpoint opening_form_ (n : nat) (u : Term_ func var) (F : Form_ pred func var) :=
+  Fixpoint opening_form_ (n : nat) (u : Term func var) (F : Form pred func var) :=
     match F with
     | Bot => Bot
     | Pred p l => Pred p (map (fun t => t{n \to u}) l)
@@ -268,12 +268,12 @@ Section OpeningSubstForms.
     | All  F'  => All (opening_form_ (n+1) u F')
     end.
 
-  #[global] Instance opening_form : Opening (Term_ func var) (Form_ pred func var) :=
+  #[global] Instance opening_form : Opening (Term func var) (Form pred func var) :=
     opening_form_.
 
-  #[global] Instance subst_form : Subst (Form_ pred func var) (Term_ func var) :=
+  #[global] Instance subst_form : Subst (Form pred func var) (Term func var) :=
     fun F sigma =>
-      (fix rec (F : Form_ pred func var) : Form_ pred func var :=
+      (fix rec (F : Form pred func var) : Form pred func var :=
          match F with
          | Bot      => Bot
          | Pred p l => Pred p (map (fun t => t@[sigma]) l)
@@ -286,8 +286,8 @@ End OpeningSubstForms.
 Section SubstOpeningLemmas.
   Context {pred func var : Atom} `{set_nat : set nat}.
 
-  Let Term := Term_ func var.
-  Let Form := Form_ pred func var.
+  Let Term := Term func var.
+  Let Form := Form pred func var.
 
   Lemma isLocallyClosed_Fun_isLocallyClosed_list :
     forall (f : func) (l : list Term),
@@ -398,8 +398,8 @@ Section FVForms.
 
   Let set_var := set_atom var.
 
-  #[global] Instance fv_form : FV (Form_ pred func var) :=
-    fix rec (F : Form_ pred func var) : set_var :=
+  #[global] Instance fv_form : FV (Form pred func var) :=
+    fix rec (F : Form pred func var) : set_var :=
       match F with
       | Bot      => empty_set
       | Pred f l => fold_left (fun s t => s \union (fv t)) l empty_set
@@ -412,20 +412,20 @@ End FVForms.
 (** *** Subformulas *)
 
 Class HasSubformulas (pred func var : Atom) (A : Type) :=
-  is_subformula : Form_ pred func var -> A -> Prop.
+  is_subformula : Form pred func var -> A -> Prop.
 
 #[global] Instance HasSubformulas_list {pred func var : Atom} {A : Type}
   `{@HasSubformulas pred func var A} : HasSubformulas pred func var (list A) :=
-  fix rec (F : Form_ pred func var) (l : list A) : Prop :=
+  fix rec (F : Form pred func var) (l : list A) : Prop :=
     match l with
     | [] => False
     | G :: Gs => is_subformula F G \/ rec F Gs
     end.
 
 #[global] Instance HasSubformulas_Form {pred func var : Atom} :
-  HasSubformulas pred func var (Form_ pred func var) :=
+  HasSubformulas pred func var (Form pred func var) :=
   fun F G =>
-    let fix rec (F G : Form_ pred func var) : Prop :=
+    let fix rec (F G : Form pred func var) : Prop :=
       match G with
       | Neg G | All G => rec F G
       | Or G1 G2 => rec F G1 \/ rec F G2
@@ -433,8 +433,8 @@ Class HasSubformulas (pred func var : Atom) (A : Type) :=
       end in
     F = G \/ rec F G.
 
-Fixpoint ls_to_form {pred func var : Atom} (Gamma : list (Form_ pred func var))
-  : Form_ pred func var :=
+Fixpoint ls_to_form {pred func var : Atom} (Gamma : list (Form pred func var))
+  : Form pred func var :=
   match Gamma with
   | [] => Neg Bot
   | F :: Fs => Neg (Or (Neg F) (Neg (ls_to_form Fs)))
@@ -444,8 +444,8 @@ Fixpoint ls_to_form {pred func var : Atom} (Gamma : list (Form_ pred func var))
 Section isClosedLemmas.
   Context {pred func var : Atom} `{set_nat : set nat}.
 
-  Let Term := Term_ func var.
-  Let Form := Form_ pred func var.
+  Let Term := Term func var.
+  Let Form := Form pred func var.
 
   Lemma isClosedList_elem :
     forall (l : list Form) (F : Form),
@@ -457,7 +457,7 @@ Section isClosedLemmas.
     - apply IHGs; auto. now apply is_empty_union2 in hclosed.
   Qed.
 
-  Lemma isClosedList_isClosedForm_isClosed :
+  Lemma isClosedList_isClosedFormisClosed :
     forall (l : list Form) (F : Form),
       isClosed F -> isClosed l -> isClosed (F :: l).
   Proof using Type.
@@ -529,20 +529,20 @@ Section isClosedLemmas.
 End isClosedLemmas.
 
 (** ** Utils functions *)
-Definition get_symbol {func var : Atom} (t : Term_ func var) : option func :=
+Definition get_symbol {func var : Atom} (t : Term func var) : option func :=
   match t with
   | Bound _ | Free _ => None
   | Fun f _ => Some f
   end.
 
-Definition is_free {func var : Atom} (t : Term_ func var) : bool :=
+Definition is_free {func var : Atom} (t : Term func var) : bool :=
   match t with
   | Bound _ | Fun _ _ => false
   | Free _ => true
   end.
 
 Lemma is_free_sound :
-  forall {func var : Atom} (t : Term_ func var),
+  forall {func var : Atom} (t : Term func var),
     is_free t = true -> exists (x : var), t = Free x.
 Proof.
   intros ??? e; destruct t; try inversion e.
@@ -553,8 +553,8 @@ Qed.
 Section FunctionSymbols.
   Context {pred func var : Atom}.
 
-  Let Term := Term_ func var.
-  Let Form := Form_ pred func var.
+  Let Term := Term func var.
+  Let Form := Form pred func var.
 
   Class GetFunctSymbols (A : Type) :=
     function_symbols: A -> set_atom func.
@@ -584,8 +584,8 @@ End FunctionSymbols.
 Module ConcreteSyntaxInstances.
   Export AtomComputationalInstances.
 
-  Definition Term := Term_ string string.
-  Definition Form := Form_ string string string.
+  Definition Term := Term string string.
+  Definition Form := Form string string string.
 
   (** *** Sets of formulas *)
 

@@ -19,7 +19,7 @@ Notation "x \in l" := (List.In x l) (at level 30).
 Section Tableaux.
   Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
 
-  Let Form := Form_ pred func var.
+  Let Form := Form pred func var.
 
   Inductive TableauTree : Type :=
   | Leaf
@@ -421,45 +421,45 @@ Section Tableaux.
           cbn; erewrite IHhbranchof'; eauto. congruence.
   Qed.
 
-  (** Actually, a [Tableau_] also keeps in memory the Skolem symbols introduced. *)
-  Record Tableau_ :=
+  (** Actually, a [Tableau] also keeps in memory the Skolem symbols introduced. *)
+  Record Tableau :=
     { tree :> TableauTree
     ; symbols : sko_record sko }.
 
   Definition expand_tableau_branch (left_forms right_forms : option (list Form))
-    (B : Branch) (T : Tableau_) : option Tableau_ :=
+    (B : Branch) (T : Tableau) : option Tableau :=
     expand_tableau_branch__aux left_forms right_forms B T >>=
       (fun tree => Some {| tree := tree; symbols := symbols T |}).
 
   (** A [Sequence] is a list of tableaux. *)
-  Definition Sequence := list Tableau_.
+  Definition Sequence := list Tableau.
 
-  Definition is_branch_closed (T : Tableau_) (sigma : Substitution var (Term_ func var))
+  Definition is_branch_closed (T : Tableau) (sigma : Substitution var (Term func var))
     (B : Branch) : Prop :=
     Bot \in get_context B T \/
       (exists (F G : Form),
           F \in get_context B T /\ G \in get_context B T /\
             F@[sigma] = Neg G@[sigma]).
 
-  (** A [Tableau_] is said closed under a substitution if every branch has a contradiction. *)
-  Definition is_tableau_closed (T : Tableau_) (sigma : Substitution var (Term_ func var)) : Prop :=
+  (** A [Tableau] is said closed under a substitution if every branch has a contradiction. *)
+  Definition is_tableau_closed (T : Tableau) (sigma : Substitution var (Term func var)) : Prop :=
     forall (B : Branch), is_branch_of B T -> is_branch_closed T sigma B.
 
-  (** A [Branch] of a [Tableau_] is satisfied if its context is satisfied. *)
-  Definition exists_satisfied_branch (M : Model pred func) (mu : env M var) (T : Tableau_) : Prop :=
+  (** A [Branch] of a [Tableau] is satisfied if its context is satisfied. *)
+  Definition exists_satisfied_branch (M : Model pred func) (mu : env M var) (T : Tableau) : Prop :=
     exists (B : Branch),
       is_branch_of B T /\ [[ M # [] # mu '|= ls_to_form (get_context B T) ]].
 
-  (** A [Tableau_] is said satisfiable if there exists a model such that for every free-variable
+  (** A [Tableau] is said satisfiable if there exists a model such that for every free-variable
       environment, there is a branch that is satisfied. *)
-  Definition is_tableau_satisfiable (T : Tableau_) :=
+  Definition is_tableau_satisfiable (T : Tableau) :=
     exists (M : Model pred func), forall (mu : env M var), exists_satisfied_branch M mu T.
 
-  Definition mkTableau (Gamma : list Form) : Tableau_ :=
+  Definition mkTableau (Gamma : list Form) : Tableau :=
     {| tree := Node Leaf Gamma Leaf
     ;  symbols := empty_record |}.
 
-  Definition mkLeaf : Tableau_ := {| tree := Leaf; symbols := empty_record |}.
+  Definition mkLeaf : Tableau := {| tree := Leaf; symbols := empty_record |}.
 
   Lemma get_context_extend_left :
     forall {T T' : TableauTree} {B : Branch} {Gamma l : list Form} {l' : option (list Form)},
@@ -543,9 +543,9 @@ Section Tableaux.
   Qed.
 
   Lemma is_branch_of_expand_tableau_branch :
-    forall {B : Branch} {T : Tableau_} (l l' : option (list Form)),
+    forall {B : Branch} {T : Tableau} (l l' : option (list Form)),
       is_branch_of B T ->
-      exists (T' : Tableau_), expand_tableau_branch l l' B T = Some T'.
+      exists (T' : Tableau), expand_tableau_branch l l' B T = Some T'.
   Proof using Type.
     intros ? [T symbs ] ?? hbranchof; cbn in *. induction hbranchof; cbn.
     - exists {| tree := Node (mkOptionalNode l) Gamma (mkOptionalNode l'); symbols := symbs |}; auto.
@@ -560,7 +560,7 @@ Section Tableaux.
   Qed.
 
   Lemma expand_tableau_branch_Some__aux :
-    forall {B : Branch} {T T' : Tableau_} {l l' : option (list Form)},
+    forall {B : Branch} {T T' : Tableau} {l l' : option (list Form)},
       expand_tableau_branch l l' B T = Some T' ->
       expand_tableau_branch__aux l l' B T = Some (tree T').
   Proof using Type.
@@ -570,7 +570,7 @@ Section Tableaux.
   Qed.
 
   Lemma expand_tableau_branch_Some_symbs :
-    forall {B : Branch} {T T' : Tableau_} {l l' : option (list Form)},
+    forall {B : Branch} {T T' : Tableau} {l l' : option (list Form)},
       expand_tableau_branch l l' B T = Some T' ->
       symbols T = symbols T'.
   Proof using Type.
@@ -622,7 +622,7 @@ Section Tableaux.
   (** If a satisfiable tableau is extended with lists of formulas of which one of them is also
       satisfied by the same model, then the extended tableau is also satisfiable. *)
   Lemma is_satisfiable_extend_gen :
-    forall (M M' : Model pred func) (T T' : Tableau_) (B : Branch) (l l' : option (list Form))
+    forall (M M' : Model pred func) (T T' : Tableau) (B : Branch) (l l' : option (list Form))
       (mu' : env M' var) (f : env M' var -> env M var),
       is_branch_of B T -> expand_tableau_branch__aux l l' B T = Some (tree T') ->
       (forall (F : Form), [[ M # [] # f mu' '|= F ]] ->
@@ -680,7 +680,7 @@ Section Tableaux.
   Qed.
 
   Lemma is_satisfiable_extend :
-    forall (M : Model pred func) (mu : env M var) (T T' : Tableau_) (B : Branch)
+    forall (M : Model pred func) (mu : env M var) (T T' : Tableau) (B : Branch)
       (l l' : option (list Form)),
       is_branch_of B T -> expand_tableau_branch l l' B T = Some T' ->
       ([[ M # [] # mu '|= ls_to_form (get_context B T) ]] ->
@@ -694,7 +694,7 @@ Section Tableaux.
   Qed.
 
   Lemma is_on_branch_in_context :
-    forall (T : Tableau_) (B : Branch) (F : Form),
+    forall (T : Tableau) (B : Branch) (F : Form),
       is_branch_of B T -> is_on_branch F B T -> F \in get_context B T.
   Proof using Type.
     intros ??? hbranchof honbranch. induction honbranch.
@@ -706,7 +706,7 @@ Section Tableaux.
   Qed.
 
   Lemma in_context_is_on_branch :
-    forall {T : Tableau_} {B : Branch} {F : Form},
+    forall {T : Tableau} {B : Branch} {F : Form},
       is_branch_of B T -> F \in get_context B T -> is_on_branch F B T.
   Proof using Type.
     intros ??? hbranchof hin. induction hbranchof.
@@ -720,7 +720,7 @@ Section Tableaux.
   Qed.
 
   Lemma is_on_satisfiable_branch :
-    forall {T : Tableau_} {B : Branch} {F : Form} {M : Model pred func} {mu : env M var},
+    forall {T : Tableau} {B : Branch} {F : Form} {M : Model pred func} {mu : env M var},
       is_branch_of B T -> is_on_branch F B T -> [[ M # [] # mu '|= ls_to_form (get_context B T) ]] ->
       [[ M # [] # mu '|= F ]].
   Proof using Type.
@@ -743,9 +743,9 @@ Reserved Notation "T |> T'" (at level 30, right associativity).
 Section ExpansionRules.
   Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
 
-  Let Term := Term_ func var.
-  Let Form := Form_ pred func var.
-  Let Tableau := Tableau_ sko.
+  Let Term := Term func var.
+  Let Form := Form pred func var.
+  Let Tableau := Tableau sko.
 
   (** By convention, we expand a tableau on the left side for unary rules. *)
   Inductive ExpansionStep : Tableau -> Tableau -> Prop :=
@@ -822,9 +822,9 @@ Notation "T |> T'" := (ExpansionStep T T').
 Section Soundness.
   Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
 
-  Let Term := Term_ func var.
-  Let Form := Form_ pred func var.
-  Let Tableau := Tableau_ sko.
+  Let Term := Term func var.
+  Let Form := Form pred func var.
+  Let Tableau := Tableau sko.
 
   (** First, we show that the last tableau of a proof cannot be satisfiable. *)
   Lemma hasTableau_not_satisfiable :
@@ -933,7 +933,7 @@ Section Soundness.
     intros ??? hclosedGamma (sequence & hproof).
     rewrite models_iff. intros M. left. intro hsat.
     have hsat' : forall (mu : env M var),
-        interpret_form_ M [] mu (ls_to_form (Neg F :: Gamma)).
+        interpret_form M [] mu (ls_to_form (Neg F :: Gamma)).
     { intro mu; change [[ M # [] # mu '|= ls_to_form (Neg F :: Gamma) ]].
       rewrite (isClosed_interp_form_env_eq _ _ _ _ (empty_env M var)); auto.
       rewrite isClosedList_isClosedFormList //. }
@@ -981,5 +981,5 @@ End Soundness.
 Module ConcreteProofInstances.
   Export ConcreteSkolemizationInstances.
 
-  Definition Tableau := @Tableau_ string string string.
+  Definition Tableau := @Tableau string string string.
 End ConcreteProofInstances.

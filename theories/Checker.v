@@ -439,7 +439,7 @@ End RulesSoundness.
 Section RuleTreeToSequence.
   Context {sko : Skolemization}.
 
-  Let Tableau := Tableau_ sko.
+  Let Tableau := Tableau sko.
 
   (** Of course, making a [Sequence] out of a [RuleTree] is not always possible, e.g., when
     the formulas specified by the [Rule] is not of the right format. Hence, we work in the
@@ -902,7 +902,7 @@ End RuleTreeToSequence.
 Section Soundness.
   Context (sko : Skolemization).
 
-  Let Tableau := Tableau_ sko.
+  Let Tableau := Tableau sko.
 
   (** Now, we show that, in the same setting, the sequence gotten from [RuleTree_to_Sequence]
       is actually an expansion sequence. A small lemma that will be useful later on is that
@@ -1323,7 +1323,7 @@ Section Soundness.
       + apply is_branch_of_nil.
       + apply esrch.
     - split.
-      + erewrite RuleTree_to_Sequence_hd; eauto.
+      + erewrite RuleTree_to_Sequence_hd; eauto. now cbn.
       + eapply GuidedTableauSearch_Some_Sequence_closed; eauto.
   Qed.
 End Soundness.

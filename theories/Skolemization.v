@@ -14,8 +14,8 @@ Section SkolemizationDef.
   Let set_var := set_atom var.
   Let set_func := set_atom func.
 
-  Let Term := Term_ func var.
-  Let Form := Form_ pred func var.
+  Let Term := Term func var.
+  Let Form := Form pred func var.
   Let Con := list Form.
 
   (** We start by defining skolemization "records", which vary depending on the skolemization.
@@ -30,7 +30,7 @@ Section SkolemizationDef.
       { record :> Type
       ; record_eqb :: EqBool record
 
-      ; value_record : func -> record -> option (Form_ pred func var)
+      ; value_record : func -> record -> option Form
       ; join : record -> record -> record
       ; single_record : func -> Form -> record
       ; empty_record : record }.
@@ -100,7 +100,7 @@ Section SkolemizationDef.
           is_sko t F symbs Gamma = true -> func
     ; args :
       forall {t : Term} {F : Form} {symbs : sko_record} {Gamma : Con},
-        is_sko t F symbs Gamma = true -> list (Term_ func var) }.
+        is_sko t F symbs Gamma = true -> list Term }.
 
   Class isSkolemization (data : SkolemizationData) :=
     { is_func :
@@ -134,7 +134,10 @@ Arguments sko_record {_ _ _} _.
 Section SkoSymbolLemmas.
   Context {pred func var : Atom} {record : SkoRecord_ pred func var}.
 
-  Definition add_symbol (f : func) (F : Form_ pred func var) (r : record) : record :=
+  Let Term := Term func var.
+  Let Form := Form pred func var.
+
+  Definition add_symbol (f : func) (F : Form) (r : record) : record :=
     join (single_record record f F) r.
 
   Lemma join_unitr :
@@ -161,9 +164,12 @@ End SkoSymbolLemmas.
 Section SkoDefs.
   Context {pred func var : Atom} (sko : Skolemization_ pred func var).
 
+  Let Term := Term func var.
+  Let Form := Form pred func var.
+
   Lemma symbol_sound :
-    forall {t : Term_ func var} {F : Form_ pred func var} {symbs : sko_record sko}
-      {Gamma : list (Form_ pred func var)} (hsko : is_sko sko t F symbs Gamma = true),
+    forall {t : Term} {F : Form} {symbs : sko_record sko}
+      {Gamma : list Form} (hsko : is_sko sko t F symbs Gamma = true),
       get_symbol t = Some (symbol sko hsko).
   Proof using Type.
     intros. etransitivity. {
@@ -179,8 +185,8 @@ Section SkolemizationInstances.
   Let set_var := set_atom var.
   Let set_func := set_atom func.
 
-  Let Term := Term_ func var.
-  Let Form := Form_ pred func var.
+  Let Term := Term func var.
+  Let Form := Form pred func var.
   Let Con := list Form.
 
   Existing Instance set_func.
@@ -219,14 +225,14 @@ Section SkolemizationInstances.
 
   (** Generic definitions for different skolemizations *)
   (* Use this function to avoid repeating the match on useless terms *)
-  Definition SkoWrapper_is_sko (t : Term_ func var) (P : func -> list (Term_ func var) -> bool) : bool :=
+  Definition SkoWrapper_is_sko (t : Term) (P : func -> list Term -> bool) : bool :=
     match t with
     | Bound _ | Free _ => false
     | Fun f l => P f l
     end.
 
   (* Use this function to get the skolem symbol (it abstracts away the impossible cases) *)
-  Definition SkoWrapper_symbol (t : Term_ func var) {P : func -> list (Term_ func var) -> bool}
+  Definition SkoWrapper_symbol (t : Term) {P : func -> list Term -> bool}
     (hsko : SkoWrapper_is_sko t P = true) : func.
     refine
       (match t as t0 return t = t0 -> func with
@@ -236,24 +242,24 @@ Section SkolemizationInstances.
     all: now rewrite e in hsko.
   Defined.
 
-  Definition SkoWrapper_args (t : Term_ func var) {P : func -> list (Term_ func var) -> bool}
-    (hsko : SkoWrapper_is_sko t P = true) : list (Term_ func var).
+  Definition SkoWrapper_args (t : Term) {P : func -> list Term -> bool}
+    (hsko : SkoWrapper_is_sko t P = true) : list Term.
   Proof.
     refine
-      (match t as t0 return t = t0 -> list (Term_ func var) with
-       | Bound _ | Free _ => fun e => False_rect (list (Term_ func var)) _
+      (match t as t0 return t = t0 -> list Term with
+       | Bound _ | Free _ => fun e => False_rect (list Term) _
        | Fun _ l => fun _ => l
        end eq_refl).
     all: now rewrite e in hsko.
   Defined.
 
-  Definition is_fv_in (S : set_atom var) (t : Term_ func var) : bool :=
+  Definition is_fv_in (S : set_atom var) (t : Term) : bool :=
     match t with
     | Bound _ | Fun _ _ => false
     | Free x => mem x S
     end.
 
-  Definition only_fv_in (S : set_atom var) (t : Term_ func var) : bool :=
+  Definition only_fv_in (S : set_atom var) (t : Term) : bool :=
     match t with
     | Bound _ | Free _ => false
     | Fun f l => forallb (is_fv_in S) l
@@ -318,8 +324,8 @@ Section SkolemizationInstances.
   Qed.
 
   Lemma OuterSkolemization_isLocallyClosed :
-    forall (t : Term_ func var) (F : Form_ pred func var) (symbs : sko_record OuterSkolemizationData)
-      (Gamma : list (Form_ pred func var)),
+    forall (t : Term) (F : Form) (symbs : sko_record OuterSkolemizationData)
+      (Gamma : list Form),
       OuterSkolemizationData t F symbs Gamma = true -> isLocallyClosed t.
   Proof using Type.
     intros ???? hsko; destruct t; cbn in *; try (inversion hsko; fail).
@@ -333,8 +339,8 @@ Section SkolemizationInstances.
   Qed.
 
   Lemma OuterSkolemization_isFunc :
-    forall (t : Term_ func var) (F : Form_ pred func var) (symbs : sko_record OuterSkolemizationData)
-      (Gamma : list (Form_ pred func var)) (hsko : OuterSkolemizationData t F symbs Gamma = true),
+    forall (t : Term) (F : Form) (symbs : sko_record OuterSkolemizationData)
+      (Gamma : list Form) (hsko : OuterSkolemizationData t F symbs Gamma = true),
       t = Fun (symbol OuterSkolemizationData hsko) (args OuterSkolemizationData hsko).
   Proof using Type.
     intros. destruct t; cbn in *; try (inversion hsko; fail).
@@ -342,8 +348,8 @@ Section SkolemizationInstances.
   Qed.
 
   Lemma OuterSkolemization_function_symbols :
-    forall {t : Term_ func var} {F : Form_ pred func var} {symbs : sko_record OuterSkolemizationData}
-      {Gamma : list (Form_ pred func var)} (hsko : OuterSkolemizationData t F symbs Gamma = true),
+    forall {t : Term} {F : Form} {symbs : sko_record OuterSkolemizationData}
+      {Gamma : list Form} (hsko : OuterSkolemizationData t F symbs Gamma = true),
       function_symbols (args OuterSkolemizationData hsko) = \{\}.
   Proof using Type.
     intros; destruct t; try (inversion hsko; fail); cbn in hsko |- *;
