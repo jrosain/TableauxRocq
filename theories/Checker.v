@@ -5,8 +5,7 @@ From Tableaux Require Import ExtendedSyntax.
 
 From Stdlib Require Import Lia.
 
-(** In this file, we implement a guided tableau proof-search procedure. It is named
-    "guided" as the rules to apply and the substitution are given.
+(** In this file, we implement a tableau proof checker procedure.
 
     It returns a boolean if the tableau is closed. We show that this procedure
     is sound, which makes it possible to output proof certificates from this
@@ -148,7 +147,7 @@ Definition get_neg_all (F : Form) : option Form :=
   end.
 
 (** *** The actual algorithm *)
-Section GuidedTableauSearchAlgorithm.
+Section ProofCheckerAlgorithm.
   Context (sko : Skolemization).
 
   Record algo_result := { status: bool; symbs: sko_record sko }.
@@ -168,7 +167,7 @@ Section GuidedTableauSearchAlgorithm.
       | Some x => action x
       end.
 
-  Definition SearchAlgorithm :=
+  Definition CheckerAlgorithm :=
     Ctx.t -> Substitution string Term -> sko_record sko -> RuleTree -> result.
 
   Definition closure_rule (search_contradiction : Ctx.t -> Substitution string Term -> bool)
@@ -180,12 +179,12 @@ Section GuidedTableauSearchAlgorithm.
 
   Definition alpha_rule (Gamma : Ctx.t) (sigma : Substitution string Term) (T : RuleTree)
     (record : sko_record sko) (F : Form) (getter : Form -> option Ctx.t) (err : string)
-    (search : SearchAlgorithm)  :=
+    (search : CheckerAlgorithm)  :=
     rule_wrapper Gamma F err getter (fun l => search (Ctx.union l Gamma) sigma record T).
 
   Definition beta_rule (Gamma : Ctx.t) (sigma : Substitution string Term) (T1 T2 : RuleTree)
     (record : sko_record sko) (F : Form) (getter : Form -> option (Ctx.t * Ctx.t))
-    (err : string) (search : SearchAlgorithm)  :=
+    (err : string) (search : CheckerAlgorithm)  :=
     rule_wrapper Gamma F err getter
       (fun l =>
          r <- search (Ctx.union (fst l) Gamma) sigma record T1;
@@ -194,13 +193,13 @@ Section GuidedTableauSearchAlgorithm.
 
   Definition gamma_rule (Gamma : Ctx.t) (sigma : Substitution string Term) (T : RuleTree)
     (record : sko_record sko) (F : Form) (x : string) (getter : Form -> option Form)
-    (err : string) (search : SearchAlgorithm)  :=
+    (err : string) (search : CheckerAlgorithm)  :=
     rule_wrapper Gamma F err getter
       (fun F => search (Ctx.add (F{0 \to Free x}) Gamma) sigma record T).
 
   Definition delta_rule (Gamma : Ctx.t) (sigma : Substitution string Term) (T : RuleTree)
     (record : sko_record sko) (F : Form) (t : Term) (getter : Form -> option Form)
-    (err : string) (search : SearchAlgorithm)  :=
+    (err : string) (search : CheckerAlgorithm)  :=
     rule_wrapper Gamma F err getter
       (fun F0 => if sko t F record (Ctx.elements Gamma)
              then
@@ -212,12 +211,12 @@ Section GuidedTableauSearchAlgorithm.
                error ("The term " ++ pr_term t ++ " is not a valid Skolem symbol in the context "
                         ++ Ctx.pr Gamma)).
 
-  (** The guided proof-search is the following algorithm:
-      - on a leaf: it tries to search for a closure [Bot] or [Neg Top] or a contradiction using
+  (** The proof checking algorithm proceeds as follows:
+      - on a leaf: it tries to search for a closure [Bot] or a contradiction using
         the supplied substitution ; returns [false] if no closure rule can be found ;
       - on a node: it tries to apply the given rule on the given formula, and calls the
         algorithm recursively. *)
-  Fixpoint GuidedTableauSearch__aux
+  Fixpoint CheckProof__aux
     (Gamma : Ctx.t) (sigma : Substitution string Term)
     (record : sko_record sko) (tree : RuleTree) : result :=
     match tree with
@@ -228,16 +227,16 @@ Section GuidedTableauSearchAlgorithm.
     | Node T1 rule T2 =>
 
         let alpha_rule (F : Form) (getter : Form -> option Ctx.t) (err : string) :=
-          alpha_rule Gamma sigma T1 record F getter err GuidedTableauSearch__aux in
+          alpha_rule Gamma sigma T1 record F getter err CheckProof__aux in
 
         let beta_rule (F : Form) (getter : Form -> option (Ctx.t * Ctx.t)) (err : string) :=
-          beta_rule Gamma sigma T1 T2 record F getter err GuidedTableauSearch__aux in
+          beta_rule Gamma sigma T1 T2 record F getter err CheckProof__aux in
 
         let gamma_rule (F : Form) (x : string) (getter : Form -> option Form) (err : string) :=
-          gamma_rule Gamma sigma T1 record F x getter err GuidedTableauSearch__aux in
+          gamma_rule Gamma sigma T1 record F x getter err CheckProof__aux in
 
         let delta_rule (F : Form) (t : Term) (getter : Form -> option Form) (err : string) :=
-          delta_rule Gamma sigma T1 record F t getter err GuidedTableauSearch__aux in
+          delta_rule Gamma sigma T1 record F t getter err CheckProof__aux in
 
         match rule with
         | AlphaNegNeg F => alpha_rule F get_neg_neg "double negation"
@@ -251,11 +250,11 @@ Section GuidedTableauSearchAlgorithm.
         end
     end.
 
-  Definition GuidedTableauSearch (Gamma : list Form) (sigma : Substitution string Term)
+  Definition CheckProof (Gamma : list Form) (sigma : Substitution string Term)
     (tree : RuleTree) : Result bool :=
-    result <- GuidedTableauSearch__aux (Ctx.from_list Gamma) sigma empty_record tree;
+    result <- CheckProof__aux (Ctx.from_list Gamma) sigma empty_record tree;
     ret (status result).
-End GuidedTableauSearchAlgorithm.
+End ProofCheckerAlgorithm.
 Arguments status {_} _.
 Arguments symbs {_} _.
 
@@ -348,11 +347,11 @@ Section RulesSoundness.
     forall {Gamma : Ctx.t} {sigma : Substitution string Term}
       {record record' : sko_record sko} {T : RuleTree} {F : Form} {err : string}
       {getter : Form -> option Ctx.t},
-      alpha_rule sko Gamma sigma T record F getter err (GuidedTableauSearch__aux sko) =
+      alpha_rule sko Gamma sigma T record F getter err (CheckProof__aux sko) =
         ret {| status := true; symbs := record' |} ->
       exists (l : Ctx.t),
         getter F = Some l /\ Ctx.In F Gamma /\
-          GuidedTableauSearch__aux sko (Ctx.union l Gamma) sigma record T =
+          CheckProof__aux sko (Ctx.union l Gamma) sigma record T =
             ret {| status := true; symbs := record' |}.
   Proof using Type.
     intros ???????? e. unfold alpha_rule in e.
@@ -363,25 +362,25 @@ Section RulesSoundness.
     forall {Gamma : Ctx.t} {sigma : Substitution string Term}
       {record record' : sko_record sko} {T1 T2 : RuleTree} {F : Form} {err : string}
       {getter : Form -> option (Ctx.t * Ctx.t)},
-      beta_rule sko Gamma sigma T1 T2 record F getter err (GuidedTableauSearch__aux sko) =
+      beta_rule sko Gamma sigma T1 T2 record F getter err (CheckProof__aux sko) =
         ret {| status := true; symbs := record' |} ->
       exists (l1 l2 : Ctx.t) (symbols : sko_record sko),
         getter F = Some (l1, l2) /\ Ctx.In F Gamma /\
-          GuidedTableauSearch__aux sko (Ctx.union l1 Gamma) sigma record T1 =
+          CheckProof__aux sko (Ctx.union l1 Gamma) sigma record T1 =
             ret {| status := true; symbs := symbols |} /\
-          GuidedTableauSearch__aux sko (Ctx.union l2 Gamma) sigma symbols T2 =
+          CheckProof__aux sko (Ctx.union l2 Gamma) sigma symbols T2 =
             ret {| status := true; symbs := record' |}.
   Proof using Type.
     intros ????????? e. unfold beta_rule in e.
     apply rule_wrapper_sound in e. destruct e as ((l1 & l2) & eg & hin & hact).
     exists l1, l2; cbn[fst snd] in hact.
-    destruct (GuidedTableauSearch__aux sko (Ctx.union l1 Gamma) sigma record T1); cbn in *.
+    destruct (CheckProof__aux sko (Ctx.union l1 Gamma) sigma record T1); cbn in *.
     destruct a as (b & s). exists s; repeat split; cbn in *; destruct b; unfold ret in hact; cbn in *;
       auto.
 
     2,4: injection hact => _ _ contra; inversion contra.
 
-    all: destruct (GuidedTableauSearch__aux sko (Ctx.union l2 Gamma) sigma s T2); cbn in *;
+    all: destruct (CheckProof__aux sko (Ctx.union l2 Gamma) sigma s T2); cbn in *;
       destruct (status a); cbn in *; auto.
 
     all: injection hact => e _; apply app_eq_nil in e; destruct e as [el el']; subst; auto.
@@ -391,11 +390,11 @@ Section RulesSoundness.
     forall {Gamma : Ctx.t} {sigma : Substitution string Term}
       {record record' : sko_record sko} {T : RuleTree} {F : Form} {x : string} {err : string}
       {getter : Form -> option Form},
-      gamma_rule sko Gamma sigma T record F x getter err (GuidedTableauSearch__aux sko) =
+      gamma_rule sko Gamma sigma T record F x getter err (CheckProof__aux sko) =
         ret {| status := true; symbs := record' |} ->
       exists (G : Form),
         getter F = Some G /\ Ctx.In F Gamma /\
-          GuidedTableauSearch__aux sko (Ctx.add (G{0 \to Free x}) Gamma) sigma record T =
+          CheckProof__aux sko (Ctx.add (G{0 \to Free x}) Gamma) sigma record T =
             ret {| status := true; symbs := record' |}.
   Proof using Type.
     intros ????????? e. unfold gamma_rule in e.
@@ -406,11 +405,11 @@ Section RulesSoundness.
     forall {Gamma : Ctx.t} {sigma : Substitution string Term}
       {record record' : sko_record sko} {T : RuleTree} {F : Form} {t : Term} {err : string}
       {getter : Form -> option Form},
-      delta_rule sko Gamma sigma T record F t getter err (GuidedTableauSearch__aux sko) =
+      delta_rule sko Gamma sigma T record F t getter err (CheckProof__aux sko) =
         ret {| status := true; symbs := record' |} ->
       exists (f : string) (G : Form),
         getter F = Some G /\ F \in Gamma /\ sko t F record Gamma = true /\ get_symbol t = Some f /\
-          GuidedTableauSearch__aux sko (G{0 \to t} :: Gamma) sigma (add_symbol f F record) T =
+          CheckProof__aux sko (G{0 \to t} :: Gamma) sigma (add_symbol f F record) T =
             ret {| status := true; symbs := record' |}.
   Proof using Type.
     intros ????????? e. unfold delta_rule in e.
@@ -637,13 +636,13 @@ Section RuleTreeToSequence.
         * rewrite -hreplace; eapply replace_expand_Left; eauto.
   Qed.
 
-  (** Then, we can show that whenever the [GuidedTableauSearch__aux] algorithm finds a result,
+  (** Then, we can show that whenever the [CheckProof__aux] algorithm finds a result,
       then the algorithm [RuleTree_to_Sequence__aux] converts the [RuleTree] to a [Sequence]
       successfully. *)
-  Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_Some__aux :
+  Lemma CheckProof_Some_RuleTree_to_Sequence_Some__aux :
     forall {Gamma : list Form} {sigma : Substitution string Term} {R : RuleTree}
       {B : Branch} {T : Tableau} {record record' : sko_record sko},
-      GuidedTableauSearch__aux sko Gamma sigma record R = ret {| status := true; symbs := record' |} ->
+      CheckProof__aux sko Gamma sigma record R = ret {| status := true; symbs := record' |} ->
       is_branch_of B T -> get_context B T = Gamma ->
       exists (s : Sequence sko), RuleTree_to_Sequence__aux B T R = Some s.
   Proof using Type.
@@ -771,25 +770,25 @@ Section RuleTreeToSequence.
   Definition RuleTree_to_Sequence (Gamma : list Form) (R : RuleTree) : option (Sequence sko) :=
     RuleTree_to_Sequence__aux EmptyBranch (mkTableau sko Gamma) R.
 
-  Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_Some :
+  Lemma CheckProof_Some_RuleTree_to_Sequence_Some :
     forall {Gamma : list Form} {sigma : Substitution string Term} {R : RuleTree}
       {record record' : sko_record sko},
-      GuidedTableauSearch__aux sko Gamma sigma record R = ret {| status := true; symbs := record' |} ->
+      CheckProof__aux sko Gamma sigma record R = ret {| status := true; symbs := record' |} ->
       exists (s : Sequence sko), RuleTree_to_Sequence Gamma R = Some s.
   Proof using Type.
     intros ????? e. cbn.
-    eapply GuidedTableauSearch_Some_RuleTree_to_Sequence_Some__aux; eauto.
+    eapply CheckProof_Some_RuleTree_to_Sequence_Some__aux; eauto.
     apply is_branch_of_nil.
   Qed.
 
-  (** The set of symbols returned by the [GuidedTableauSearch__aux] algorithm is exactly the
+  (** The set of symbols returned by the [CheckProof__aux] algorithm is exactly the
       set of symbols of the last tableau of the sequence returned by
       [RuleTree_to_Sequence__aux]. *)
   Lemma RuleTree_to_Sequence_symbols :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
       {T : Tableau} {record : sko_record sko} {s : Sequence sko},
       is_branch_of B T ->
-      GuidedTableauSearch__aux sko (get_context B T) sigma (symbols T) R =
+      CheckProof__aux sko (get_context B T) sigma (symbols T) R =
         ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s ->
       record = symbols (last s (mkLeaf sko)).
@@ -912,7 +911,7 @@ Section Soundness.
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
       {T T' : Tableau} {record : sko_record sko} {s : Sequence sko},
       is_branch_of B T ->
-      GuidedTableauSearch__aux sko (get_context B T) sigma (symbols T) R =
+      CheckProof__aux sko (get_context B T) sigma (symbols T) R =
         ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s -> s.(1) = Some T' ->
       T |> T'.
@@ -1006,10 +1005,10 @@ Section Soundness.
           cbn; now rewrite hexpand.
   Qed.
 
-  Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_is_expansion_sequence :
+  Lemma CheckProof_Some_RuleTree_to_Sequence_is_expansion_sequence :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
       {T : Tableau} {record : sko_record sko} {s : Sequence sko},
-      is_branch_of B T -> GuidedTableauSearch__aux sko (get_context B T) sigma (symbols T) R =
+      is_branch_of B T -> CheckProof__aux sko (get_context B T) sigma (symbols T) R =
                            ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s ->
       is_expansion_sequence s.
@@ -1214,11 +1213,11 @@ Section Soundness.
           eapply IHR1; eauto.
   Qed.
 
-  Lemma GuidedTableauSearch_Some_RuleTree_to_Sequence_closed :
+  Lemma CheckProof_Some_RuleTree_to_Sequence_closed :
     forall {R : RuleTree} {sigma : Substitution string Term} {B B' : Branch}
       {T : Tableau} {record : sko_record sko} {s : Sequence sko},
       is_branch_of B T -> is_branch_of (B ++ B')%list (last s (mkLeaf sko)) ->
-      GuidedTableauSearch__aux sko (get_context B T) sigma (symbols T) R =
+      CheckProof__aux sko (get_context B T) sigma (symbols T) R =
         ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s ->
       is_branch_closed sko (last s (mkLeaf sko)) sigma (B ++ B')%list.
@@ -1290,48 +1289,48 @@ Section Soundness.
         * rewrite ectx1; eauto.
   Admitted.
 
-  Lemma GuidedTableauSearch_Some_Sequence_closed :
+  Lemma CheckProof_Some_Sequence_closed :
     forall {R : RuleTree} {Gamma : list Form} {sigma : Substitution string Term}
       {record : sko_record sko} {s : Sequence sko},
-      GuidedTableauSearch__aux sko Gamma sigma empty_record R = ret {| status := true; symbs := record |} ->
+      CheckProof__aux sko Gamma sigma empty_record R = ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence Gamma R = Some s ->
       is_tableau_closed (last s (mkLeaf sko)) sigma.
   Proof using Type.
     intros ????? esrch eseq B hbranchof. change B with (EmptyBranch ++ B)%list.
-    eapply GuidedTableauSearch_Some_RuleTree_to_Sequence_closed; eauto.
+    eapply CheckProof_Some_RuleTree_to_Sequence_closed; eauto.
     - apply is_branch_of_nil.
     - cbn; eauto.
   Qed.
 
   (** We can then conclude on the soundness of the algorithm. *)
-  Lemma GuidedTableauSearch_sound :
+  Lemma CheckProof_sound :
     forall {Gamma : list Form} {sigma : Substitution string Term} {R : RuleTree},
-      GuidedTableauSearch sko Gamma sigma R = ret true ->
+      CheckProof sko Gamma sigma R = ret true ->
       hasTableau sko Gamma sigma.
   Proof using Type.
     intros ??? e.
 
-    cbn in e. destruct (GuidedTableauSearch__aux sko (Ctx.from_list Gamma) sigma empty_record R) eqn:esrch;
+    cbn in e. destruct (CheckProof__aux sko (Ctx.from_list Gamma) sigma empty_record R) eqn:esrch;
       try easy; cbn in *.
     destruct a; cbn in *. injection e => estatus el; subst.
     rewrite app_nil_r in estatus; subst.
 
-    have [s esequence] := GuidedTableauSearch_Some_RuleTree_to_Sequence_Some esrch.
+    have [s esequence] := CheckProof_Some_RuleTree_to_Sequence_Some esrch.
     exists s; split.
 
-    - eapply GuidedTableauSearch_Some_RuleTree_to_Sequence_is_expansion_sequence; eauto.
+    - eapply CheckProof_Some_RuleTree_to_Sequence_is_expansion_sequence; eauto.
       + apply is_branch_of_nil.
       + apply esrch.
     - split.
       + erewrite RuleTree_to_Sequence_hd; eauto. now cbn.
-      + eapply GuidedTableauSearch_Some_Sequence_closed; eauto.
+      + eapply CheckProof_Some_Sequence_closed; eauto.
   Qed.
 End Soundness.
 
 (** ** 3. The [tableaux] tactic *)
 
 Ltac tableaux tree :=
-  progress (apply (GuidedTableauSearch_sound _ _ _ tree); native_compute;
+  progress (apply (CheckProof_sound _ _ _ tree); native_compute;
             lazymatch goal with
             | [ |- (false, [?err]) = (true, []) ] =>
                 fail 0 "tableaux failed with the following error message: " err
