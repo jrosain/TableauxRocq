@@ -29,17 +29,6 @@ Inductive RuleTree : Type :=
 | Leaf : option (Form * Form) -> RuleTree
 | Node : RuleTree -> Rule -> RuleTree -> RuleTree.
 
-Definition mkTrivialClosure : RuleTree := Leaf None.
-
-Definition mkClosure (F G : Form) : RuleTree :=
-  Leaf (Some (F, G)).
-
-Definition mkUnaryNode (rule : Rule) (T1 : RuleTree) : RuleTree :=
-  Node T1 rule (Leaf None).
-
-Definition mkBinaryNode (rule : Rule) (T1 T2 : RuleTree) : RuleTree :=
-  Node T1 rule T2.
-
 (** A small [Result] monad that stores the errors encountered. *)
 Definition Result (A : Type) : Type := A * list string.
 
@@ -870,7 +859,7 @@ Section RuleTreeToSequence.
                                                              (last s1 (mkLeaf sko)).
         { eapply get_context_replace_child_oth.
           3: eassumption.
-          all: eauto.}
+          all: eauto. }
         rewrite ectx2' in ectx2; auto.
 
         destruct (IHR2 (B ++ [Right])%list symbs record' (last s1 (mkLeaf sko)) hbranchof2'
@@ -1015,7 +1004,7 @@ Section RuleTreeToSequence.
                                                              (last s0 (mkLeaf sko)).
         { eapply get_context_replace_child_oth.
           3: eassumption.
-          all: eauto.}
+          all: eauto. }
 
         eapply IHR2; eauto.
         now rewrite -ectx2'.
@@ -1236,7 +1225,7 @@ Section Soundness.
                                                              (last s0 (mkLeaf sko)).
         { eapply get_context_replace_child_oth.
           3: eassumption.
-          all: eauto.}
+          all: eauto. }
         rewrite ectx2' in esrch2; auto.
         have esymbs2 : symbols (last s0 (mkLeaf sko)) = symbs1.
         { symmetry; eapply RuleTree_to_Sequence_symbols.
@@ -1637,17 +1626,7 @@ Section Soundness.
   Qed.
 End Soundness.
 
-(** ** 3. The [tableaux] tactic *)
-
-Ltac tableaux tree :=
-  progress (apply (CheckProof_sound _ _ _ tree); native_compute;
-            lazymatch goal with
-            | [ |- (false, [?err]) = (true, []) ] =>
-                fail 0 "tableaux failed with the following error message: " err
-            | _ => reflexivity
-            end).
-
-(** ** 4. Extended Syntax *)
+(** ** 3. Extended Syntax *)
 
 Module Export ExtendedSyntax.
   Inductive ExtendedRule : Type :=
@@ -1664,4 +1643,246 @@ Module Export ExtendedSyntax.
   | GammaNegEx : Form -> string -> ExtendedRule
   | DeltaEx : Form -> Term -> ExtendedRule
   | DeltaNegAll : Form -> Term -> ExtendedRule.
+
+  Inductive ExtendedRuleTree : Type :=
+  | Leaf : option (Form * Form) -> ExtendedRuleTree
+  | Node : ExtendedRuleTree -> ExtendedRule -> ExtendedRuleTree -> ExtendedRuleTree.
+
+  Definition mkTrivialClosure : ExtendedRuleTree := Leaf None.
+
+  Definition mkClosure (F G : Form) : ExtendedRuleTree :=
+    Leaf (Some (F, G)).
+
+  Definition mkUnaryNode (rule : ExtendedRule) (T1 : ExtendedRuleTree) : ExtendedRuleTree :=
+    Node T1 rule (Leaf None).
+
+  Definition mkBinaryNode (rule : ExtendedRule) (T1 T2 : ExtendedRuleTree) : ExtendedRuleTree :=
+    Node T1 rule T2.
+
+  Definition get_neg_neg (F : Form) : Result Form :=
+    match F with
+    | Neg (Neg G) => ret G
+    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++ " is not a double negation."])
+    end.
+
+  Definition get_neg_or (F : Form) : Result (list Form) :=
+    match F with
+    | Neg (Or F1 F2) => ret [Neg F1 ; Neg F2]
+    | _ => ([], ["Error: the formula " ++ pr_form F ++ " is not a negated disjunction."])
+    end.
+
+  Definition get_and (F : Form) : Result (list Form) :=
+    match F with
+    | Neg (Or (Neg F1) (Neg F2)) => ret [F1 ; F2 ; Neg (Neg F1) ; Neg (Neg F2)]
+    | _ => ([], ["Error: the formula " ++ pr_form F ++ " is not a conjunction."])
+    end.
+
+  Definition get_neg_imp (F : Form) : Result (list Form) :=
+    match F with
+    | Neg (Or (Neg F1) F2) => ret [F1 ; Neg F2 ; Neg (Neg F1)]
+    | _ => ([], ["Error: the formula " ++ pr_form F ++ " is not a negated implication."])
+    end.
+
+  Definition get_or (F : Form) : Result (Form * Form) :=
+    match F with
+    | Or F1 F2 => ret (F1, F2)
+    | _ => ((Neg Bot, Neg Bot), ["Error: the formula " ++ pr_form F ++ " is not a disjunction."])
+    end.
+
+  Definition get_imp (F : Form) : Result (Form * Form) :=
+    match F with
+    | Or (Neg F1) F2 => ret (Neg F1, F2)
+    | _ => ((Neg Bot, Neg Bot), ["Error: the formula " ++ pr_form F ++ " is not an implication."])
+    end.
+
+  Definition get_neg_and (F : Form) : Result (list Form * list Form) :=
+    match F with
+    | Neg (Neg (Or (Neg F1) (Neg F2))) => ret ([Neg F1 ; Or (Neg F1) (Neg F2)], [Neg F2 ; Or (Neg F1) (Neg F2)])
+    | _ => (([], []), ["Error: the formula " ++ pr_form F ++ " is not a negated conjunction."])
+    end.
+
+  Definition get_equ (F : Form) :
+    Result (list Form * list Form * list Form * list Form * list Form) :=
+    let err := (([], [], [], [], []),
+                 ["Error: the formula " ++ pr_form F ++ " is not an equivalence."]) in
+    match F with
+    | Neg (Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F3) F4))) =>
+        if negb (eqb F1 F4 && eqb F2 F3) then err
+        else
+          ret ([Neg F1 ; Neg F2], [F1 ; Neg F1], [Neg F2 ; F2], [F1 ; F2],
+              [(Or (Neg F2) F1) ; (Or (Neg F1) F2) ; Neg (Neg (Or (Neg F1) F2)) ; Neg (Neg (Or (Neg F2) F1))])
+    | _ => err
+    end.
+
+  Definition get_neg_equ (F : Form) : Result (list Form * list Form * Form) :=
+    let err := (([], [], Neg Bot),
+                 ["Error: the formula " ++ pr_form F ++ " is not an equivalence."]) in
+    match F with
+    | Neg (Neg (Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F3) F4)))) =>
+        if negb (eqb F1 F4 && eqb F2 F3) then err
+        else ret ([F1 ; Neg (Neg F1) ; F2 ; Neg (Or (Neg F1) F2)],
+                 [F2 ; Neg (Neg F2) ; F1 ; Neg (Or (Neg F2) F1)],
+                 Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F2) F1)))
+    | _ => err
+    end.
+
+  Definition get_all (F : Form) : Result Form :=
+    match F with
+    | All G => ret G
+    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++ " is not a universal quantifier."])
+    end.
+
+  Definition get_neg_ex (F : Form) : Result Form :=
+    match F with
+    | Neg (Neg (All (Neg G))) => ret G
+    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++
+                   " is not a negated existential quantifier."])
+    end.
+
+  Definition get_ex (F : Form) : Result Form :=
+    match F with
+    | Neg (All (Neg G)) => ret G
+    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++ " is not an existential quantifier."])
+    end.
+
+  Definition get_neg_all (F : Form) : Result Form :=
+    match F with
+    | Neg (All G) => ret G
+    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++ " is not a negated universal quantifier."])
+    end.
+
+  (* We provide a compilation of the [ExtendedRuleTree] to a [RuleTree]. *)
+  Fixpoint compile__aux (Gamma : list Form) (T : ExtendedRuleTree) : Result RuleTree :=
+    match T with
+    | Leaf None => if Ctx.mem [[ ENeg ETop ]] Gamma
+                  then ret (Checker.Node (Checker.Leaf None)
+                              (Checker.AlphaNegNeg [[ ENeg ETop ]]) (Checker.Leaf None))
+                  else ret (Checker.Leaf None)
+    | Leaf (Some (F, G)) => ret (Checker.Leaf (Some (F, G)))
+    | Node T1 r T2 =>
+        match r with
+        | AlphaNegNeg F =>
+            G <- get_neg_neg F;
+            T1' <- compile__aux (G :: Gamma) T1;
+            ret (Checker.Node T1' (Checker.AlphaNegNeg F) (Checker.Leaf None))
+        | AlphaNegOr F =>
+            l <- get_neg_or F;
+            T1' <- compile__aux (l ++ Gamma)%list T1;
+            ret (Checker.Node T1' (Checker.AlphaNegOr F) (Checker.Leaf None))
+        | AlphaAnd F =>
+            l <- get_and F;
+            T1' <- compile__aux (l ++ Gamma)%list T1;
+            ret (Checker.Node (Checker.Node T1' (Checker.AlphaNegNeg (last l (Neg Bot)))
+                                 (Checker.Leaf None))
+                   (Checker.AlphaNegNeg (hd (Neg Bot) (tl (tl l)))) (Checker.Leaf None))
+        | AlphaNegImp F =>
+            l <- get_neg_imp F;
+            T1' <- compile__aux (l ++ Gamma)%list T1;
+            ret (Checker.Node T1' (Checker.AlphaNegNeg (last l (Neg Bot))) (Checker.Leaf None))
+        | BetaOr F =>
+            fs <- get_or F;
+            T1' <- compile__aux (fst fs :: Gamma)%list T1;
+            T2' <- compile__aux (snd fs :: Gamma)%list T2;
+            ret (Checker.Node T1' (Checker.BetaOr F) T2')
+        | BetaImp F =>
+            fs <- get_imp F;
+            T1' <- compile__aux (fst fs :: Gamma)%list T1;
+            T2' <- compile__aux (snd fs :: Gamma)%list T2;
+            ret (Checker.Node T1' (Checker.BetaOr F) T2')
+        | BetaNegAnd F =>
+            fs <- get_neg_and F;
+            T1' <- compile__aux (fst fs ++ Gamma)%list T1;
+            T2' <- compile__aux (snd fs ++ Gamma)%list T2;
+            ret (Checker.Node (Checker.Node T1' (Checker.BetaOr (last (fst fs) (Neg Bot))) T2')
+                              (Checker.AlphaNegNeg F) (Checker.Leaf None))
+        | BetaEqu F =>
+            fs <- get_equ F;
+            match fs, snd fs, snd (fst fs) with
+            | (fnegs, contr1, contr2, fpos, prefix), [nF2 ; nF1 ; nnF1 ; nnF2], [F1 ; F2] =>
+                T1' <- compile__aux (fnegs ++ prefix ++ Gamma)%list T1;
+                T2' <- compile__aux (fpos ++ prefix ++ Gamma)%list T2;
+                ret (Checker.Node
+                       (Checker.Node
+                          (Checker.Node
+                             (Checker.Node
+                                (Checker.Node
+                                   (Checker.Leaf (Some (F1, Neg F1)))
+                                   (Checker.BetaOr nF2)
+                                   T1')
+                                (Checker.BetaOr nF1)
+                                (Checker.Node
+                                   (Checker.Leaf (Some (F2, Neg F2)))
+                                   (Checker.BetaOr nF2)
+                                   T2'))
+                             (Checker.AlphaNegNeg nnF2) (Checker.Leaf None))
+                          (Checker.AlphaNegNeg nnF1) (Checker.Leaf None))
+                       (Checker.AlphaNegOr F) (Checker.Leaf None))
+             | _, _, _ => (Checker.Leaf None, ["Anomaly: please report to the developers."])
+             end
+        | BetaNegEqu F =>
+            fs <- get_neg_equ F;
+            T1' <- compile__aux (fst (fst fs) ++ Gamma)%list T1;
+            T2' <- compile__aux (snd (fst fs) ++ Gamma)%list T2;
+            ret (Checker.Node
+                   (Checker.Node
+                      (Checker.Node
+                         T1'
+                         (Checker.AlphaNegOr (last (fst (fst fs)) (Neg Bot)))
+                         (Checker.Leaf None))
+                      (Checker.BetaOr (snd fs))
+                      (Checker.Node
+                         T2'
+                         (Checker.AlphaNegOr (last (snd (fst fs)) (Neg Bot)))
+                         (Checker.Leaf None)))
+                   (Checker.AlphaNegNeg F)
+                   (Checker.Leaf None))
+        | GammaAll F x =>
+            G <- get_all F;
+            T1' <- compile__aux (G{0 \to Free x} :: Gamma) T1;
+            ret (Checker.Node T1' (Checker.GammaAll F x) (Checker.Leaf None))
+        | GammaNegEx F x =>
+            G <- get_all F;
+            T1' <- compile__aux (Neg G{0 \to Free x} :: All (Neg G) :: Gamma) T1;
+            ret (Checker.Node
+                   (Checker.Node T1' (Checker.GammaAll (All (Neg G)) x) (Checker.Leaf None))
+                   (Checker.AlphaNegNeg F) (Checker.Leaf None))
+        | DeltaEx F t =>
+            G <- get_ex F;
+            T1' <- compile__aux (G{0 \to t} :: Neg (Neg G{0 \to t}) :: Gamma) T1;
+            ret (Checker.Node
+                   (Checker.Node T1' (Checker.AlphaNegNeg (Neg (Neg G{0 \to t}))) (Checker.Leaf None))
+                   (Checker.DeltaNegAll F t) (Checker.Leaf None))
+        | DeltaNegAll F t =>
+            G <- get_neg_all F;
+            T1' <- compile__aux (G{0 \to t} :: Gamma) T1;
+            ret (Checker.Node T1' (Checker.DeltaNegAll F t) (Checker.Leaf None))
+        end
+    end.
+
+  Definition compile (T : ExtendedRuleTree) : Result RuleTree := compile__aux [] T.
+
+  Lemma Extended_CheckProof_sound :
+    forall {sko : Skolemization} {Gamma : list Form} {sigma : Substitution string Term} (R : ExtendedRuleTree),
+      (T <- compile R;
+       CheckProof sko Gamma sigma T) = ret true ->
+      hasTableau sko Gamma sigma.
+  Proof.
+    intros ???? echk.
+    destruct (compile R) eqn:comp; try easy.
+    unshelve eapply CheckProof_sound; eauto.
+    cbn in echk |- *.
+    have el : l = [].
+    { injection echk => els _. apply app_eq_nil in els; easy. }
+    rewrite el in echk; now cbn in echk.
+  Qed.
 End ExtendedSyntax.
+
+(** ** 4. The [tableaux] tactic *)
+
+Ltac tableaux tree :=
+  apply (Extended_CheckProof_sound tree); native_compute;
+  lazymatch goal with
+  | [ |- (false, [?err]) = (true, []) ] =>
+      fail 0 "tableaux failed with the following error message: " err
+  | _ => reflexivity
+  end.
