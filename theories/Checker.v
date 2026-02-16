@@ -1459,7 +1459,79 @@ Section Soundness.
              rewrite -app_assoc in contra'; exfalso; now apply contra'.
 
       (* Case: [BetaOr] *)
-      + admit.
+      + apply beta_rule_sound in esrch; destruct esrch as
+          (l1 & l2 & symbs & eget & hin & esrch1 & esrch2).
+        have eseq0 := eseq.
+        cbn in eseq; rewrite eget in eseq.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
+        destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
+        destruct (RuleTree_to_Sequence__aux (B ++ [Right])%list _ _) eqn:eseq2; try easy.
+        have es : last s (mkLeaf sko) = last s1 (mkLeaf sko).
+        { injection eseq => <-.
+          rewrite app_comm_cons. rewrite last_app //.
+          eapply RuleTree_to_Sequence_not_nil; eauto. }
+        rewrite !es in hbranchof' |- *.
+        have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}
+          := is_branch_of_extend_left hbranchof hexpand.
+        have hbranchof2 := is_branch_of_extend_right hbranchof hexpand.
+        have [T0 [ hnleaf e ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
+        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
+        have ectx2 := get_context_extend_right hbranchof hexpand eq_refl.
+
+        have [ T1' [ hnleaf1 ereplace ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
+        have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
+        { clear; induction B; cbn; intro; congruence. }
+
+        have hbranchof2' : is_branch_of (B ++ [Right])%list (last s0 (mkLeaf sko)).
+        { eapply is_branch_of_replace_child_oth.
+          3: eassumption.
+          all: eauto. }
+        have ectx2' : get_context (B ++ [Right])%list t = get_context (B ++ [Right])%list
+                                                             (last s0 (mkLeaf sko)).
+        { eapply get_context_replace_child_oth.
+          3: eassumption.
+          all: eauto. }
+        rewrite ectx2' in ectx2; auto.
+
+        destruct B' as [|b' B'].
+        * rewrite app_nil_r in hbranchof'; exfalso.
+          have [ T'' [ hnleaf0 erepl ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
+          admit.
+        * destruct b'.
+          -- have hbranchof0 : is_branch_of (B ++ Left :: B')%list (last s0 (mkLeaf sko)).
+             { have [ T2' [ hnleaf2 erepl2 ] ] := RuleTree_to_Sequence_branch hbranchof2' eseq2.
+               admit. }
+            enough (hclosed0 :
+                     is_branch_closed sko (last s0 (mkLeaf sko)) sigma (B ++ [Left] ++ B')%list).
+            { have [ T2' [ hnleaf2 erepl2 ] ] := RuleTree_to_Sequence_branch hbranchof2' eseq2.
+              destruct hclosed0 as [htriv | hcontr].
+              - left. erewrite <-get_context_replace_child_oth.
+                5: exact erepl2.
+                all: eauto.
+                intro. rewrite app_inv_head_iff in H.
+                inversion H.
+               - destruct hcontr as (F & G & econF & econG & esig).
+                right; exists F, G; repeat split; auto.
+                 + erewrite <-get_context_replace_child_oth.
+                   5: exact erepl2.
+                   all: eauto.
+                   intro. rewrite app_inv_head_iff in H.
+                   inversion H.
+                 + erewrite <-get_context_replace_child_oth.
+                   5: exact erepl2.
+                   all: eauto.
+                   intro. rewrite app_inv_head_iff in H.
+                   inversion H. }
+            rewrite app_assoc; eapply IHR1; eauto.
+            ++ rewrite -app_assoc; auto.
+            ++ rewrite ectx1; eauto.
+          -- change (B ++ Right :: B')%list with (B ++ [Right] ++ B')%list.
+             rewrite app_assoc; eapply IHR2; eauto.
+             ++ rewrite -app_assoc; auto.
+             ++ rewrite ectx2; eauto; cbn.
+                cbn in ectx1. rewrite /Ctx.union -ectx1 in esrch1.
+                have esymbs := RuleTree_to_Sequence_symbols hbranchof1 esrch1 eseq1.
+                rewrite -esymbs; eauto.
 
       (* Case: [GammaAll] *)
       + apply gamma_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch1).
@@ -1520,7 +1592,7 @@ Section Soundness.
              have contra := replace_expanded_child_not_right hbranchof hnleaf0 hexpand erepl.
              have contra' := not_subbranch_no_ext_is_branch B' contra.
              rewrite -app_assoc in contra'; exfalso; now apply contra'.
-  Admitted.
+  Qed.
 
   Lemma CheckProof_Some_Sequence_closed :
     forall {R : RuleTree} {Gamma : list Form} {sigma : Substitution string Term}

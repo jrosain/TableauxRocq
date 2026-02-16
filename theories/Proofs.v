@@ -52,6 +52,27 @@ Section Tableaux.
     forall (T1 T2 : TableauTree) (Gamma : list Form) (B : Branch),
       is_branch_of B T2 -> is_branch_of (Right :: B) (Node T1 Gamma T2).
 
+  Lemma is_branch_of_dec :
+    forall (B : Branch) (T : TableauTree),
+      is_branch_of B T \/ ~ is_branch_of B T.
+  Proof using Type.
+    intros B T; revert B; induction T; intros B; destruct B as [|b B].
+    - right; now intro.
+    - right; now intro.
+    - destruct T1, T2.
+      * left; constructor.
+      * right; intro contra; inversion contra; easy.
+      * right; intro contra; inversion contra; easy.
+      * right; intro contra; inversion contra; easy.
+    - destruct b.
+      + destruct (IHT1 B).
+        * left; now constructor.
+        * right; intro contra; now inversion contra.
+      + destruct (IHT2 B).
+        * left; now constructor.
+        * right; intro contra; now inversion contra.
+  Qed.
+
   (** A [Branch] [is_subbranch_of] a [TableauTree] whenever the list of branching steps describes
       a path from the root of the [TableauTree] to any node of the tree. *)
   Inductive is_subbranch_of : Branch -> TableauTree -> Prop :=
