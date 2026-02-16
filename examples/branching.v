@@ -54,6 +54,6 @@ Theorem hasTableau_outer_branching_proof :
 Proof. tableaux outer_branching_proof. Qed.
 (** Yay!! *)
 
-(* Theorem hasTableau_inner_branching_proof : *)
-(*   hasTableau InnerSkolemization [Neg (translate_EForm branching)] subst. *)
-(* Proof. tableaux outer_branching_proof. Qed. *)
+Theorem hasTableau_inner_branching_proof :
+  hasTableau InnerSkolemization [Neg (translate_EForm branching)] subst.
+Proof. tableaux outer_branching_proof. Qed.
