@@ -408,6 +408,34 @@ Section Tableaux.
           eapply is_branch_of_right, IHhbranchof'; eauto. congruence.
   Qed.
 
+  Lemma is_branch_of_replace_child_oth_inv :
+    forall {B B' : Branch} {b b' : BranchingStep} {T T' T0 : TableauTree},
+      is_branch_of (B ++ b :: B') T0 -> b <> b' -> replace_child (B ++ [b']) T T' = Some T0 ->
+      is_branch_of (B ++ b :: B') T.
+  Proof using Type.
+    intro B; induction B as [|b0 B0 IHB0]; intros ?????? hbranchof ne erepl.
+    - cbn in *. destruct b, b'; try easy.
+      + destruct T; try easy.
+        injection erepl => eT0. rewrite -eT0 in hbranchof; inversion hbranchof; subst.
+        now constructor.
+      + destruct T; try easy.
+        injection erepl => eT0. rewrite -eT0 in hbranchof; inversion hbranchof; subst.
+        now constructor.
+    - cbn in *; destruct b0.
+      + destruct T; try easy.
+        destruct (replace_child _ _ _) eqn:erepl0; try easy.
+        inversion hbranchof; subst.
+        injection erepl => eT2 eG et; subst.
+        specialize (IHB0 B' b b' T1 T' T3 H0 ne erepl0).
+        now constructor.
+      + destruct T; try easy.
+        destruct (replace_child _ _ _) eqn:erepl0; try easy.
+        inversion hbranchof; subst.
+        injection erepl => eT2 eG et; subst.
+        specialize (IHB0 B' b b' T2 T' T4 H0 ne erepl0).
+        now constructor.
+  Qed.
+
   (** The [context] of a branch is the list of all the formulas of a branch. *)
   Fixpoint get_context (B : Branch) (T : TableauTree) : list Form :=
     match B, T with
