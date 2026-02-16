@@ -105,10 +105,7 @@ Definition is_neg (F : Form) : bool :=
     [Neg P@[sigma] = P'@[sigma]] in [Gamma]. *)
 Definition formula_contradiction (F G : Form) (Gamma : Ctx.t) (sigma : Substitution string Term): bool :=
   Ctx.mem F Gamma && Ctx.mem G Gamma &&
-    (match F with
-     | Neg F => negb (is_neg G) && eqb F@[sigma] G@[sigma]
-     | _ => is_neg G && eqb (Neg F)@[sigma] G@[sigma]
-     end).
+    (eqb (Neg F)@[sigma] G@[sigma] || eqb (Neg G)@[sigma] F@[sigma]).
 
 Definition get_neg_neg (F : Form) : option Ctx.t :=
   match F with
@@ -165,10 +162,10 @@ Section ProofCheckerAlgorithm.
     Ctx.t -> Substitution string Term -> sko_record sko -> RuleTree -> result.
 
   Definition closure_rule (search_contradiction : Ctx.t -> Substitution string Term -> bool)
-    (Gamma : Ctx.t) (sigma : Substitution string Term) (symbols : sko_record sko) : result :=
+    (msg : string) (Gamma : Ctx.t) (sigma : Substitution string Term) (symbols : sko_record sko) : result :=
     if search_contradiction Gamma sigma
     then ret {| status := true; symbs := symbols |}
-    else error ("No contradiction in the context: " ++
+    else error ("No (" ++ msg ++ ") contradiction in the context: " ++
                   pr_list pr_form (Ctx.elements Gamma)@[sigma]).
 
   Definition alpha_rule (Gamma : Ctx.t) (sigma : Substitution string Term) (T : RuleTree)
@@ -214,9 +211,10 @@ Section ProofCheckerAlgorithm.
     (Gamma : Ctx.t) (sigma : Substitution string Term)
     (record : sko_record sko) (tree : RuleTree) : result :=
     match tree with
-    | Leaf None => closure_rule (fun Gamma _ => trivial_contradiction Gamma) Gamma sigma record
+    | Leaf None => closure_rule (fun Gamma _ => trivial_contradiction Gamma) "trivial" Gamma sigma record
 
-    | Leaf (Some (F, G)) => closure_rule (formula_contradiction F G) Gamma sigma record
+    | Leaf (Some (F, G)) =>
+        closure_rule (formula_contradiction F G) (pr_form F ++ " <> " ++ pr_form G) Gamma sigma record
 
     | Node T1 rule T2 =>
 
@@ -270,45 +268,15 @@ Qed.
 Section RulesSoundness.
   Context {sko : Skolemization}.
 
-  Lemma formula_contradiction_sound_neg :
-    forall {F F' G : Form} {Gamma : Ctx.t} {sigma : Substitution string Term},
-      formula_contradiction F G Gamma sigma = true -> F = Neg F' ->
-      exists (P P' : Form), Ctx.In P Gamma /\ Ctx.In P' Gamma /\ P@[sigma] = (Neg P')@[sigma].
-  Proof using Type.
-    intros ????? ((hin & hin')%andb_prop & e)%andb_prop eF; unfold formula_contradiction in e;
-      rewrite eF in e.
-    apply andb_prop in e; destruct e as (h & e).
-    rewrite eqbIsEq in e. exists F, G. rewrite !Ctx.mem_spec in hin, hin'; repeat split; auto.
-    rewrite eF; cbn; now apply f_equal.
-  Qed.
-
-  Lemma formula_contradiction_sound_pos :
-    forall {F G : Form} {Gamma : Ctx.t} {sigma : Substitution string Term},
-      formula_contradiction F G Gamma sigma = true -> is_neg F = false ->
-      exists (P P' : Form), Ctx.In P Gamma /\ Ctx.In P' Gamma /\ P@[sigma] = (Neg P')@[sigma].
-  Proof using Type.
-    intros ???? ((hin & hin')%andb_prop & e)%andb_prop eF; unfold formula_contradiction in e.
-    have e' : (is_neg G && eqb (Neg F) @[ sigma] G @[ sigma])%bool = true.
-    { destruct F; try inversion eF; auto. }
-    clear e. apply andb_prop in e'; destruct e' as (h & e).
-    rewrite eqbIsEq in e. exists G, F. rewrite !Ctx.mem_spec in hin, hin'; repeat split; auto.
-  Qed.
-
-  Lemma is_neg_dec :
-    forall (F : Form), (exists (F' : Form), F = Neg F') \/ is_neg F = false.
-  Proof using Type.
-    intros F; destruct F; auto.
-    left. now exists F.
-  Qed.
-
   Lemma formula_contradiction_sound :
     forall {F G : Form} {Gamma : Ctx.t} {sigma : Substitution string Term},
       formula_contradiction F G Gamma sigma = true ->
       exists (P P' : Form), Ctx.In P Gamma /\ Ctx.In P' Gamma /\ P@[sigma] = (Neg P')@[sigma].
   Proof using Type.
-    intros ???? e. destruct (is_neg_dec F) as [e0 | e0].
-    - destruct e0 as (F' & eF). eapply formula_contradiction_sound_neg; eauto.
-    - eapply formula_contradiction_sound_pos; eauto.
+    intros ???? ((hin & hin')%andb_prop & e)%andb_prop; unfold formula_contradiction in e.
+    apply Bool.orb_prop in e; rewrite !eqbIsEq in e; destruct e as [e1 | e2].
+    - exists G, F; repeat split; auto; now rewrite -Ctx.mem_spec.
+    - exists F, G; repeat split; auto; now rewrite -Ctx.mem_spec.
   Qed.
 
   Lemma trivial_contradiction_sound :
@@ -1720,8 +1688,8 @@ Module Export ExtendedSyntax.
     match F with
     | Neg (Neg (Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F3) F4)))) =>
         if negb (eqb F1 F4 && eqb F2 F3) then err
-        else ret ([F1 ; Neg (Neg F1) ; F2 ; Neg (Or (Neg F1) F2)],
-                 [F2 ; Neg (Neg F2) ; F1 ; Neg (Or (Neg F2) F1)],
+        else ret ([F1 ; Neg (Neg F1) ; Neg F2 ; Neg (Or (Neg F1) F2)],
+                 [F2 ; Neg (Neg F2) ; Neg F1 ; Neg (Or (Neg F2) F1)],
                  Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F2) F1)))
     | _ => err
     end.
@@ -1772,9 +1740,11 @@ Module Export ExtendedSyntax.
         | AlphaAnd F =>
             l <- get_and F;
             T1' <- compile__aux (l ++ Gamma)%list T1;
-            ret (Checker.Node (Checker.Node T1' (Checker.AlphaNegNeg (last l (Neg Bot)))
-                                 (Checker.Leaf None))
-                   (Checker.AlphaNegNeg (hd (Neg Bot) (tl (tl l)))) (Checker.Leaf None))
+            ret (Checker.Node
+                   (Checker.Node (Checker.Node T1' (Checker.AlphaNegNeg (last l (Neg Bot)))
+                                    (Checker.Leaf None))
+                      (Checker.AlphaNegNeg (hd (Neg Bot) (tl (tl l)))) (Checker.Leaf None))
+                   (Checker.AlphaNegOr F) (Checker.Leaf None))
         | AlphaNegImp F =>
             l <- get_neg_imp F;
             T1' <- compile__aux (l ++ Gamma)%list T1;
@@ -1809,9 +1779,9 @@ Module Export ExtendedSyntax.
                           (Checker.Node
                              (Checker.Node
                                 (Checker.Node
-                                   (Checker.Leaf (Some (F1, Neg F1)))
+                                   T1'
                                    (Checker.BetaOr nF2)
-                                   T1')
+                                   (Checker.Leaf (Some (F1, Neg F1))))
                                 (Checker.BetaOr nF1)
                                 (Checker.Node
                                    (Checker.Leaf (Some (F2, Neg F2)))
@@ -1829,12 +1799,16 @@ Module Export ExtendedSyntax.
             ret (Checker.Node
                    (Checker.Node
                       (Checker.Node
-                         T1'
+                         (Checker.Node T1'
+                            (Checker.AlphaNegNeg (hd (Neg Bot) (tl (fst (fst fs)))))
+                            (Checker.Leaf None))
                          (Checker.AlphaNegOr (last (fst (fst fs)) (Neg Bot)))
                          (Checker.Leaf None))
                       (Checker.BetaOr (snd fs))
                       (Checker.Node
-                         T2'
+                         (Checker.Node T1'
+                            (Checker.AlphaNegNeg (hd (Neg Bot) (tl (snd (fst fs)))))
+                            (Checker.Leaf None))
                          (Checker.AlphaNegOr (last (snd (fst fs)) (Neg Bot)))
                          (Checker.Leaf None)))
                    (Checker.AlphaNegNeg F)
@@ -1862,16 +1836,16 @@ Module Export ExtendedSyntax.
         end
     end.
 
-  Definition compile (T : ExtendedRuleTree) : Result RuleTree := compile__aux [] T.
+  Definition compile (Gamma : list Form) (T : ExtendedRuleTree) : Result RuleTree := compile__aux Gamma T.
 
   Lemma Extended_CheckProof_sound :
     forall {sko : Skolemization} {Gamma : list Form} {sigma : Substitution string Term} (R : ExtendedRuleTree),
-      (T <- compile R;
+      (T <- compile Gamma R;
        CheckProof sko Gamma sigma T) = ret true ->
       hasTableau sko Gamma sigma.
   Proof.
     intros ???? echk.
-    destruct (compile R) eqn:comp; try easy.
+    destruct (compile Gamma R) eqn:comp; try easy.
     unshelve eapply CheckProof_sound; eauto.
     cbn in echk |- *.
     have el : l = [].
