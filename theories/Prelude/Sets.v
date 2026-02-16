@@ -350,6 +350,8 @@ Notation "\{ x , y , .. , z \}" := (add x (add y .. (add z \{\}) ..)).
     import them or not. For instance, [SetComputationalInstances] will be annoying inside
     proofs, but will compute well once extracted / have a nice [decide] tactic. *)
 Module SetComputationalInstances.
+  Open Scope string_scope.
+
   Module Type SimpleOrderedType.
     Parameter t : Type.
 

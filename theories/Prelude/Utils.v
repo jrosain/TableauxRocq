@@ -164,14 +164,17 @@ Proof.
 Qed.
 
 (** Printing a list *)
-Definition pr_list {A : Type} (pr_A : A -> string) (l : list A) : string :=
-  let fix F (l : list A) : string :=
-    match l with
-    | [] => ""
-    | [x] => pr_A x
-    | x :: xs => pr_A x ++ " ; " ++ F xs
-    end in
-  F l.
+Section StringLemmas.
+  #[local] Open Scope string_scope.
+  Definition pr_list {A : Type} (pr_A : A -> string) (l : list A) : string :=
+    let fix F (l : list A) : string :=
+      match l with
+      | [] => ""
+      | [x] => pr_A x
+      | x :: xs => pr_A x ++ " ; " ++ F xs
+      end in
+    F l.
+End StringLemmas.
 
 Lemma nth_error_Some' :
   forall {A : Type} (l : list A) (n : nat) (x : A),

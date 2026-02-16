@@ -147,7 +147,7 @@ Section Tableaux.
   Lemma is_branch_of_extend_left :
     forall {T T' : TableauTree} {B : Branch} {l : list Form} {l' : option (list Form)},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) l' B T = Some T' ->
-      is_branch_of (B ++ [Left])%list T'.
+      is_branch_of (B ++ [Left]) T'.
   Proof using Type.
     intros ????? hbranchof e. generalize dependent T'; induction hbranchof; intros T' e; cbn in *.
     - injection e => <-; cbn. apply is_branch_of_left; constructor.
@@ -178,7 +178,7 @@ Section Tableaux.
   Lemma is_branch_of_extend_right :
     forall {T T' : TableauTree} {B : Branch} {l : option (list Form)} {l' : list Form},
       is_branch_of B T -> expand_tableau_branch__aux l (Some l') B T = Some T' ->
-      is_branch_of (B ++ [Right])%list T'.
+      is_branch_of (B ++ [Right]) T'.
   Proof using Type.
     intros ????? hbranchof e. generalize dependent T'; induction hbranchof; intros T' e; cbn in *.
     - injection e => <-; cbn. apply is_branch_of_right; constructor.
@@ -300,7 +300,7 @@ Section Tableaux.
   Lemma replace_expand_Left :
     forall {B : Branch} {T T0 : TableauTree} (T' : TableauTree) {l : list Form},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) None B T = Some T0 ->
-      exists T'', T'' <> Leaf /\ replace_child B T T'' = replace_child (B ++ [Left])%list T0 T'.
+      exists T'', T'' <> Leaf /\ replace_child B T T'' = replace_child (B ++ [Left]) T0 T'.
   Proof using Type.
     intros ????? hbranchof; revert  T0 T' l.
     induction hbranchof; intros ??? hexpand.
@@ -321,10 +321,10 @@ Section Tableaux.
   Lemma replace_child_sequence_expand :
     forall {B : Branch} {T T0 : TableauTree} (T1 T2 : TableauTree) {l l' : option (list Form)},
       expand_tableau_branch__aux l l' B T = Some T0 ->
-      (T' <- replace_child (B ++ [Left])%list T T1;
-       replace_child (B ++ [Right])%list T' T2) =
-      (T' <- replace_child (B ++ [Left])%list T0 T1;
-       replace_child (B ++ [Right])%list T' T2).
+      (T' <- replace_child (B ++ [Left]) T T1;
+       replace_child (B ++ [Right]) T' T2) =
+      (T' <- replace_child (B ++ [Left]) T0 T1;
+       replace_child (B ++ [Right]) T' T2).
   Proof using Type.
     intros B; induction B as [|b B IHB]; intros ?????? e.
     - destruct T; try easy; cbn in *.
@@ -334,15 +334,15 @@ Section Tableaux.
       + destruct (expand_tableau_branch__aux l l' B T3) eqn:eexpand; try easy.
         injection e => <-; cbn in *.
         specialize (IHB T3 t T1 T2 l l' eexpand).
-        destruct (replace_child (B ++ [Left])%list T3 T1),
-          (replace_child (B ++ [Left])%list t T1); try easy;
+        destruct (replace_child (B ++ [Left]) T3 T1),
+          (replace_child (B ++ [Left]) t T1); try easy;
           rewrite IHB //.
         rewrite -IHB //.
       + destruct (expand_tableau_branch__aux l l' B T4) eqn:eexpand; try easy.
         injection e => <-; cbn in *.
         specialize (IHB T4 t T1 T2 _ _ eexpand).
-        destruct (replace_child (B ++ [Left])%list T4 T1),
-          (replace_child (B ++ [Left])%list t T1); try easy;
+        destruct (replace_child (B ++ [Left]) T4 T1),
+          (replace_child (B ++ [Left]) t T1); try easy;
           rewrite IHB //.
         rewrite -IHB //.
   Qed.
@@ -351,15 +351,15 @@ Section Tableaux.
     forall {B : Branch} {T : TableauTree} (T1 T2 : TableauTree) (Gamma : list Form),
       is_branch_of B T -> get_label B T = Some Gamma ->
       replace_child B T (Node T1 Gamma T2) =
-        (T' <- replace_child (B ++ [Left])%list T T1;
-         replace_child (B ++ [Right])%list T' T2).
+        (T' <- replace_child (B ++ [Left]) T T1;
+         replace_child (B ++ [Right]) T' T2).
   Proof using Type.
     intros ????? hbranchof; revert T1 T2 Gamma; induction hbranchof; intros ??? elabel.
     - cbn in *; injection elabel => -> //.
     - cbn in *. specialize (IHhbranchof T0 T3 Gamma0 elabel).
-      rewrite IHhbranchof. destruct (replace_child (B ++ [Left])%list _ _) eqn:erepl0; easy.
+      rewrite IHhbranchof. destruct (replace_child (B ++ [Left]) _ _) eqn:erepl0; easy.
     - cbn in *. specialize (IHhbranchof T0 T3 Gamma0 elabel).
-      rewrite IHhbranchof. destruct (replace_child (B ++ [Left])%list _ _) eqn:erepl0; easy.
+      rewrite IHhbranchof. destruct (replace_child (B ++ [Left]) _ _) eqn:erepl0; easy.
   Qed.
 
   Lemma is_branch_of_replace_child_oth :
@@ -391,8 +391,8 @@ Section Tableaux.
   Fixpoint get_context (B : Branch) (T : TableauTree) : list Form :=
     match B, T with
     | [], Node Leaf Gamma Leaf => Gamma
-    | Left :: B, Node T1 Gamma _ => (get_context B T1 ++ Gamma)%list
-    | Right :: B, Node _ Gamma T2 => (get_context B T2 ++ Gamma)%list
+    | Left :: B, Node T1 Gamma _ => (get_context B T1 ++ Gamma)
+    | Right :: B, Node _ Gamma T2 => (get_context B T2 ++ Gamma)
     | _, _ => []
     end.
 
@@ -419,6 +419,25 @@ Section Tableaux.
         * now cbn.
         * inversion hbranchof; subst.
           cbn; erewrite IHhbranchof'; eauto. congruence.
+  Qed.
+
+  Lemma get_context_app_fst :
+    forall (F : Form) (B B' : Branch) (T : TableauTree),
+      F \in get_context B T -> F \in get_context (B ++ B') T.
+  Proof using Type.
+    intros ??; induction B as [|b B IHB]; intros ?? hin.
+    - destruct T; cbn in *.
+      + inversion hin.
+      + destruct T1, T2; try easy.
+        destruct B'; try easy.
+        destruct b; cbn; apply in_or_app; now right.
+    - destruct b, T; cbn in *; try easy.
+      + apply in_app_or in hin; destruct hin as [hin | hin].
+        * apply in_or_app; left. now apply IHB.
+        * apply in_or_app; now right.
+      + apply in_app_or in hin; destruct hin as [hin | hin].
+        * apply in_or_app; left. now apply IHB.
+        * apply in_or_app; now right.
   Qed.
 
   (** Actually, a [Tableau] also keeps in memory the Skolem symbols introduced. *)
@@ -464,7 +483,7 @@ Section Tableaux.
   Lemma get_context_extend_left :
     forall {T T' : TableauTree} {B : Branch} {Gamma l : list Form} {l' : option (list Form)},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) l' B T = Some T' ->
-      get_context B T = Gamma -> get_context (B ++ [Left])%list T' = (l ++ Gamma)%list.
+      get_context B T = Gamma -> get_context (B ++ [Left]) T' = (l ++ Gamma).
   Proof using Type.
     intro T. induction T; intros ????? hbranchof e eT; destruct B.
     - inversion e.
@@ -487,7 +506,7 @@ Section Tableaux.
   Lemma get_context_extend_right :
     forall {T T' : TableauTree} {B : Branch} {Gamma l' : list Form} {l : option (list Form)},
       is_branch_of B T -> expand_tableau_branch__aux l (Some l') B T = Some T' ->
-      get_context B T = Gamma -> get_context (B ++ [Right])%list T' = (l' ++ Gamma)%list.
+      get_context B T = Gamma -> get_context (B ++ [Right]) T' = (l' ++ Gamma).
   Proof using Type.
     intro T. induction T; intros ????? hbranchof e eT; destruct B.
     - inversion e.
@@ -583,7 +602,7 @@ Section Tableaux.
     forall {B : Branch} {T T0 T0' T' : TableauTree} {Gamma : list Form},
       is_branch_of B T -> T0' <> Leaf ->
       expand_tableau_branch__aux (Some Gamma) None B T = Some T0 ->
-      replace_child (B ++ [Left])%list T0 T0' = Some T' -> ~is_branch_of B T'.
+      replace_child (B ++ [Left]) T0 T0' = Some T' -> ~is_branch_of B T'.
   Proof using Type.
     intro B; induction B as [|b B IHB]; intros ????? hbranchof hnleaf hexpand hrepl hbranchof'.
 
@@ -608,6 +627,47 @@ Section Tableaux.
         specialize (IHB T2); eapply IHB; eauto.
         injection hexpand => -> _ _; rewrite erepl1.
         injection hrepl => -> //.
+  Qed.
+
+  Lemma replace_expanded_child_not_right :
+    forall {B : Branch} {T T0 T0' T' : TableauTree} {Gamma : list Form},
+      is_branch_of B T -> T0' <> Leaf ->
+      expand_tableau_branch__aux (Some Gamma) None B T = Some T0 ->
+      replace_child (B ++ [Left]) T0 T0' = Some T' -> ~is_subbranch_of (B ++ [Right]) T'.
+  Proof using Type.
+    intros ?????? hbranchof. revert T0 T0' T' Gamma; induction hbranchof;
+      intros ???? ne hexpand erepl hbranchof'; cbn in *.
+
+    - injection hexpand => eT0; subst.
+      injection erepl => eT'; subst. inversion hbranchof'; subst.
+      inversion H1.
+
+    - destruct T0; try easy.
+      destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand1; try easy.
+      destruct (replace_child _ _ _) eqn:erepl1; try easy.
+      injection erepl => eT'; subst; inversion hbranchof'; subst.
+      eapply IHhbranchof with (T' := t0); eauto.
+      injection hexpand => _ _ -> //.
+
+    - destruct T0; try easy.
+      destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand1; try easy.
+      destruct (replace_child _ _ _) eqn:erepl1; try easy.
+      injection erepl => eT'; subst; inversion hbranchof'; subst.
+      eapply IHhbranchof with (T' := t0); eauto.
+      injection hexpand => -> //.
+  Qed.
+
+  Lemma not_subbranch_no_ext_is_branch :
+    forall {B : Branch} (B' : Branch) {T : TableauTree},
+      ~is_subbranch_of B T -> ~is_branch_of (B ++ B') T.
+  Proof using Type.
+    intros ??? hsubbranch hbranch.
+    apply is_branch_of_is_subbranch_of in hbranch. apply hsubbranch; clear hsubbranch.
+    revert B' T hbranch; induction B as [|b B IHB]; intros ?? hsubbranch.
+    - cbn in hsubbranch; inversion hsubbranch; constructor.
+    - destruct b; inversion hsubbranch; subst.
+      + constructor. eapply IHB; eauto.
+      + constructor. eapply IHB; eauto.
   Qed.
 
   (** An optional list of formulas is satisfied either if it is none or if the list is
@@ -642,7 +702,7 @@ Section Tableaux.
 
       (* Case: the extension with the formulas on the left is satisfied. *)
       + destruct l.
-        * exists (B0 ++ [Left])%list; split; cbn.
+        * exists (B0 ++ [Left]); split; cbn.
           -- destruct (expand_tableau_branch__aux (Some l) l' B0 T) eqn:eT.
              ++ eapply is_branch_of_extend_left; eauto.
                 injection e => <-; eauto.
@@ -656,7 +716,7 @@ Section Tableaux.
 
       (* Case: the extension with the formulas on the right is satisfied. *)
       + destruct l'.
-        * exists (B0 ++ [Right])%list; split; cbn.
+        * exists (B0 ++ [Right]); split; cbn.
           -- destruct (expand_tableau_branch__aux l (Some l0) B0 T) eqn:eT.
              ++ eapply is_branch_of_extend_right; eauto.
                 injection e => <-; eauto.

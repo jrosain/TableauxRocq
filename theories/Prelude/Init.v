@@ -6,7 +6,6 @@ From Stdlib Require Export Strings.String.
 From Stdlib Require Export Lists.List.
 
 Export ListNotations.
-Open Scope string_scope.
 
 Notation "#| l |" := (List.length l).
 Notation "l .( i )" := (List.nth_error l i).
