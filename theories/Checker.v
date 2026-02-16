@@ -1778,7 +1778,10 @@ Module Export ExtendedSyntax.
         | AlphaNegImp F =>
             l <- get_neg_imp F;
             T1' <- compile__aux (l ++ Gamma)%list T1;
-            ret (Checker.Node T1' (Checker.AlphaNegNeg (last l (Neg Bot))) (Checker.Leaf None))
+            ret (Checker.Node
+                   (Checker.Node T1' (Checker.AlphaNegNeg (last l (Neg Bot))) (Checker.Leaf None))
+                   (Checker.AlphaNegOr F)
+                   (Checker.Leaf None))
         | BetaOr F =>
             fs <- get_or F;
             T1' <- compile__aux (fst fs :: Gamma)%list T1;
@@ -1841,7 +1844,7 @@ Module Export ExtendedSyntax.
             T1' <- compile__aux (G{0 \to Free x} :: Gamma) T1;
             ret (Checker.Node T1' (Checker.GammaAll F x) (Checker.Leaf None))
         | GammaNegEx F x =>
-            G <- get_all F;
+            G <- get_neg_ex F;
             T1' <- compile__aux (Neg G{0 \to Free x} :: All (Neg G) :: Gamma) T1;
             ret (Checker.Node
                    (Checker.Node T1' (Checker.GammaAll (All (Neg G)) x) (Checker.Leaf None))
@@ -1882,7 +1885,7 @@ End ExtendedSyntax.
 Ltac tableaux tree :=
   apply (Extended_CheckProof_sound tree); native_compute;
   lazymatch goal with
-  | [ |- (false, [?err]) = (true, []) ] =>
+  | [ |- (false, ?err :: _) = (true, []) ] =>
       fail 0 "tableaux failed with the following error message: " err
   | _ => reflexivity
   end.

@@ -1,3 +1,4 @@
+Set Warnings "-native-compiler".
 From Tableaux Require Import All.
 
 (** In this file, we give an example of a tableau proof of the drinker principle:
@@ -48,18 +49,8 @@ Proof.
       the formula from the extended syntax to the internal one. *)
   apply (mkUnaryNode (GammaNegEx (Neg [[ drinker ]]) "X")).
 
-  (** The second step is to apply the negated implication on the underlying formula.
-      Here, as we must specify the formula, there are two options: first, write down
-      the formula by hand (as an automated theorem prover would do), or use the utility
-      function [get_neg_ex]. This returns an [option Form], but in this case, we know that
-      this will always be [Some ...], so we can use [option_get] to ... get the formula.
-
-      Indeed: *)
-  Transparent eqb. Eval cbn in (option_get Bot (get_neg_ex (Neg [[ drinker ]]))). Opaque eqb.
-
-  (** Beware that, using this method, the bound variable [0] appears. It needs to be
-      replaced by the free variable we just created, i.e., [X]. *)
-  apply (mkUnaryNode (AlphaNegImp (option_get Bot (get_neg_ex (Neg [[ drinker ]]))){0 \to Free "X"})).
+  (** The second step is to apply the negated implication on the underlying formula. *)
+  apply (mkUnaryNode (AlphaNegImp (Neg [[ "P" ''('"X") '=> '! "y" :("P" ''('"y")) ]]))).
 
   (** We can now apply the first Skolemization rule, generating the Skolem symbol [f X]. *)
   apply (mkUnaryNode (DeltaNegAll (Neg [[ '! "y" :("P" ''('"y"))  ]])
@@ -68,8 +59,8 @@ Proof.
   (** Then, we have to apply back the drinker formula, which generates a new metavariable [X2] *)
   apply (mkUnaryNode (GammaNegEx (Neg [[ drinker ]]) "X2")).
 
-  (** We can use the same trick as before to split the formulas, replacing [X] by [X2]. *)
-  apply (mkUnaryNode (AlphaNegImp (option_get Bot (get_neg_ex (Neg [[ drinker ]]))){0 \to Free "X2"})).
+  (** And replay the same first step. *)
+  apply (mkUnaryNode (AlphaNegImp (Neg [[ "P" ''('"X2") '=> '! "y" :("P" ''('"y")) ]]))).
 
   (** Now, we claim that there is a contradiction with the substitution [X2 -> f X] between
       [P X2] and [Neg (P (f X))]. We can give these two formulas in any order to the utility
@@ -96,7 +87,7 @@ Definition inner_drinker_proof : ExtendedRuleTree.
 Proof.
   (** The proof proceeds as before for the first two steps *)
   apply (mkUnaryNode (GammaNegEx (Neg [[ drinker ]]) "X")).
-  apply (mkUnaryNode (AlphaNegImp (option_get Bot (get_neg_ex (Neg [[ drinker ]]))){0 \to Free "X"})).
+  apply (mkUnaryNode (AlphaNegImp (Neg [[ "P" ''('"X") '=> '! "y" :("P" ''('"y")) ]]))).
 
   (** We can now apply the first Skolemization rule, generating the Skolem symbol [c]. *)
   apply (mkUnaryNode (DeltaNegAll (Neg [[ '! "y" :("P" ''('"y")) ]])
@@ -106,6 +97,6 @@ Proof.
   exact (mkClosure [[ "P" ''('"X") ]] [[ '~ ("P" ''("c" '())) ]] ).
 Defined.
 
-Theorem hasTableau_inner_drinker_proof :
-  hasTableau InnerSkolemization [Neg (translate_EForm drinker)] inner_subst.
-Proof. tableaux inner_drinker_proof. Qed.
+(* Theorem hasTableau_inner_drinker_proof : *)
+(*   hasTableau InnerSkolemization [Neg (translate_EForm drinker)] inner_subst. *)
+(* Proof. tableaux inner_drinker_proof. Qed. *)

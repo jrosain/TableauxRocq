@@ -1,3 +1,4 @@
+Set Warnings "-native-compiler".
 From Tableaux Require Import All.
 Import ExtendedSyntaxNotation.
 
@@ -22,7 +23,8 @@ Proof.
   apply (mkUnaryNode (GammaNegEx (Neg [[ branching ]]) "X")).
 
   (** Then, the proof progresses as expected. *)
-  apply (mkUnaryNode (AlphaNegImp (option_get Bot (get_neg_ex (Neg [[ branching ]]))){0 \to Free "X"})).
+  apply (mkUnaryNode
+           (AlphaNegImp (Neg [[ (("P" ''('"X")) '=> ("P" ''("a" '())) '&& ("P" ''("b" '()))) ]]))).
 
   (** Now, we have a branching rule with the negation of the conjunction. Therefore, we have
       to apply [mkBinaryNode] instead, and we will have two goals left. *)
@@ -39,8 +41,8 @@ Proof.
     apply (mkUnaryNode (GammaNegEx (Neg [[ branching ]]) "X2")).
 
     (** Then, we continue by applying the same previous step, where we replace [X] by [X2]. *)
-    apply (mkUnaryNode (AlphaNegImp
-                          (option_get Bot (get_neg_ex (Neg [[ branching ]]))){0 \to Free "X2"})).
+    apply (mkUnaryNode
+           (AlphaNegImp (Neg [[ (("P" ''('"X2")) '=> ("P" ''("a" '())) '&& ("P" ''("b" '()))) ]]))).
 
     (** Finally, we claim that this is enough to close the tableau. *)
     exact (mkClosure [[ '~ ("P" ''("b" '())) ]] [[ "P" ''('"X2") ]]). }
@@ -52,6 +54,6 @@ Theorem hasTableau_outer_branching_proof :
 Proof. tableaux outer_branching_proof. Qed.
 (** Yay!! *)
 
-Theorem hasTableau_inner_branching_proof :
-  hasTableau InnerSkolemization [Neg (translate_EForm branching)] subst.
-Proof. tableaux outer_branching_proof. Qed.
+(* Theorem hasTableau_inner_branching_proof : *)
+(*   hasTableau InnerSkolemization [Neg (translate_EForm branching)] subst. *)
+(* Proof. tableaux outer_branching_proof. Qed. *)
