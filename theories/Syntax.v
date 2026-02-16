@@ -570,6 +570,16 @@ Section FunctionSymbols.
     GetFunctSymbols (list A) :=
     fun l => fold_left (fun s t => s \union (function_symbols t)) l \{\}.
 
+  Lemma GetFunctSymbols_in :
+    forall {A : Type} `{GetFunctSymbols A} (x : A) (l : list A) (f : func),
+      List.In x l -> set_in f (function_symbols x) ->
+      set_in f (function_symbols l).
+  Proof using Type.
+    intros ????? hin1 hin2; induction l as [|y ys IHys]; inversion hin1.
+    - subst; cbn. rewrite set_fold_left union_spec; left; rewrite union_spec; now right.
+    - cbn. rewrite set_fold_left union_spec; right; now apply IHys.
+  Qed.
+
   #[global] Instance GetFunctSymbols_form : GetFunctSymbols Form :=
     fix rec (F : Form) : set_atom func :=
       match F with

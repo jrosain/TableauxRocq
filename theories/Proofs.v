@@ -489,6 +489,28 @@ Section Tableaux.
         * apply in_or_app; now right.
   Qed.
 
+  Fixpoint get_all_formulas (T : TableauTree) : list Form :=
+    match T with
+    | Leaf => []
+    | Node T1 Gamma T2 => Gamma ++ get_all_formulas T1 ++ get_all_formulas T2
+    end.
+
+  Lemma in_get_ctx_in_all_formulas :
+    forall (B : Branch) (T : TableauTree) (F : Form),
+      is_branch_of B T -> F \in get_context B T -> F \in get_all_formulas T.
+  Proof using Type.
+    intros ??? hbranchof; induction hbranchof.
+    - intro; cbn in *. rewrite app_nil_r //.
+    - intros [hin | hin]%in_app_or; cbn in *.
+      + apply in_or_app; right; apply in_or_app; left.
+        now apply IHhbranchof.
+      + apply in_or_app; now left.
+    - intros [hin | hin]%in_app_or; cbn in *.
+      + apply in_or_app; right; apply in_or_app; right.
+        now apply IHhbranchof.
+      + apply in_or_app; now left.
+  Qed.
+
   (** Actually, a [Tableau] also keeps in memory the Skolem symbols introduced. *)
   Record Tableau :=
     { tree :> TableauTree
@@ -776,8 +798,10 @@ Section Tableaux.
     forall (M M' : Model pred func) (T T' : Tableau) (B : Branch) (l l' : option (list Form))
       (mu' : env M' var) (f : env M' var -> env M var),
       is_branch_of B T -> expand_tableau_branch__aux l l' B T = Some (tree T') ->
-      (forall (F : Form), [[ M # [] # f mu' '|= F ]] ->
-                     [[ M' # [] # mu' '|= F ]]) ->
+      (forall (F : Form),
+          F \in get_all_formulas T ->
+          [[ M # [] # f mu' '|= F ]] ->
+          [[ M' # [] # mu' '|= F ]]) ->
       ([[ M # [] # (f mu') '|= ls_to_form (get_context B T) ]] ->
        is_optional_satisfied M' mu' l \/ is_optional_satisfied M' mu' l') ->
       (exists_satisfied_branch M (f mu') T) ->
@@ -801,7 +825,10 @@ Section Tableaux.
           -- destruct (expand_tableau_branch__aux (Some l) l' B0 T) eqn:eT.
              ++ injection e => eT'. rewrite eT' in eT. erewrite get_context_extend_left; eauto.
                 cbn. unfold interpret; rewrite (ls_to_form_app l (get_context B0 T) M' [] mu').
-                cbn. intros [hl | hnB0]; auto. now apply hnB0, hcsv.
+                cbn. intros [hl | hnB0]; auto. apply hnB0, interp_form_list.
+                intros F hin; apply hcsv; auto.
+                ** eapply in_get_ctx_in_all_formulas; eauto.
+                ** apply (in_form_list_interp hin hsatB).
              ++ inversion e.
         * now cbn in hsatl.
 
@@ -816,7 +843,10 @@ Section Tableaux.
              ++ injection e => eT'; rewrite eT' in eT.
                 erewrite get_context_extend_right; eauto.
                 cbn; unfold interpret. rewrite (ls_to_form_app l0 (get_context B0 T) M' [] mu').
-                cbn. intros [hl0 | hnB0]; auto. now apply hnB0, hcsv.
+                cbn. intros [hl0 | hnB0]; auto. apply hnB0, interp_form_list.
+                intros F hin; apply hcsv; auto.
+                ** eapply in_get_ctx_in_all_formulas; eauto.
+                ** apply (in_form_list_interp hin hsatB).
              ++ inversion e.
 
         * inversion hsatr.
@@ -826,7 +856,9 @@ Section Tableaux.
       + injection e => <-. exists B; split.
         * apply is_branch_of_extend_oth with (T := T) (B := B0) (l := l) (l' := l'); auto.
         * cbn in *. rewrite -(get_context_extend_oth T t B0 B l l' hbranchof hbranchB); try easy.
-          now apply hcsv.
+          apply interp_form_list; intros F hin; apply hcsv.
+          -- eapply in_get_ctx_in_all_formulas; eauto.
+          -- apply (in_form_list_interp hin hsatB).
       + inversion e.
   Qed.
 
@@ -922,7 +954,8 @@ Section ExpansionRules.
 
   | expansion_NegAll :
     forall (T T' : Tableau) (B : Branch) (F : Form) (t : Term)
-      (hsko : sko t (Neg (All F)) (symbols T) (get_context B T) = true),
+      (hsko : sko t (Neg (All F)) (symbols T) (fv (get_context B T))
+                (function_symbols (get_all_formulas T)) = true),
       is_branch_of B T -> is_on_branch (Neg (All F)) B T ->
       expand_tableau_branch__aux (Some [Neg F{0 \to t}]) None B T = Some (tree T') ->
       symbols T' = add_symbol (symbol sko hsko) (Neg (All F)) (symbols T) ->
@@ -1052,10 +1085,19 @@ Section Soundness.
       exists (ReplacementModel M interp); intro mu.
       eapply is_satisfiable_extend_gen with (M := M) (M' := ReplacementModel M interp)
                                             (f := fun x => x); eauto.
-      intro hinterp'; left; cbn. intros [ hnF | contra ].
-      + apply hnF, hinterpsko.
-        eapply is_on_satisfiable_branch; eauto.
-      + apply contra; now intro.
+      + intros G hin hinterp'; apply hinterp; auto.
+        intros f hin'; rewrite union_spec; left.
+        eapply GetFunctSymbols_in; eauto.
+      + intro hinterp'; left; cbn. intros [ hnF | contra ].
+        * apply hnF, hinterpsko.
+          -- intros f hin; rewrite union_spec; left.
+             change (set_in f (function_symbols F)) with
+               (set_in f (function_symbols (Neg (All F)))) in hin.
+             eapply GetFunctSymbols_in; eauto.
+             eapply in_get_ctx_in_all_formulas; eauto.
+             eapply is_on_branch_in_context; eauto.
+          -- eapply is_on_satisfiable_branch; eauto.
+        * apply contra; now intro.
   Qed.
 
   (** By induction, it directly implies that if the first tableau of an expansion sequence

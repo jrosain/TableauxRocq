@@ -97,6 +97,6 @@ Proof.
   exact (mkClosure [[ "P" ''('"X") ]] [[ '~ ("P" ''("c" '())) ]] ).
 Defined.
 
-(* Theorem hasTableau_inner_drinker_proof : *)
-(*   hasTableau InnerSkolemization [Neg (translate_EForm drinker)] inner_subst. *)
-(* Proof. tableaux inner_drinker_proof. Qed. *)
+Theorem hasTableau_inner_drinker_proof :
+  hasTableau InnerSkolemization [Neg (translate_EForm drinker)] inner_subst.
+Proof. tableaux inner_drinker_proof. Qed.

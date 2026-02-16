@@ -213,6 +213,19 @@ Section SemanticsFacts.
     - apply IHGs; auto. apply NNPP => save; apply hinterp; now right.
   Qed.
 
+  Lemma interp_form_list :
+    forall (Gamma : list Form) (M : Model pred func) (rho : list M) (sigma : env M var),
+      (forall (F : Form), List.In F Gamma -> [[ M # rho # sigma '|= F ]]) ->
+      [[ M # rho # sigma '|= ls_to_form Gamma ]].
+  Proof using Type.
+    intros ???? HF; induction Gamma as [|F Gamma IHGamma].
+    - now intro.
+    - cbn; intros [hnF | hnG].
+      + apply hnF, HF; now left.
+      + apply hnG. apply IHGamma; intros G hin; apply HF.
+        now right.
+  Qed.
+
   Lemma extend_with_equiv_form :
     forall (F G : Form) (Gamma : list Form) (M : Model pred func)
       (rho : list M) (sigma : env M var),

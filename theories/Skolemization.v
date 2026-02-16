@@ -16,7 +16,7 @@ Section SkolemizationDef.
 
   Let Term := Term func var.
   Let Form := Form pred func var.
-  Let Con := list Form.
+  Let Ctx := list Form.
 
   (** We start by defining skolemization "records", which vary depending on the skolemization.
       For instance, starting from pre-inner Skolemization, we want to check that each function
@@ -30,11 +30,13 @@ Section SkolemizationDef.
       { record :> Type
       ; record_eqb :: EqBool record
 
+      ; to_set : record -> set_func
       ; value_record : func -> record -> option Form
       ; join : record -> record -> record
       ; single_record : func -> Form -> record
       ; empty_record : record }.
     #[global] Arguments value_record {_} _ _.
+    #[global] Arguments to_set {_} _.
     #[global] Arguments join {_} _ _.
     #[global] Arguments empty_record {_}.
 
@@ -94,27 +96,30 @@ Section SkolemizationDef.
         it is a Skolemization. *)
   Record SkolemizationData :=
     { sko_record : SkoRecord
-    ; is_sko :> Term -> Form -> sko_record -> Con -> bool
+    ; is_sko :> Term -> Form -> sko_record -> set_var -> set_func -> bool
     ; symbol :
-        forall {t : Term} {F : Form} {symbs : sko_record} {Gamma : Con},
-          is_sko t F symbs Gamma = true -> func
+        forall {t : Term} {F : Form} {symbs : sko_record} {fvs : set_var} {func_symbols : set_func},
+          is_sko t F symbs fvs func_symbols = true -> func
     ; args :
-      forall {t : Term} {F : Form} {symbs : sko_record} {Gamma : Con},
-        is_sko t F symbs Gamma = true -> list Term }.
+      forall {t : Term} {F : Form} {symbs : sko_record} {fvs : set_var} {func_symbols : set_func},
+        is_sko t F symbs fvs func_symbols = true -> list Term }.
 
   Class isSkolemization (data : SkolemizationData) :=
     { is_func :
-      forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
-        (hsko : is_sko data t F symbs Gamma = true),
+      forall {t : Term} {F : Form} {symbs : sko_record data} {fvs : set_var} {func_symbols : set_func}
+        (hsko : is_sko data t F symbs fvs func_symbols = true),
         t = Fun (symbol data hsko) (args data hsko)
     ; is_sko_sound :
-      forall {t : Term} {F : Form} {symbs : sko_record data} {Gamma : Con}
-        (hsko : is_sko data t (Neg (All F)) symbs Gamma = true) (M : Model pred func),
+      forall {t : Term} {F : Form} {symbs : sko_record data} {fvs : set_var} {func_symbols : set_func}
+        (hsko : is_sko data t (Neg (All F)) symbs fvs func_symbols = true) (M : Model pred func),
       exists (f : func -> list M -> M),
-        (forall (mu : env M var), [[ M # [] # mu '|= Neg (All F) ]] ->
-                            [[ ReplacementModel M f # [] # mu '|= Neg F{0 \to t} ]]) /\
-          (forall (F : Form) (mu : env M var), [[ M # [] # mu '|= F ]] ->
-                                         [[ ReplacementModel M f # [] # mu '|= F ]]) }.
+        (forall (mu : env M var),
+            subset (function_symbols F) (func_symbols \union to_set symbs) ->
+            [[ M # [] # mu '|= Neg (All F) ]] ->
+            [[ ReplacementModel M f # [] # mu '|= Neg F{0 \to t} ]]) /\
+          (forall (F : Form) (mu : env M var),
+              subset (function_symbols F) (func_symbols \union to_set symbs) -> [[ M # [] # mu '|= F ]] ->
+              [[ ReplacementModel M f # [] # mu '|= F ]]) }.
 
   Record Skolemization_ :=
     { skoData :> SkolemizationData
@@ -166,10 +171,12 @@ Section SkoDefs.
 
   Let Term := Term func var.
   Let Form := Form pred func var.
+  Let set_var := set_atom var.
+  Let set_func := set_atom func.
 
   Lemma symbol_sound :
-    forall {t : Term} {F : Form} {symbs : sko_record sko}
-      {Gamma : list Form} (hsko : is_sko sko t F symbs Gamma = true),
+    forall {t : Term} {F : Form} {symbs : sko_record sko} {fvs : set_var} {func_symbols : set_func}
+      (hsko : is_sko sko t F symbs fvs func_symbols  = true),
       get_symbol t = Some (symbol sko hsko).
   Proof using Type.
     intros. etransitivity. {
@@ -187,40 +194,70 @@ Section SkolemizationInstances.
 
   Let Term := Term func var.
   Let Form := Form pred func var.
-  Let Con := list Form.
+  Let Ctx := list Form.
 
   Existing Instance set_func.
 
-  (** An instance of [SkoRecord] with [unit]. *)
-  Definition SkoRecordData_unit :
+  (** An instance of [SkoRecord] with a [set_func]. *)
+  Definition SkoRecordData_set :
     SkoRecordData pred func var.
   Proof.
     unshelve econstructor.
-    - exact unit.
+    - exact set_func.
     - typeclasses eauto.
-    - exact (fun _ _ => None).
-    - exact (fun _ _ => tt).
-    - exact (fun _ _ => tt).
-    - exact tt.
+    - exact (fun s => s).
+    - exact (fun f s => if mem f s then Some Bot else None).
+    - exact union.
+    - exact (fun f _ => singleton f).
+    - exact \{\}.
   Defined.
 
-  Lemma SkoRecordSpecs_unit :
-    SkoRecordSpecs SkoRecordData_unit.
+  Lemma SkoRecordSpecs_set :
+    SkoRecordSpecs SkoRecordData_set.
   Proof using Type.
     constructor.
     - intros; split; intro h; intros.
-      + now cbn.
-      + now destruct r1, r2.
-    - now intros.
-    - intros; cbn in *. tauto.
-    - reflexivity.
+      + rewrite set_ext in h; specialize (h f).
+        unfold in_record; cbn in *.
+        destruct (mem f r1) eqn:hmem.
+        * rewrite mem_spec h -mem_spec in hmem.
+          rewrite hmem //.
+        * rewrite mem_spec' h -mem_spec' in hmem.
+          rewrite hmem //.
+      + rewrite set_ext; intro f; specialize (h f).
+        unfold in_record in h; cbn in *.
+        destruct (mem f r1) eqn:hmem1, (mem f r2) eqn:hmem2.
+        * rewrite !mem_spec in hmem1, hmem2. split; auto.
+        * destruct h; easy.
+        * destruct h; easy.
+        * rewrite !mem_spec' in hmem1, hmem2. split; auto.
+          -- intro hr1; exfalso; now apply hmem1.
+          -- intro hr2; exfalso; now apply hmem2.
+    - intros f g F; unfold in_record; cbn.
+      destruct (mem g (singleton f)) eqn:eg; intro; try easy.
+      rewrite mem_spec singleton_spec // in eg |- *.
+    - intros f r1 r2; unfold in_record; cbn.
+      destruct (mem f (r1 \union r2)) eqn:eunion, (mem f r1) eqn:er1, (mem f r2) eqn:er2;
+        firstorder.
+      + rewrite !mem_spec' in er1, er2.
+        rewrite mem_spec union_spec in eunion. exfalso; destruct eunion; auto.
+      + rewrite !mem_spec in er1, er2.
+        rewrite mem_spec' union_spec in eunion. apply eunion; now left.
+      + rewrite !mem_spec in er1, er2.
+        rewrite mem_spec' union_spec in eunion. apply eunion; now left.
+      + rewrite mem_spec in er1; rewrite mem_spec' in er2.
+        rewrite mem_spec' union_spec in eunion. apply eunion; now left.
+      + rewrite mem_spec' in er1; rewrite mem_spec in er2.
+        rewrite mem_spec' union_spec in eunion. apply eunion; now right.
+    - intro; cbn. destruct (mem f \{\}) eqn:eempty; auto.
+      rewrite mem_spec in eempty. exfalso; eapply empty_spec; eauto.
   Qed.
 
-  Definition sko_record_unit : SkoRecord pred func var.
+  Definition sko_record_set : SkoRecord pred func var.
   Proof.
     unshelve econstructor.
-    - exact SkoRecordData_unit.
-    - exact SkoRecordSpecs_unit.
+    - exact SkoRecordData_set.
+    - exact SkoRecordSpecs_set.
   Defined.
 
   (** Generic definitions for different skolemizations *)
@@ -268,23 +305,23 @@ Section SkolemizationInstances.
   (** In outer skolemization, we want to check that:
       - [t] is a functorial term [f (t1, ..., tn)],
       - such that [f] does not already appear in [Gamma],
-      - and [t1, ..., tn] are actually all the free variables of [Gamma].
+      - and [t1, ..., tn] are actually all the free variables of (morally) the context.
 
       As the fact that it's a functorial term is already given by [SkoWrapper_is_sko],
       we focus on defining the other aspects here. *)
-  Definition OuterSkolemization_is_sko_pred (Gamma : Con) (f : func) (l : list Term) : bool :=
-    negb (mem f (function_symbols Gamma)) &&
-      eqb (fv l) (fv Gamma) &&
-      forallb is_free l.
+  Definition OuterSkolemization_is_sko_pred (fvs : set_var) (func_symbols : set_func) (f : func)
+    (l : list Term) : bool :=
+    negb (mem f func_symbols) &&
+      eqb (fv l) fvs && forallb is_free l.
 
   Lemma OuterSkolemization_is_sko_pred_sound :
-    forall (Gamma : Con) (f : func) (l : list Term),
-      OuterSkolemization_is_sko_pred Gamma f l = true ->
-      ~(set_in f (function_symbols Gamma)) /\
-        fv l = fv Gamma /\
+    forall (fvs : set_var) (func_symbols : set_func) (f : func) (l : list Term),
+      OuterSkolemization_is_sko_pred fvs func_symbols f l = true ->
+      ~(set_in f func_symbols) /\
+        fv l = fvs /\
         (forall (t : Term), List.In t l -> exists (x : var), t = Free x).
   Proof using Type.
-    intros ??? [ [ hfresh%Bool.negb_true_iff e ]%andb_prop hfree ]%andb_prop;
+    intros ???? [ [ hfresh%Bool.negb_true_iff e ]%andb_prop hfree ]%andb_prop;
       repeat split.
     - rewrite -mem_spec' //.
     - rewrite -eqbIsEq //.
@@ -295,24 +332,26 @@ Section SkolemizationInstances.
   Definition OuterSkolemizationData : SkolemizationData pred func var.
   Proof.
     unshelve econstructor.
-    - exact sko_record_unit. (* in outer skolemization, we don't need to check other symbols *)
-    - intros t _ _ Gamma. exact (SkoWrapper_is_sko t (OuterSkolemization_is_sko_pred Gamma)).
-    - intros t ??? hsko. apply (SkoWrapper_symbol t hsko).
-    - intros t ??? hsko. apply (SkoWrapper_args t hsko).
+    - exact sko_record_set.
+    (* in outer skolemization, we simply need to keep track of which symbols have been
+       instantiated *)
+    - intros t _ symbs1 fvs symbs2.
+      exact (SkoWrapper_is_sko t (OuterSkolemization_is_sko_pred fvs (symbs2 \union symbs1))).
+    - intros t ???? hsko. apply (SkoWrapper_symbol t hsko).
+    - intros t ???? hsko. apply (SkoWrapper_args t hsko).
   Defined.
 
   Lemma OuterSkolemization_args_vars :
-    forall {Gamma : Con} {t : Term} {F : Form} {symbs : sko_record_unit}
-      (hsko : OuterSkolemizationData t F symbs Gamma = true),
+    forall {func_symbols : set_func} {t : Term} {F : Form} {symbs : sko_record OuterSkolemizationData}
+      {fvs : set_var} (hsko : OuterSkolemizationData t F symbs fvs func_symbols = true),
     exists (l : list var), args OuterSkolemizationData hsko =
                         map (fun v => Free v) l.
   Proof using Type.
-    intros ?????. set largs := args OuterSkolemizationData hsko.
+    intros ??????. set largs := args OuterSkolemizationData hsko.
     destruct t; try inversion hsko; cbn in hsko.
     have eargs : largs = l by reflexivity. rewrite eargs.
-    have h := OuterSkolemization_is_sko_pred_sound Gamma a l.
-    destruct (h hsko) as (_ & _ & hargs).
-    clear largs eargs H0 hsko h.
+    have [ _ [ _ hargs ] ] := OuterSkolemization_is_sko_pred_sound _ _ _ _ H0.
+    clear largs eargs H0 hsko.
     induction l as [|t ts IHts].
     - now exists [].
     - have ht := hargs t ltac:(now left).
@@ -324,14 +363,14 @@ Section SkolemizationInstances.
   Qed.
 
   Lemma OuterSkolemization_isLocallyClosed :
-    forall (t : Term) (F : Form) (symbs : sko_record OuterSkolemizationData)
-      (Gamma : list Form),
-      OuterSkolemizationData t F symbs Gamma = true -> isLocallyClosed t.
+    forall (t : Term) (F : Form) (symbs : sko_record OuterSkolemizationData) (fvs : set_var)
+      (func_symbols : set_func),
+      OuterSkolemizationData t F symbs fvs func_symbols = true -> isLocallyClosed t.
   Proof using Type.
-    intros ???? hsko; destruct t; cbn in *; try (inversion hsko; fail).
+    intros ????? hsko; destruct t; cbn in *; try (inversion hsko; fail).
     apply OuterSkolemization_is_sko_pred_sound in hsko; destruct hsko as (_ & _ & hfv).
-    clear Gamma symbs F; induction l as [|t ts IHts]; unfold isLocallyClosed; cbn; unfold is_empty;
-      auto.
+    clear func_symbols symbs F; induction l as [|t ts IHts]; unfold isLocallyClosed; cbn;
+      unfold is_empty; auto.
     change (bv t \union bv_list ts = \{\}); apply is_empty_union; split.
     + have h : exists x, t = Free x by apply hfv; now left.
       destruct h as (x & e); rewrite e; now cbn.
@@ -339,8 +378,8 @@ Section SkolemizationInstances.
   Qed.
 
   Lemma OuterSkolemization_isFunc :
-    forall (t : Term) (F : Form) (symbs : sko_record OuterSkolemizationData)
-      (Gamma : list Form) (hsko : OuterSkolemizationData t F symbs Gamma = true),
+    forall (t : Term) (F : Form) (symbs : sko_record OuterSkolemizationData) (fvs : set_var)
+      (func_symbols : set_func) (hsko : OuterSkolemizationData t F symbs fvs func_symbols = true),
       t = Fun (symbol OuterSkolemizationData hsko) (args OuterSkolemizationData hsko).
   Proof using Type.
     intros. destruct t; cbn in *; try (inversion hsko; fail).
@@ -348,8 +387,8 @@ Section SkolemizationInstances.
   Qed.
 
   Lemma OuterSkolemization_function_symbols :
-    forall {t : Term} {F : Form} {symbs : sko_record OuterSkolemizationData}
-      {Gamma : list Form} (hsko : OuterSkolemizationData t F symbs Gamma = true),
+    forall {t : Term} {F : Form} {symbs : sko_record OuterSkolemizationData} {fvs : set_var}
+      {func_symbols : set_func} (hsko : OuterSkolemizationData t F symbs fvs func_symbols = true),
       function_symbols (args OuterSkolemizationData hsko) = \{\}.
   Proof using Type.
     intros; destruct t; try (inversion hsko; fail); cbn in hsko |- *;
@@ -364,21 +403,21 @@ Section SkolemizationInstances.
 
   Lemma isSkolemization_OuterSkolemizationData :
     isSkolemization OuterSkolemizationData.
-  Proof.
+  Proof using Type.
     constructor.
     - apply OuterSkolemization_isFunc.
-    - intros ???? hsko ?.
+    - intros ????? hsko ?.
       destruct t; try inversion hsko.
       destruct (OuterSkolemization_args_vars hsko) as (l0 & el0).
       cbn in el0. rewrite el0.
       exists (replace_interp_func M F (symbol OuterSkolemizationData hsko) l0); split.
       + intros mu hdelta; apply satisfies_opening_with_sko; auto.
-        destruct (OuterSkolemization_is_sko_pred_sound _ _ _ H0) as (hnin & _ & _).
-        (* OK if [Neg (All F)] is in [Gamma], which is the case. *)
-        admit.
+        destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _).
+        intro hin; now apply hnin, hdelta.
       + intros G mu hG. unfold interpret; rewrite no_skolem_same_interp_form; auto.
-        (* OK if [G] is in [Gamma], which is the case (TODO) *)
-  Admitted.
+        destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _); cbn.
+        intro hin; now apply hnin, hG.
+  Qed.
 
   Definition OuterSkolemization : Skolemization_ pred func var.
   Proof.
@@ -387,30 +426,128 @@ Section SkolemizationInstances.
     - exact isSkolemization_OuterSkolemizationData.
   Defined.
 
-  (* Definition InnerSkolemizationData : SkolemizationData pred func var. *)
-  (* Proof. *)
-  (*   unshelve econstructor. *)
-  (*   - exact sko_record_sets. (* in inner skolemization, we also only care about freshness of the *)
-  (*                               symbols *) *)
-  (*   - intros t F _ symbs. *)
-  (*     (* We want to check (i) that the list [l] is composed of all the free variables appearing *)
-  (*        in the Skolemized formula [F], and (ii) that the symbol [f] is fresh in the set of *)
-  (*        Skolem symbols already appearing in the branch. *) *)
-  (*     exact (SkoWrapper_is_sko t (fun f l => andb (only_fv_in (fv F) t) (isFresh f symbs))). *)
-  (*   - intros t ??? hsko. apply (SkoWrapper_symbol t hsko). *)
-  (*   - intros t ??? hsko. apply (SkoWrapper_args t hsko). *)
-  (* Defined. *)
+  (** In inner skolemization, we want to check that:
+      - [t] is a functorial term [f (t1, ..., tn)],
+      - such that [f] does not already appear in [Gamma],
+      - and [t1, ..., tn] are actually all the free variables of the formula.
 
-  (* Lemma isSkolemization_InnerSkolemizationData : *)
-  (*   isSkolemization InnerSkolemizationData. *)
-  (* Proof. Admitted. *)
+      As the fact that it's a functorial term is already given by [SkoWrapper_is_sko],
+      we focus on defining the other aspects here. *)
+  Definition InnerSkolemization_is_sko_pred (F : Form) (func_symbols : set_func) (f : func)
+    (l : list Term) : bool :=
+    negb (mem f func_symbols) &&
+      eqb (fv l) (fv F) && forallb is_free l.
 
-  (* Definition InnerSkolemization : Skolemization_ pred func var. *)
-  (* Proof. *)
-  (*   unshelve econstructor. *)
-  (*   - exact InnerSkolemizationData. *)
-  (*   - exact isSkolemization_InnerSkolemizationData. *)
-  (* Defined. *)
+  Lemma InnerSkolemization_is_sko_pred_sound :
+    forall (F : Form) (func_symbols : set_func) (f : func) (l : list Term),
+      InnerSkolemization_is_sko_pred F func_symbols f l = true ->
+      ~(set_in f func_symbols) /\
+        fv l = fv F /\
+        (forall (t : Term), List.In t l -> exists (x : var), t = Free x).
+  Proof using Type.
+    intros ???? [ [ hfresh%Bool.negb_true_iff e ]%andb_prop hfree ]%andb_prop;
+      repeat split.
+    - rewrite -mem_spec' //.
+    - rewrite -eqbIsEq //.
+    - rewrite forallb_forall in hfree; intros ? hin; specialize (hfree t hin).
+      now apply is_free_sound in hfree.
+  Qed.
+
+  Definition InnerSkolemizationData : SkolemizationData pred func var.
+  Proof.
+    unshelve econstructor.
+    - exact sko_record_set.
+    - intros t F symbs _ func_symbols.
+      exact (SkoWrapper_is_sko t (InnerSkolemization_is_sko_pred F (func_symbols \union symbs))).
+    - intros t ???? hsko. apply (SkoWrapper_symbol t hsko).
+    - intros t ???? hsko. apply (SkoWrapper_args t hsko).
+  Defined.
+
+  Lemma InnerSkolemization_args_vars :
+    forall {func_symbols : set_func} {t : Term} {F : Form}
+      {symbs : sko_record InnerSkolemizationData} {fvs : set_var}
+      (hsko : InnerSkolemizationData t F symbs fvs func_symbols = true),
+    exists (l : list var), args InnerSkolemizationData hsko =
+                        map (fun v => Free v) l.
+  Proof using Type.
+    intros ??????. set largs := args InnerSkolemizationData hsko.
+    destruct t; try inversion hsko; cbn in hsko.
+    have eargs : largs = l by reflexivity. rewrite eargs.
+    have [ _ [ _ hargs ] ] := InnerSkolemization_is_sko_pred_sound _ _ _ _ H0.
+    clear largs eargs H0 hsko.
+    induction l as [|t ts IHts].
+    - now exists [].
+    - have ht := hargs t ltac:(now left).
+      destruct ht as (x & e).
+      have H : forall t, List.In t ts -> exists x : var, t = Free x.
+      { intros; apply hargs. now right. }
+      specialize (IHts H). destruct IHts as (l0 & el0).
+      exists (x :: l0); cbn. rewrite e el0 //.
+  Qed.
+
+  Lemma InnerSkolemization_isLocallyClosed :
+    forall (t : Term) (F : Form) (symbs : sko_record InnerSkolemizationData) (fvs : set_var)
+      (func_symbols : set_func),
+      InnerSkolemizationData t F symbs fvs func_symbols = true -> isLocallyClosed t.
+  Proof using Type.
+    intros ????? hsko; destruct t; cbn in *; try (inversion hsko; fail).
+    apply InnerSkolemization_is_sko_pred_sound in hsko; destruct hsko as (_ & _ & hfv).
+    clear func_symbols symbs F; induction l as [|t ts IHts]; unfold isLocallyClosed; cbn;
+      unfold is_empty; auto.
+    change (bv t \union bv_list ts = \{\}); apply is_empty_union; split.
+    + have h : exists x, t = Free x by apply hfv; now left.
+      destruct h as (x & e); rewrite e; now cbn.
+    + apply IHts; intros; apply hfv; now right.
+  Qed.
+
+  Lemma InnerSkolemization_isFunc :
+    forall (t : Term) (F : Form) (symbs : sko_record InnerSkolemizationData) (fvs : set_var)
+      (func_symbols : set_func) (hsko : InnerSkolemizationData t F symbs fvs func_symbols = true),
+      t = Fun (symbol InnerSkolemizationData hsko) (args InnerSkolemizationData hsko).
+  Proof using Type.
+    intros. destruct t; cbn in *; try (inversion hsko; fail).
+    reflexivity.
+  Qed.
+
+  Lemma InnerSkolemization_function_symbols :
+    forall {t : Term} {F : Form} {symbs : sko_record InnerSkolemizationData} {fvs : set_var}
+      {func_symbols : set_func} (hsko : InnerSkolemizationData t F symbs fvs func_symbols = true),
+      function_symbols (args InnerSkolemizationData hsko) = \{\}.
+  Proof using Type.
+    intros; destruct t; try (inversion hsko; fail); cbn in hsko |- *;
+      unfold InnerSkolemization_is_sko_pred in hsko.
+    have hsko' := andb_prop _ _ hsko.
+    destruct hsko' as (_ & hfree); clear hsko.
+    induction l as [|t ts IHts]; auto; cbn.
+    cbn in hfree; apply andb_prop in hfree; destruct hfree as [hfreet hfreets].
+    rewrite set_fold_left empty_unitl IHts; auto.
+    destruct t; try inversion hfreet; cbn; apply empty_unitl.
+  Qed.
+
+  Lemma isSkolemization_InnerSkolemizationData :
+    isSkolemization InnerSkolemizationData.
+  Proof using Type.
+    constructor.
+    - apply InnerSkolemization_isFunc.
+    - intros ????? hsko ?.
+      destruct t; try inversion hsko.
+      destruct (InnerSkolemization_args_vars hsko) as (l0 & el0).
+      cbn in el0. rewrite el0.
+      exists (replace_interp_func M F (symbol InnerSkolemizationData hsko) l0); split.
+      + intros mu hdelta; apply satisfies_opening_with_sko; auto.
+        destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _).
+        intro hin; now apply hnin, hdelta.
+      + intros G mu hG. unfold interpret; rewrite no_skolem_same_interp_form; auto.
+        destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _); cbn.
+        intro hin. now apply hnin, hG.
+  Qed.
+
+  Definition InnerSkolemization : Skolemization_ pred func var.
+  Proof.
+    unshelve econstructor.
+    - exact InnerSkolemizationData.
+    - exact isSkolemization_InnerSkolemizationData.
+  Defined.
 End SkolemizationInstances.
 
 Module ConcreteSkolemizationInstances.

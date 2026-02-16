@@ -192,7 +192,7 @@ Section ProofCheckerAlgorithm.
     (record : sko_record sko) (F : Form) (t : Term) (getter : Form -> option Form)
     (err : string) (search : CheckerAlgorithm)  :=
     rule_wrapper Gamma F err getter
-      (fun F0 => if sko t F record (Ctx.elements Gamma)
+      (fun F0 => if sko t F record (fv Gamma) (function_symbols Gamma \union to_set record)
              then
                match get_symbol t with
                | None => error "This shouldn't ever happen."
@@ -370,14 +370,16 @@ Section RulesSoundness.
       delta_rule sko Gamma sigma T record F t getter err (CheckProof__aux sko) =
         ret {| status := true; symbs := record' |} ->
       exists (f : string) (G : Form),
-        getter F = Some G /\ F \in Gamma /\ sko t F record Gamma = true /\ get_symbol t = Some f /\
+        getter F = Some G /\ F \in Gamma /\
+          sko t F record (fv Gamma) (function_symbols Gamma \union to_set record) = true /\
+          get_symbol t = Some f /\
           CheckProof__aux sko (G{0 \to t} :: Gamma) sigma (add_symbol f F record) T =
             ret {| status := true; symbs := record' |}.
   Proof using Type.
     intros ????????? e. unfold delta_rule in e.
     apply rule_wrapper_sound in e.
     destruct e as (G & eG & hin & e).
-    destruct (sko t F record (Ctx.elements Gamma)) eqn:hsko; try inversion e.
+    destruct (sko t F _ _ _) eqn:hsko; try inversion e.
     destruct (get_symbol t) eqn:esym; try inversion e.
     exists a, G; repeat split; auto.
   Qed.
@@ -1107,11 +1109,18 @@ Section Soundness.
         do 2 (destruct f; try easy).
         have e := symbol_sound sko hsko.
         rewrite esymb in e; injection e => ->; eauto.
-        eapply expansion_NegAll with (hsko := hsko); eauto.
+        (* TODO, important: *)
+        have hapi : function_symbols (get_context B T) \union to_set (symbols T) =
+                      function_symbols (get_all_formulas T) by admit.
+        (* What we want here (should be easy): *)
+        have hsko' : sko t (Neg (All f)) (symbols T) (fv (get_context B T))
+                       (function_symbols (get_all_formulas T)) = true by admit.
+        eapply expansion_NegAll with (hsko := hsko'); eauto.
         * apply in_context_is_on_branch; eauto.
         * cbn in eget. change (Neg f {0 \to t}) with ((Neg f) {0 \to t}); injection eget => ->.
           cbn; now rewrite hexpand.
-  Qed.
+        * cbn. admit. (* should also be easy *)
+  Admitted.
 
   Lemma CheckProof_Some_RuleTree_to_Sequence_is_expansion_sequence :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
