@@ -1417,7 +1417,7 @@ Section Soundness.
         destruct B' as [|b' B'].
         * rewrite app_nil_r in hbranchof'; exfalso.
           have [ T'' [ hnleaf0 erepl ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
-          have contra := replace_expanded_child_not_branch hbranchof hnleaf0 hexpand erepl.
+          have contra := replace_expanded_child_not_branch_Left hbranchof hnleaf0 hexpand erepl.
           easy.
         * destruct b'.
           -- change (B ++ Left :: B')%list with (B ++ [Left] ++ B')%list.
@@ -1425,7 +1425,7 @@ Section Soundness.
              ++ rewrite -app_assoc; auto.
              ++ rewrite ectx1; eauto.
           -- have [ T'' [ hnleaf0 erepl ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
-             have contra := replace_expanded_child_not_right hbranchof hnleaf0 hexpand erepl.
+             have contra := replace_expanded_child_not_subbranch hbranchof hnleaf0 hexpand erepl.
              have contra' := not_subbranch_no_ext_is_branch B' contra.
              rewrite -app_assoc in contra'; exfalso; now apply contra'.
 
@@ -1446,7 +1446,7 @@ Section Soundness.
         destruct B' as [|b' B'].
         * rewrite app_nil_r in hbranchof'; exfalso.
           have [ T'' [ hnleaf0 erepl ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
-          have contra := replace_expanded_child_not_branch hbranchof hnleaf0 hexpand erepl.
+          have contra := replace_expanded_child_not_branch_Left hbranchof hnleaf0 hexpand erepl.
           easy.
         * destruct b'.
           -- change (B ++ Left :: B')%list with (B ++ [Left] ++ B')%list.
@@ -1454,7 +1454,7 @@ Section Soundness.
              ++ rewrite -app_assoc; auto.
              ++ rewrite ectx1; eauto.
           -- have [ T'' [ hnleaf0 erepl ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
-             have contra := replace_expanded_child_not_right hbranchof hnleaf0 hexpand erepl.
+             have contra := replace_expanded_child_not_subbranch hbranchof hnleaf0 hexpand erepl.
              have contra' := not_subbranch_no_ext_is_branch B' contra.
              rewrite -app_assoc in contra'; exfalso; now apply contra'.
 
@@ -1496,7 +1496,11 @@ Section Soundness.
         destruct B' as [|b' B'].
         * rewrite app_nil_r in hbranchof'; exfalso.
           have [ T'' [ hnleaf0 erepl ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
-          admit.
+          have [ T2' [ hnleaf2 erepl2 ] ] := RuleTree_to_Sequence_branch hbranchof2' eseq2.
+          cbn in ereplace.
+          have contra := replace_expanded_child_not_branch_Right
+                           hbranchof hnleaf1 hnleaf2 hexpand ereplace erepl2.
+          easy.
         * destruct b'.
           -- have hbranchof0 : is_branch_of (B ++ Left :: B')%list (last s0 (mkLeaf sko)).
              { have [ T2' [ hnleaf2 erepl2 ] ] := RuleTree_to_Sequence_branch hbranchof2' eseq2.

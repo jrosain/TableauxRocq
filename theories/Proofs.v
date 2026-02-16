@@ -619,7 +619,7 @@ Section Tableaux.
     destruct T'; injection e => -> _ //.
   Qed.
 
-  Lemma replace_expanded_child_not_branch :
+  Lemma replace_expanded_child_not_branch_Left :
     forall {B : Branch} {T T0 T0' T' : TableauTree} {Gamma : list Form},
       is_branch_of B T -> T0' <> Leaf ->
       expand_tableau_branch__aux (Some Gamma) None B T = Some T0 ->
@@ -650,7 +650,49 @@ Section Tableaux.
         injection hrepl => -> //.
   Qed.
 
-  Lemma replace_expanded_child_not_right :
+  Lemma replace_expanded_child_not_branch_Right :
+    forall {B : Branch} {T T0 T0' T1 T1' T2 : TableauTree} {Gamma1 Gamma2 : list Form},
+      is_branch_of B T -> T0' <> Leaf -> T1' <> Leaf ->
+      expand_tableau_branch__aux (Some Gamma1) (Some Gamma2) B T = Some T0 ->
+      replace_child (B ++ [Left]) T0 T0' = Some T1 ->
+      replace_child (B ++ [Right]) T1 T1' = Some T2 -> ~is_branch_of B T2.
+  Proof using Type.
+    intro B; induction B as [|b B IHB];
+      intros ???????? hbranchof hnleaf0 hnleaf1 hexpand hrepl1 hrepl2 hbranchof'.
+
+    - cbn in *. inversion hbranchof; subst; try easy.
+      destruct T0; try easy.
+      destruct T1; try easy.
+      apply hnleaf1. injection hrepl2 => eT2; subst.
+      now inversion hbranchof'.
+
+    - destruct b; cbn in *.
+
+      + destruct T, T0, T1; try easy.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand1; try easy.
+        destruct (replace_child (B ++ [Left]) _ _) eqn:erepl1; try easy.
+        destruct (replace_child (B ++ [Right]) _ _) eqn:erepl2; try easy.
+        inversion hbranchof'; subst.
+        inversion hbranchof; subst.
+        specialize (IHB T3 t T0' T1_1 T1' t1 Gamma1 Gamma2 H2 hnleaf0 hnleaf1 hexpand1).
+        apply IHB; auto.
+        * injection hexpand => _ _ ->.
+          injection hrepl1 => _ _ <- //.
+        * injection hrepl2 => _ _ -> //.
+      + destruct T, T0, T1; try easy.
+        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand1; try easy.
+        destruct (replace_child (B ++ [Left]) _ _) eqn:erepl1; try easy.
+        destruct (replace_child (B ++ [Right]) _ _) eqn:erepl2; try easy.
+        inversion hbranchof'; subst.
+        inversion hbranchof; subst.
+        specialize (IHB T4 t T0' t0 T1' t1 Gamma1 Gamma2 H2 hnleaf0 hnleaf1 hexpand1).
+        apply IHB; auto.
+        * injection hexpand => -> //.
+        * injection hrepl1 => -> //.
+        * injection hrepl2 => -> //.
+  Qed.
+
+  Lemma replace_expanded_child_not_subbranch :
     forall {B : Branch} {T T0 T0' T' : TableauTree} {Gamma : list Form},
       is_branch_of B T -> T0' <> Leaf ->
       expand_tableau_branch__aux (Some Gamma) None B T = Some T0 ->
