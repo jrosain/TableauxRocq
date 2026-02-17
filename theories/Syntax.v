@@ -570,6 +570,13 @@ Section FunctionSymbols.
     GetFunctSymbols (list A) :=
     fun l => fold_left (fun s t => s \union (function_symbols t)) l \{\}.
 
+  #[global] Instance GetFunctSymbols_opt {A : Type} `{GetFunctSymbols A} :
+    GetFunctSymbols (option A) :=
+    fun o => match o with
+          | None => \{\}
+          | Some x => function_symbols x
+          end.
+
   Lemma GetFunctSymbols_in :
     forall {A : Type} `{GetFunctSymbols A} (x : A) (l : list A) (f : func),
       List.In x l -> set_in f (function_symbols x) ->

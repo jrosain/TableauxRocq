@@ -545,6 +545,11 @@ Section Tableaux.
   Definition is_tableau_satisfiable (T : Tableau) :=
     exists (M : Model pred func), forall (mu : env M var), exists_satisfied_branch M mu T.
 
+  (** We say that a tableau [T] preserves the function symbols of [s] if the function symbols of
+      [get_all_formulas T] is equal to [s \union to_set record]. *)
+  Definition preserves_function_symbols (T : Tableau) (s : set_atom func) :=
+    function_symbols (get_all_formulas T) = s \union to_set (symbols T).
+
   Definition mkTableau (Gamma : list Form) : Tableau :=
     {| tree := Node Leaf Gamma Leaf
     ;  symbols := empty_record |}.
@@ -783,6 +788,126 @@ Section Tableaux.
       + constructor. eapply IHB; eauto.
   Qed.
 
+  Lemma extend_function_symbols :
+    forall (B : Branch) (T T' : Tableau) (l l' : option (list Form)),
+      is_branch_of B T ->
+      expand_tableau_branch l l' B T = Some T' ->
+      function_symbols (get_all_formulas T) \subseteq function_symbols (get_all_formulas T').
+  Proof using Type.
+    intros ? [T symbsT] [T' symbsT'] ?? hbranchof; revert T' l l'; cbn in *; induction hbranchof;
+      intros ??? e; cbn in e.
+    - injection e => _ <-. intros f hin.
+      cbn; rewrite !fold_left_app.
+      do 2 rewrite set_fold_left; rewrite !union_spec.
+      do 2 left; cbn in hin.
+      now rewrite app_nil_r in hin.
+    - destruct (expand_tableau_branch__aux _ _ _ _) eqn:eaux; try easy.
+      intros f hin; cbn in *.
+      injection e => _ <-; cbn.
+      rewrite !fold_left_app in hin |- *.
+      do 2 rewrite set_fold_left in hin |- *.
+      rewrite !union_spec in hin |- *.
+      destruct hin as [ [ hG | hT1 ] | hT2 ]; do 2 rewrite set_fold_left; rewrite !union_spec.
+      + now do 2 left.
+      + left; right. eapply IHhbranchof; eauto.
+        erewrite eaux. injection e => <- _ //.
+      + now right.
+    - destruct (expand_tableau_branch__aux _ _ _ _) eqn:eaux; try easy.
+      intros f hin; cbn in *.
+      injection e => _ <-; cbn.
+      rewrite !fold_left_app in hin |- *.
+      do 2 rewrite set_fold_left in hin |- *.
+      rewrite !union_spec in hin |- *.
+      destruct hin as [ [ hG | hT1 ] | hT2 ]; rewrite set_fold_left; rewrite !union_spec.
+      + now do 2 left.
+      + now left; right.
+      + right. eapply IHhbranchof; eauto.
+        erewrite eaux. injection e => <- _ //.
+  Qed.
+
+  Lemma extend_function_symbols' :
+    forall (B : Branch) (T T' : Tableau) (l l' : option (list Form)),
+      is_branch_of B T -> function_symbols l \subseteq function_symbols (get_all_formulas T) ->
+      function_symbols l' \subseteq function_symbols (get_all_formulas T) ->
+      expand_tableau_branch l l' B T = Some T' ->
+      function_symbols (get_all_formulas T') \subseteq function_symbols (get_all_formulas T).
+  Proof using Type.
+    intros ? [T symbsT] [T' symbsT'] ?? hbranchof hsub1 hsub2 e f hin.
+    cbn in hbranchof, hin |- *. specialize (hsub1 f); specialize (hsub2 f).
+    revert T' e hin; induction hbranchof; intros ? e hin; cbn in e.
+    - injection e => _ eT'. rewrite -eT' in hin; cbn in hin |- *.
+      rewrite app_nil_r. rewrite !fold_left_app in hin.
+      do 2 rewrite set_fold_left in hin; rewrite !union_spec in hin.
+      destruct hin as [ [ hG | hl ] | hl']; auto.
+      + cbn in hsub1; rewrite app_nil_r in hsub1; apply hsub1.
+        destruct l; cbn in hl |- *; auto.
+        now rewrite app_nil_r in hl.
+      + cbn in hsub2; rewrite app_nil_r in hsub2; apply hsub2.
+        destruct l'; cbn in hl' |- *; auto.
+        now rewrite app_nil_r in hl'.
+    - destruct (expand_tableau_branch__aux _ _ _ _) eqn:eaux; try easy.
+      destruct (set_in_dec f (function_symbols l)) as [hl | hnl].
+      + now specialize (hsub1 hl).
+      + destruct (set_in_dec f (function_symbols l')) as [hl' | hnl'].
+        * now specialize (hsub2 hl').
+        * injection e => _ eT'; rewrite -eT' in hin; cbn in hin |- *.
+          rewrite !fold_left_app in hin |- *.
+          do 2 rewrite set_fold_left in hin; do 2 rewrite set_fold_left.
+          rewrite !union_spec in hin |- *; destruct hin as [ [ hG | ht ] | hT2 ].
+          -- now do 2 left.
+          -- left; right. eapply IHhbranchof; eauto.
+             ++ intro; easy.
+             ++ intro; easy.
+             ++ injection e => <- _; cbn. now rewrite eaux.
+          -- now right.
+    - destruct (expand_tableau_branch__aux _ _ _ _) eqn:eaux; try easy.
+      destruct (set_in_dec f (function_symbols l)) as [hl | hnl].
+      + now specialize (hsub1 hl).
+      + destruct (set_in_dec f (function_symbols l')) as [hl' | hnl'].
+        * now specialize (hsub2 hl').
+        * injection e => _ eT'; rewrite -eT' in hin; cbn in hin |- *.
+          rewrite !fold_left_app in hin |- *.
+          do 2 rewrite set_fold_left in hin; do 2 rewrite set_fold_left.
+          rewrite !union_spec in hin |- *; destruct hin as [ [ hG | ht ] | hT2 ].
+          -- now do 2 left.
+          -- now left; right.
+          -- right. eapply IHhbranchof; eauto.
+             ++ intro; easy.
+             ++ intro; easy.
+             ++ injection e => <- _; cbn. now rewrite eaux.
+  Qed.
+
+  Lemma extend_subset_preserves_function_symbols :
+    forall {B : Branch} {T T' : Tableau} (s : set_atom func) {l l' : option (list Form)},
+      is_branch_of B T -> preserves_function_symbols T s ->
+      function_symbols l \subseteq s \union to_set (symbols T) -> function_symbols l' \subseteq s \union to_set (symbols T) ->
+      expand_tableau_branch l l' B T = Some T' ->
+      preserves_function_symbols T' s.
+  Proof using Type.
+    intros ?????? hbranchof hpres hsub1 hsub2 e.
+    red in hpres |- *; cbn in hpres |- *.
+    erewrite <-expand_tableau_branch_Some_symbs; eauto.
+    rewrite -hpres. apply set_ext; intro f; split.
+    - eapply extend_function_symbols'; eauto; rewrite hpres; auto.
+    - eapply extend_function_symbols; eauto.
+  Qed.
+
+  Lemma extend_subset_preserves_function_symbols' :
+    forall {B : Branch} {T T' : Tableau} (s : set_atom func) {l l' : option (list Form)},
+      is_branch_of B T -> preserves_function_symbols T s ->
+      function_symbols l \subseteq s \union to_set (symbols T') ->
+      function_symbols l' \subseteq s \union to_set (symbols T') ->
+      expand_tableau_branch__aux l l' B T = Some (tree T') ->
+      preserves_function_symbols T' s.
+  Proof using Type.
+    intros ?????? hbranchof hpres hsub1 hsub2 e.
+    red in hpres |- *; cbn in hpres |- *. apply set_ext; intro f; split.
+    - intro h; destruct (set_in_dec f (function_symbols l)) as [hl | hnl].
+      + now specialize (hsub1 f hl).
+      + destruct (set_in_dec f (function_symbols l')) as [hl' | hnl'].
+        * now specialize (hsub2 f hl').
+  Admitted.
+
   (** An optional list of formulas is satisfied either if it is none or if the list is
       satisfied. *)
   Definition is_optional_satisfied
@@ -918,6 +1043,7 @@ Arguments symbols {_ _ _ _}.
 Arguments is_tableau_closed {_ _ _ _ _} _ _.
 Arguments is_tableau_satisfiable {_ _ _ _} _.
 Arguments exists_satisfied_branch {_ _ _ _} _ _ _.
+Arguments preserves_function_symbols {_ _ _ _} _ _.
 
 (** ** Expansion rules *)
 
@@ -1086,12 +1212,11 @@ Section Soundness.
       eapply is_satisfiable_extend_gen with (M := M) (M' := ReplacementModel M interp)
                                             (f := fun x => x); eauto.
       + intros G hin hinterp'; apply hinterp; auto.
-        intros f hin'; rewrite union_spec; left.
-        eapply GetFunctSymbols_in; eauto.
+        intros f hin'; eapply GetFunctSymbols_in; eauto.
       + intro hinterp'; left; cbn. intros [ hnF | contra ].
         * apply hnF, hinterpsko.
-          -- intros f hin; rewrite union_spec; left.
-             change (set_in f (function_symbols F)) with
+          -- intros f hin;
+               change (set_in f (function_symbols F)) with
                (set_in f (function_symbols (Neg (All F)))) in hin.
              eapply GetFunctSymbols_in; eauto.
              eapply in_get_ctx_in_all_formulas; eauto.

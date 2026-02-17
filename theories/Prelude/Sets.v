@@ -343,6 +343,7 @@ Hint Unfold are_disjoint : set_db.
 Notation "\{ \}" := empty_set.
 Notation "\{ x \}" := (add x \{\}).
 Notation "\{ x , y , .. , z \}" := (add x (add y .. (add z \{\}) ..)).
+Notation "S1 \subseteq S2" := (subset S1 S2) (at level 40).
 
 (** ** Built-in instances *)
 

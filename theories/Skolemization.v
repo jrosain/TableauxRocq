@@ -89,7 +89,9 @@ Section SkolemizationDef.
   (** We define the first part of the Skolemization process: the data. It takes:
       - a Skolemization record,
       - a boolean predicate [is_sko], to check if a given term is a valid skolemization
-        in a given context,
+        w.r.t. (i) the formula which is Skolemized, (ii) the Skolemization context,
+        (iii) the set of free variables of the current branch, and (iv) the set of
+        function symbols of the tableau,
       - a [symbol] function, that should always return a [func] if the term [t] is a
         skolemization,
       - and an [args] function, that should always return the arguments of the term [t] if
@@ -114,11 +116,11 @@ Section SkolemizationDef.
         (hsko : is_sko data t (Neg (All F)) symbs fvs func_symbols = true) (M : Model pred func),
       exists (f : func -> list M -> M),
         (forall (mu : env M var),
-            subset (function_symbols F) (func_symbols \union to_set symbs) ->
+            subset (function_symbols F) func_symbols ->
             [[ M # [] # mu '|= Neg (All F) ]] ->
             [[ ReplacementModel M f # [] # mu '|= Neg F{0 \to t} ]]) /\
           (forall (F : Form) (mu : env M var),
-              subset (function_symbols F) (func_symbols \union to_set symbs) -> [[ M # [] # mu '|= F ]] ->
+              subset (function_symbols F) func_symbols -> [[ M # [] # mu '|= F ]] ->
               [[ ReplacementModel M f # [] # mu '|= F ]]) }.
 
   Record Skolemization_ :=
@@ -335,8 +337,8 @@ Section SkolemizationInstances.
     - exact sko_record_set.
     (* in outer skolemization, we simply need to keep track of which symbols have been
        instantiated *)
-    - intros t _ symbs1 fvs symbs2.
-      exact (SkoWrapper_is_sko t (OuterSkolemization_is_sko_pred fvs (symbs2 \union symbs1))).
+    - intros t _ _ fvs symbs2.
+      exact (SkoWrapper_is_sko t (OuterSkolemization_is_sko_pred fvs symbs2)).
     - intros t ???? hsko. apply (SkoWrapper_symbol t hsko).
     - intros t ???? hsko. apply (SkoWrapper_args t hsko).
   Defined.
@@ -457,8 +459,8 @@ Section SkolemizationInstances.
   Proof.
     unshelve econstructor.
     - exact sko_record_set.
-    - intros t F symbs _ func_symbols.
-      exact (SkoWrapper_is_sko t (InnerSkolemization_is_sko_pred F (func_symbols \union symbs))).
+    - intros t F _ _ func_symbols.
+      exact (SkoWrapper_is_sko t (InnerSkolemization_is_sko_pred F func_symbols)).
     - intros t ???? hsko. apply (SkoWrapper_symbol t hsko).
     - intros t ???? hsko. apply (SkoWrapper_args t hsko).
   Defined.
