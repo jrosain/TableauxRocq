@@ -595,6 +595,122 @@ Section FunctionSymbols.
       | Neg F | All F => rec F
       | Or F1 F2 => rec F1 \union rec F2
       end.
+
+  Lemma function_symbols_opening_terms :
+    forall (t u : Term) (n : nat),
+      function_symbols (u{n \to t}) \subseteq
+        function_symbols u \union function_symbols t.
+  Proof using Type.
+    intros t u; induction u using term_ind; intros m.
+    - cbn; rewrite -match_eq_dec_eq_bool; destruct (m == n).
+      + rewrite empty_unitl //.
+      + now intros f contra%empty_spec.
+    - now intros f contra%empty_spec.
+    - intros g hin; cbn in hin |- *.
+      rewrite set_fold_left union_spec in hin; destruct hin as [e | hin].
+      + apply singleton_spec in e; rewrite e.
+        rewrite set_fold_left !union_spec; repeat left.
+        now rewrite singleton_spec.
+      + rewrite set_fold_left union_assoc !union_spec.
+        right. rewrite -union_spec. induction l as [|w ws IHws]; auto.
+        * cbn in hin |- *. now apply empty_spec in hin.
+        * cbn in hin |- *; rewrite set_fold_left empty_unitl in hin.
+          rewrite union_spec in hin; destruct hin as [hw | hws].
+          -- apply Forall_inv in X; apply X in hw; rewrite union_spec in hw;
+               destruct hw as [hw | ht].
+             ++ rewrite set_fold_left empty_unitl !union_spec.
+                now repeat left.
+             ++ rewrite set_fold_left empty_unitl !union_spec.
+                now right.
+          -- apply Forall_tail in X. specialize (IHws X hws).
+             rewrite set_fold_left empty_unitl !union_spec.
+             rewrite union_spec in IHws; destruct IHws as [hws' | ht].
+             ++ now left; right.
+             ++ now right.
+  Qed.
+
+  Lemma function_symbols_opening :
+    forall (F : Form) (t : Term) (n : nat),
+      function_symbols (F{n \to t}) \subseteq
+        function_symbols (All F) \union function_symbols t.
+  Proof using Type.
+    intros F; induction F; intros t n.
+    - now intros f contra%empty_spec.
+    - cbn; intros f hin. induction l as [|u us IHus].
+      + now apply empty_spec in hin.
+      + cbn in hin; rewrite set_fold_left empty_unitl !union_spec in hin.
+        destruct hin as [hu | hus].
+        * cbn; rewrite set_fold_left empty_unitl !union_spec.
+          apply function_symbols_opening_terms in hu; rewrite union_spec in hu;
+            destruct hu as [hu | ht].
+          -- now repeat left.
+          -- now right.
+        * cbn; rewrite set_fold_left empty_unitl !union_spec.
+          specialize (IHus hus). rewrite union_spec in IHus; destruct IHus as [hus' | ht].
+          -- now left; right.
+          -- now right.
+    - intros; now apply IHF.
+    - intros f hin; cbn in hin |- *; rewrite !union_spec in hin |- *.
+      destruct hin as [hF1 | hF2].
+      + apply IHF1 in hF1; rewrite union_spec in hF1; destruct hF1 as [hF1 | ht].
+        * cbn in hF1; now repeat left.
+        * now right.
+      + apply IHF2 in hF2; rewrite union_spec in hF2; destruct hF2 as [hF2 | ht].
+        * cbn in hF2; now left; right.
+        * now right.
+    - now apply IHF.
+  Qed.
+
+  Lemma function_symbols_opening_terms' :
+    forall (t u : Term) (n : nat),
+      function_symbols u \subseteq function_symbols (u{n \to t}).
+  Proof using Type.
+    intros t u; induction u using term_ind; intros m.
+    - now intros f contra%empty_spec.
+    - now intros f contra%empty_spec.
+    - intros g hin; cbn in hin |- *. rewrite set_fold_left union_spec in hin.
+      rewrite set_fold_left union_spec. destruct hin as [hf | hus].
+      + now left.
+      + right. induction l as [|u us IHus]; auto.
+        cbn in hus |- *. rewrite set_fold_left union_spec empty_unitl in hus.
+        rewrite set_fold_left union_spec empty_unitl. destruct hus as [hu | hus].
+        * left. apply Forall_inv in X; now apply X.
+        * right; apply IHus; auto. now apply Forall_tail in X.
+  Qed.
+
+  Lemma function_symbols_opening_form' :
+    forall (F : Form) (t : Term) (n : nat),
+      function_symbols (All F) \subseteq
+        function_symbols (F{n \to t}).
+  Proof using Type.
+    intros F; induction F; intros t n.
+    - now intros f contra%empty_spec.
+    - cbn; intros f hin. induction l as [|u us IHus].
+      + now apply empty_spec in hin.
+      + cbn in hin; rewrite set_fold_left empty_unitl !union_spec in hin.
+        destruct hin as [hu | hus].
+        * cbn; rewrite set_fold_left empty_unitl !union_spec.
+          eapply function_symbols_opening_terms' in hu; left; eassumption.
+        * cbn; rewrite set_fold_left empty_unitl !union_spec. right.
+          now apply IHus.
+    - intros; now apply IHF.
+    - intros f hin; cbn in hin |- *; rewrite !union_spec in hin |- *.
+      destruct hin as [hF1 | hF2].
+      + eapply IHF1 in hF1; left; eassumption.
+      + eapply IHF2 in hF2; right; eassumption.
+    - now apply IHF.
+  Qed.
+
+  Lemma function_symbols_opening_free :
+    forall (F : Form) (n : nat) (x : var),
+      function_symbols (F{n \to Free x}) = function_symbols (All F).
+  Proof using Type.
+    intros ???. apply set_ext; intros f; split; intros hin.
+    - rewrite <-empty_unitr.
+      change \{\} with (function_symbols (Free x)).
+      eapply function_symbols_opening; eauto.
+    - now apply function_symbols_opening_form'.
+  Qed.
 End FunctionSymbols.
 
 (** ** Concrete instances *)
