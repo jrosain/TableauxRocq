@@ -4,6 +4,7 @@ From Corelib Require Import Morphisms.
 
 From Stdlib Require Import Classical.
 From Stdlib Require Import Lia.
+From Stdlib Require Import Logic.IndefiniteDescription.
 
 From Tableaux Require Import Prelude.All.
 From Tableaux Require Import Syntax.
@@ -33,17 +34,17 @@ Section SemanticsDef.
         | x :: xs => interpret rho sigma x :: F xs
         end.
 
-  #[global] Instance interpret_term (M : Model) : Interpret M (Term_ func var) M :=
+  #[global] Instance interpret_term (M : Model) : Interpret M (Term func var) M :=
     fun rho sigma =>
-      fix F (t : Term_ func var) : M :=
+      fix F (t : Term func var) : M :=
         match t with
         | Bound n => option_get non_empty (nth_error rho n)
         | Free  x => option_get non_empty (sigma x)
         | Fun f l => interp_func f (map F l)
         end.
 
-  #[global] Instance interpret_form_ (M : Model) : Interpret M (Form_ pred func var) Prop :=
-    fix rec (rho : list M) (sigma : env M var) (F : Form_ pred func var) : Prop :=
+  #[global] Instance interpret_form (M : Model) : Interpret M (Form pred func var) Prop :=
+    fix rec (rho : list M) (sigma : env M var) (F : Form pred func var) : Prop :=
       match F with
       | Bot        => False
       | Pred p l => interp_pred p (map (interpret_term M rho sigma) l)
@@ -52,20 +53,20 @@ Section SemanticsDef.
       | All F    => forall (x : M), rec (x :: rho) sigma F
       end.
 
-  Definition is_valid (F : Form_ pred func var) :=
-    forall (M : Model), interpret_form_ M [] (empty_env M var) F.
+  Definition is_valid (F : Form pred func var) :=
+    forall (M : Model), interpret_form M [] (empty_env M var) F.
 
-  Definition is_satisfiable (F : Form_ pred func var) :=
+  Definition is_satisfiable (F : Form pred func var) :=
     exists (M : Model), forall (mu : env M var),
-      interpret_form_ M [] mu F.
+      interpret_form M [] mu F.
 
-  Definition equiv (F G : Form_ pred func var) :=
+  Definition equiv (F G : Form pred func var) :=
     forall (M : Model) (rho : list M) (sigma : env M var),
-      interpret_form_ M rho sigma F <-> interpret_form_ M rho sigma G.
+      interpret_form M rho sigma F <-> interpret_form M rho sigma G.
 
-  Definition imply (F G : Form_ pred func var) :=
+  Definition imply (F G : Form pred func var) :=
     forall (M : Model) (sigma : env M var),
-      interpret_form_ M [] sigma F -> interpret_form_ M [] sigma G.
+      interpret_form M [] sigma F -> interpret_form M [] sigma G.
 
   #[global] Instance equiv_refl : Reflexive equiv.
   Proof using Type.
@@ -91,57 +92,35 @@ Section SemanticsDef.
     - apply equiv_trans.
   Qed.
 
+  Lemma equiv_imply :
+    forall (F G : Form pred func var),
+      equiv F G -> imply F G.
+  Proof using Type.
+    intros ?? hequiv M sigma. specialize (hequiv M [] sigma). apply hequiv.
+  Qed.
+
   #[global] Instance equiv_proper_interp (M : Model) :
-    Proper (equiv ==> iff) (interpret_form_ M [] (empty_env M var)).
+    Proper (equiv ==> iff) (interpret_form M [] (empty_env M var)).
   Proof using Type.
     intros F G hequ.
     now specialize (hequ M).
   Qed.
-
-  (** The same model but where a function is replaced by another element. *)
-  Section ReplacementModel.
-    Context {M : Model} (c c' : M).
-
-    Existing Instance eqb_atom.
-
-    Definition interp_func' (f : func) (l : list M) : M :=
-      let c0 := @interp_func M f l in
-      match c0 == c with
-      | left _ => c'
-      | right _ => c0
-      end.
-
-    Definition interp_pred' (p : pred) (l' : list M) : Prop :=
-      @interp_pred M p (list_replace l' c c').
-
-    Definition non_empty' :=
-      match non_empty == c with
-      | left _ => c'
-      | right _ => non_empty
-      end.
-
-    Definition ReplacementModel : Model :=
-      {| car := M
-      ;  interp_func := interp_func'
-      ;  interp_pred := interp_pred'
-      ;  non_empty := non_empty' |}.
-  End ReplacementModel.
 End SemanticsDef.
 
 Arguments Model : clear implicits.
 Arguments Interpret {_ _ _} _ _ _.
 Arguments interpret {_ _ _} _ {_ _ _} _ _ _.
 
-Notation "\models F" := (is_valid F) (at level 40).
-Notation "[[ M # rho # sigma '\models F ]]" := (interpret M rho sigma F).
+Notation "|= F" := (is_valid F) (at level 40).
+Notation "[[ M # rho # sigma '|= F ]]" := (interpret M rho sigma F).
 Notation "F \equiv G" := (equiv F G) (at level 30).
-Notation "Gamma \models F" := (is_valid (Or (Neg (ls_to_form Gamma)) F)) (at level 40).
+Notation "Gamma |= F" := (is_valid (Or (Neg (ls_to_form Gamma)) F)) (at level 40).
 
 Section SemanticsFacts.
   Context {pred func var : Atom} `{set_nat : set nat}.
 
-  Let Form := Form_ pred func var.
-  Let Term := Term_ func var.
+  Let Form := Form pred func var.
+  Let Term := Term func var.
 
   Lemma ls_to_form_commutes :
     forall (Gamma : list Form) (F G : Form),
@@ -162,7 +141,7 @@ Section SemanticsFacts.
 
   Lemma is_satisfiable_is_not_countersat :
     forall (F : Form),
-      is_satisfiable F -> \models Neg F -> False.
+      is_satisfiable F -> |= Neg F -> False.
   Proof using Type.
     intros F hsat hfalse. destruct hsat as (M & hsat).
     specialize (hfalse M); specialize (hsat (empty_env M var)).
@@ -179,7 +158,7 @@ Section SemanticsFacts.
 
   Lemma in_form_list_models :
     forall (F : Form) (Gamma : list Form),
-      List.In F Gamma -> Gamma \models F.
+      List.In F Gamma -> Gamma |= F.
   Proof using Type.
     intros ?? Hin. induction Gamma as [|G Gs IHGs]; inversion Hin.
     - rewrite !H in IHGs |- *.
@@ -192,7 +171,7 @@ Section SemanticsFacts.
 
   Lemma explosion_principle :
     forall (F : Form) (Gamma : list Form),
-      Gamma \models Bot -> Gamma \models F.
+      Gamma |= Bot -> Gamma |= F.
   Proof using Type.
     intros F Gamma Hmodels M. cbn.
     specialize (Hmodels M). cbn in Hmodels. destruct Hmodels as [H | contra].
@@ -202,7 +181,7 @@ Section SemanticsFacts.
 
   Lemma models_iff :
     forall (F : Form) (Gamma : list Form),
-      (Gamma \models F) <-> ((Neg F :: Gamma) \models Bot).
+      (Gamma |= F) <-> ((Neg F :: Gamma) |= Bot).
   Proof using Type.
     intros F Gamma. split.
     - intros Hmodels M; cbn. specialize (Hmodels M). cbn in Hmodels.
@@ -217,7 +196,7 @@ Section SemanticsFacts.
 
   Lemma models_P_neg_P :
     forall (F : Form) (Gamma : list Form),
-      Gamma \models F -> Gamma \models Neg F -> Gamma \models Bot.
+      Gamma |= F -> Gamma |= Neg F -> Gamma |= Bot.
   Proof using Type.
     intros F Gamma HF HNF M.
     specialize (HF M); specialize (HNF M); cbn in HF, HNF |- *.
@@ -227,18 +206,31 @@ Section SemanticsFacts.
   Lemma in_form_list_interp :
     forall {F : Form} {Gamma : list Form} {M : Model pred func}
       {rho : list M} {sigma : env M var},
-      List.In F Gamma -> [[ M # rho # sigma '\models ls_to_form Gamma ]] -> [[ M # rho # sigma '\models F ]].
+      List.In F Gamma -> [[ M # rho # sigma '|= ls_to_form Gamma ]] -> [[ M # rho # sigma '|= F ]].
   Proof using Type.
     intros ????? hin hinterp; induction Gamma as [|G Gs IHGs]; inversion hin; subst.
     - cbn in hinterp |- *. apply NNPP => save. apply hinterp; now left.
     - apply IHGs; auto. apply NNPP => save; apply hinterp; now right.
   Qed.
 
+  Lemma interp_form_list :
+    forall (Gamma : list Form) (M : Model pred func) (rho : list M) (sigma : env M var),
+      (forall (F : Form), List.In F Gamma -> [[ M # rho # sigma '|= F ]]) ->
+      [[ M # rho # sigma '|= ls_to_form Gamma ]].
+  Proof using Type.
+    intros ???? HF; induction Gamma as [|F Gamma IHGamma].
+    - now intro.
+    - cbn; intros [hnF | hnG].
+      + apply hnF, HF; now left.
+      + apply hnG. apply IHGamma; intros G hin; apply HF.
+        now right.
+  Qed.
+
   Lemma extend_with_equiv_form :
     forall (F G : Form) (Gamma : list Form) (M : Model pred func)
       (rho : list M) (sigma : env M var),
-      [[ M # rho # sigma '\models ls_to_form Gamma ]] -> F \equiv G -> List.In G Gamma ->
-      [[ M # rho # sigma '\models ls_to_form (F :: Gamma) ]].
+      [[ M # rho # sigma '|= ls_to_form Gamma ]] -> F \equiv G -> List.In G Gamma ->
+      [[ M # rho # sigma '|= ls_to_form (F :: Gamma) ]].
   Proof using Type.
     intros ?????? hinterp hequiv hin. cbn. intros [hnF | hnG]; auto.
     have hG := in_form_list_interp hin hinterp.
@@ -249,37 +241,19 @@ Section SemanticsFacts.
   Lemma extend_with_imply_form :
     forall (F G : Form) (Gamma : list Form) (M : Model pred func)
       (sigma : env M var),
-      [[ M # [] # sigma '\models ls_to_form Gamma ]] -> imply G F -> List.In G Gamma ->
-      [[ M # [] # sigma '\models ls_to_form (F :: Gamma) ]].
+      [[ M # [] # sigma '|= ls_to_form Gamma ]] -> imply G F -> List.In G Gamma ->
+      [[ M # [] # sigma '|= ls_to_form (F :: Gamma) ]].
   Proof using Type.
     intros ????? hinterp himply hin. cbn. intros [hnF | hnG]; auto.
     have hG := in_form_list_interp hin hinterp.
     now apply hnF, himply.
   Qed.
 
-  Lemma extend_with_imply_form' :
-    forall (F G : Form) (Gamma : list Form) (M : Model pred func)
-      (sigma : env M var),
-      [[ M # [] # sigma '\models ls_to_form Gamma ]] ->
-      (exists M' sigma',
-          (~ [[ M # [] # sigma '\models F ]]) ->
-          (~ [[ M' # [] # sigma' '\models G ]]) /\
-            [[ M' # [] # sigma' '\models ls_to_form Gamma ]]) ->
-      List.In G Gamma -> [[ M # [] # sigma '\models ls_to_form (F :: Gamma) ]].
-  Proof using Type.
-    intros ????? hinterp himply hin. cbn. intros [hnF | hnG]; auto.
-    have hG := in_form_list_interp hin hinterp.
-    destruct himply as (M' & sigma' & h); auto.
-    specialize (h hnF). destruct h as (hnG & hGamma) .
-    have h := in_form_list_interp hin hGamma.
-    now apply hnG.
-  Qed.
-
   Lemma interp_list_commute :
     forall (F G : Form) (Gamma : list Form) (M : Model pred func)
       (rho : list M) (sigma : env M var),
-      [[ M # rho # sigma '\models ls_to_form (Neg (Or (Neg F) (Neg G)) :: Gamma) ]] ->
-      [[ M # rho # sigma '\models ls_to_form (F :: G :: Gamma) ]].
+      [[ M # rho # sigma '|= ls_to_form (Neg (Or (Neg F) (Neg G)) :: Gamma) ]] ->
+      [[ M # rho # sigma '|= ls_to_form (F :: G :: Gamma) ]].
   Proof using Type.
     intros ?????? hinterp. cbn in *. intros [hnF | hinterp'].
     - apply hinterp. left. intros h; apply h. now left.
@@ -316,6 +290,28 @@ Section SemanticsFacts.
     intros F G M. cbn. firstorder.
   Qed.
 
+  Lemma ls_to_form_app :
+    forall (Gamma Gamma' : list Form),
+      ls_to_form (Gamma ++ Gamma')%list \equiv Neg (Or (Neg (ls_to_form Gamma)) (Neg (ls_to_form Gamma'))).
+  Proof using Type.
+    intros ??; induction Gamma as [|F Fs IHFs].
+    - cbn; split; intro hinterp.
+      + intros [hnG | contra]; auto.
+      + apply NNPP => save; apply hinterp. now right.
+    - cbn. apply neg_equiv. etransitivity.
+      + apply or_equiv.
+        * reflexivity.
+        * apply neg_equiv, IHFs.
+      + split; intro hinterp; cbn in *.
+        * destruct hinterp; auto.
+          apply NNPP => save. apply H. intros []; auto.
+          apply save. left. intro hinterp'; apply hinterp'. now right.
+        * destruct hinterp; auto.
+          apply NNPP => hinterp. apply H. intros [].
+          -- apply hinterp; now left.
+          -- apply hinterp; right. intro h0. apply h0. now left.
+  Qed.
+
   Lemma isLocallyClosed_interp_env :
     forall (M : Model pred func) (rho0 rho1 : list M) (sigma : env M var) (t : Term),
       isLocallyClosed t ->
@@ -345,7 +341,7 @@ Section SemanticsFacts.
     forall (M : Model pred func) (rho : list M) (sigma : env M var) (t u : Term),
       isLocallyClosed u ->
       interpret_term M rho sigma (t {#|rho| \to u}) =
-        interpret_term M (rho ++ [ [[ M # rho # sigma '\models u ]] ])%list sigma t.
+        interpret_term M (rho ++ [ [[ M # rho # sigma '|= u ]] ])%list sigma t.
   Proof using Type.
     intros ??????. induction t using term_ind.
     - cbn. rewrite -match_eq_dec_eq_bool; destruct (#|rho| == n).
@@ -361,7 +357,7 @@ Section SemanticsFacts.
             cbn in H0. lia. }
           rewrite nth_error_app1; auto.
           now rewrite e.
-        * have hgt : #|rho ++ [ [[ M # rho # sigma '\models u ]] ]|  <= n.
+        * have hgt : #|rho ++ [ [[ M # rho # sigma '|= u ]] ]|  <= n.
           { rewrite nth_error_None in e.
             have hlt : #|rho| < n by lia.
             rewrite last_length. lia. }
@@ -369,8 +365,8 @@ Section SemanticsFacts.
           now rewrite hgt.
     - now cbn.
     - cbn. rewrite map_map.
-      have hmap : (map (fun x : Term_ func var => interpret_term M rho sigma x {#| rho | \to u}) l) =
-                    (map (interpret_term M (rho ++ [ [[M # rho # sigma '\models u]] ])%list sigma) l).
+      have hmap : (map (fun x : Term => interpret_term M rho sigma x {#| rho | \to u}) l) =
+                    (map (interpret_term M (rho ++ [ [[M # rho # sigma '|= u]] ])%list sigma) l).
       { induction l as [|v vs IHvs]; auto; cbn.
         rewrite IHvs.
         - now apply Forall_tail in X.
@@ -383,13 +379,13 @@ Section SemanticsFacts.
   Lemma form_env_inst_commutes :
     forall (M : Model pred func) (rho : list M) (sigma : env M var) (F : Form) (t : Term),
       isLocallyClosed t ->
-      interpret_form_ M rho sigma (F {#|rho| \to t}) =
-        interpret_form_ M (rho ++ [ [[ M # rho # sigma '\models t ]] ])%list sigma F.
+      interpret_form M rho sigma (F {#|rho| \to t}) =
+        interpret_form M (rho ++ [ [[ M # rho # sigma '|= t ]] ])%list sigma F.
   Proof using Type.
     intros ??????. revert rho. induction F; auto; cbn; intros rho.
     - rewrite map_map.
       have hmap : (map (fun u => interpret_term M rho sigma u {#|rho| \to t}) l) =
-                    (map (interpret_term M (rho ++ [ [[ M # rho # sigma '\models t ]] ])%list sigma) l).
+                    (map (interpret_term M (rho ++ [ [[ M # rho # sigma '|= t ]] ])%list sigma) l).
       { induction l as [|v vs IHvs]; auto; cbn.
         rewrite IHvs term_env_inst_commutes; auto. }
       rewrite hmap //.
@@ -400,8 +396,6 @@ Section SemanticsFacts.
       do 4 f_equal. unfold interpret.
       apply isLocallyClosed_interp_env; auto.
   Qed.
-
-  Existing Instance eqb_atom.
 
   Lemma instantiate_imply_all :
     forall (F : Form) (t : Term),
@@ -414,14 +408,55 @@ Section SemanticsFacts.
     - apply hinterp.
   Qed.
 
+  Lemma isClosed_interp_term_env_eq :
+    forall (M : Model pred func) (t : Term) (rho : list M) (sigma mu : env M var),
+      isClosed t ->
+      [[ M # rho # sigma '|= t ]] = [[ M # rho # mu '|= t ]].
+  Proof using Type.
+    intros ????? hclosed; induction t using term_ind; cbn; auto.
+    - unfold isClosed in hclosed; cbn in hclosed;
+        apply is_empty_spec with (x := a) in hclosed.
+      + inversion hclosed.
+      + now apply singleton_spec.
+    - apply f_equal. induction l as [|u us IHus]; cbn; auto.
+      rewrite IHus.
+      + unfold isClosed in hclosed |- *; cbn in *.
+        rewrite set_fold_left in hclosed. now apply is_empty_union2 in hclosed.
+      + now apply Forall_tail in X.
+      + apply Forall_inv in X; rewrite X //.
+        unfold isClosed in hclosed |- *; cbn in *.
+        rewrite set_fold_left in hclosed. apply is_empty_union1 in hclosed.
+        now rewrite empty_unitl in hclosed.
+  Qed.
+
+  Lemma isClosed_interp_form_env_eq :
+    forall (M : Model pred func) (F : Form) (rho : list M) (sigma mu : env M var),
+      isClosed F ->
+      [[ M # rho # sigma '|= F ]] = [[ M # rho # mu '|= F ]].
+  Proof using Type.
+    intros ????? hclosed; revert rho; induction F; cbn; auto.
+    - intro; apply f_equal. induction l as [|t ts IHts]; cbn; auto.
+      rewrite IHts; unfold isClosed in hclosed |- *; cbn in *.
+      + rewrite set_fold_left in hclosed; now apply is_empty_union2 in hclosed.
+      + f_equal. change ([[ M # rho # sigma '|= t ]] = [[ M # rho # mu '|= t ]]).
+        apply isClosed_interp_term_env_eq. unfold isClosed;
+          rewrite set_fold_left empty_unitl in hclosed; now apply is_empty_union1 in hclosed.
+    - intros; rewrite IHF //.
+    - intros; rewrite IHF1; [| rewrite IHF2 //];
+        unfold isClosed in hclosed |- *; cbn in *.
+      + now apply is_empty_union1 in hclosed.
+      + now apply is_empty_union2 in hclosed.
+    - intro; apply prodext=>x; rewrite IHF; auto.
+  Qed.
+
   Definition subst_to_env (M : Model pred func)
     (sigma : Substitution var Term) : env M var :=
-    fun x => Some ([[ M # [] # empty_env M var '\models sigma x ]]).
+    fun x => Some ([[ M # [] # empty_env M var '|= sigma x ]]).
 
   Lemma subst_commutes_with_env_terms :
     forall (M : Model pred func) (t : Term) (rho : list M) (sigma : Substitution var Term),
-      [[ M # rho # empty_env M var '\models t@[sigma] ]] =
-        [[ M # rho # subst_to_env M sigma '\models t ]].
+      [[ M # rho # empty_env M var '|= t@[sigma] ]] =
+        [[ M # rho # subst_to_env M sigma '|= t ]].
   Proof using Type.
     intros. induction t using term_ind; cbn; try reflexivity.
     - apply isLocallyClosed_interp_env. apply isSubst.
@@ -433,8 +468,8 @@ Section SemanticsFacts.
 
   Lemma subst_commutes_with_env_forms :
     forall (M : Model pred func) (F : Form) (rho : list M) (sigma : Substitution var Term),
-      [[ M # rho # empty_env M var '\models F@[sigma] ]] <->
-        [[ M # rho # subst_to_env M sigma '\models F ]].
+      [[ M # rho # empty_env M var '|= F@[sigma] ]] <->
+        [[ M # rho # subst_to_env M sigma '|= F ]].
   Proof using Type.
     intros M F. induction F; cbn.
     - reflexivity.
@@ -443,8 +478,8 @@ Section SemanticsFacts.
                  map (interpret_term M rho (subst_to_env M sigma)) l.
       { induction l as [|t ts IHts]; cbn; auto.
         rewrite IHts. f_equal.
-        change ([[ M # rho # empty_env M var '\models t@[sigma] ]] =
-                  [[ M # rho # subst_to_env M sigma '\models t ]]).
+        change ([[ M # rho # empty_env M var '|= t@[sigma] ]] =
+                  [[ M # rho # subst_to_env M sigma '|= t ]]).
         apply subst_commutes_with_env_terms. }
       now rewrite e.
     - intros ??. rewrite IHF //.
@@ -453,4 +488,214 @@ Section SemanticsFacts.
       + rewrite -IHF //.
       + rewrite IHF //.
   Qed.
+
+  Lemma only_fv_valuation_matters_in_terms :
+    forall (M : Model pred func) (t : Term) (rho : list M) (sigma mu : env M var),
+      (forall (x : var), set_in x (fv t) -> [[ M # rho # sigma '|= Free x ]] = [[ M # rho # mu '|= Free x ]]) ->
+      [[ M # rho # sigma '|= t ]] = [[ M # rho # mu '|= t ]].
+  Proof using Type.
+    intros ????? heq; induction t using term_ind; auto.
+    - rewrite heq //. cbn; now apply singleton_spec.
+    - cbn; apply f_equal.
+      cbn in heq; induction l as [|u us IHus]; auto.
+      cbn; rewrite IHus.
+      + intros; apply heq; cbn.
+        rewrite set_fold_left empty_unitl union_spec; now right.
+      + now apply Forall_tail in X.
+      + apply Forall_inv in X; rewrite X //.
+        intros; apply heq; cbn.
+        rewrite set_fold_left empty_unitl union_spec; now left.
+  Qed.
+
+  Lemma only_fv_valuation_matters_in_forms :
+    forall (M : Model pred func) (F : Form) (rho : list M) (sigma mu : env M var),
+      (forall (x : var), set_in x (fv F) -> [[ M # rho # sigma '|= Free x ]] = [[ M # rho # mu '|= Free x ]]) ->
+      [[ M # rho # sigma '|= F ]] <-> [[ M # rho # mu '|= F ]].
+  Proof using Type.
+    intros ????? heq; generalize dependent rho; induction F; intros rho heq; auto; cbn.
+    - easy.
+    - have el : map (interpret_term M rho sigma) l = map (interpret_term M rho mu) l.
+      { induction l as [|t ts IHts]; auto.
+        cbn. change (interpret_term M rho sigma t) with ([[ M # rho # sigma '|= t ]]);
+          erewrite only_fv_valuation_matters_in_terms.
+        2: { intros x hin; apply heq; cbn.
+             rewrite set_fold_left empty_unitl union_spec. now left. }
+        unfold interpret. rewrite IHts //.
+        intros x hin; apply heq; cbn.
+        rewrite set_fold_left empty_unitl union_spec. now right. }
+      rewrite el //.
+    - rewrite IHF //.
+    - rewrite IHF1.
+      + intros; apply heq; cbn.
+        rewrite union_spec; now left.
+      + rewrite IHF2 //.
+        intros; apply heq. rewrite union_spec; now right.
+    - split; intros hinterp x.
+      + rewrite -IHF; auto.
+      + rewrite IHF; auto.
+  Qed.
 End SemanticsFacts.
+
+(** ** Replacement model *)
+
+(** We define a [ReplacementModel] to validate Skolemization.
+
+    This is a model where the function to interpret functions is replaced by another function,
+    which makes the given function symbol together with the given variables true whenever
+    the delta formula is true. To do so, we use the term given by [satisfy_delta] together with
+    a choice function that makes it possible to extract this term.
+
+    This choice function is unavoidable, as in and of itself, Skolemization uses the axiom of
+    choice. *)
+Section ReplaceInterpFunc.
+  Context {pred func var : Atom} (M : Model pred func) (F : Form pred func var).
+
+  Lemma satisfy_delta :
+    forall (mu : env M var),
+    exists (c : M), [[ M # [] # mu '|= Neg (All F) ]] -> [[ M # [c] # mu '|= Neg F ]].
+  Proof using Type.
+    intros ?. destruct (classic ([[M # [] # mu '|= Neg (All F)]])) as [hdelta | hndelta].
+    - apply NNPP => save. apply hdelta. intro c. apply NNPP => hdelta'.
+      apply save. exists c. now intro.
+    - exists non_empty. intro. exfalso. now apply hndelta.
+  Qed.
+
+  (** Application of the axiom of choice on [satisfying_delta]. *)
+  Definition satisfying_symbol (mu : env M var) :
+    { c : M | [[ M # [] # mu '|= Neg (All F) ]] -> [[ M # [c] # mu '|= Neg F ]] }.
+  Proof using Type. apply constructive_indefinite_description, satisfy_delta. Qed.
+
+  Context (f : func) (vs : list var).
+
+  Fixpoint mk_env (l : list (var * M)) : env M var :=
+    match l with
+    | [] => empty_env M var
+    | (x, c) :: xs =>
+        fun (y : var) => if eqb x y then Some c
+                      else mk_env xs y
+    end.
+
+  Definition replace_interp_func (f' : func) (l : list M) : M :=
+    if eqb f f' then proj1_sig (satisfying_symbol (mk_env (combine vs l)))
+    else @interp_func _ _ M f' l.
+End ReplaceInterpFunc.
+
+Section RealReplacementModel.
+  Context `{set_nat : set nat} {pred func var : Atom} (M : Model pred func).
+
+  Definition ReplacementModel (f : func -> list M -> M) :=
+    {| car := M
+    ;  interp_func := f
+    ;  interp_pred := interp_pred
+    ;  non_empty := non_empty |}.
+
+  Let Form := Form pred func var.
+  Let Term := Term func var.
+
+  (** Properties of [ReplacementModel] with [replace_interp_func]. *)
+  Context (F : Form) (f : func) (vs : list var).
+
+  Let M' := ReplacementModel (replace_interp_func M F f vs).
+  Let t := Fun f (map (fun v : var => Free v) vs).
+
+  Lemma satisfying_symbol_prop :
+    forall (mu : env M var),
+      fv F \subseteq from_list vs ->
+      exists (c : M),
+        interpret_term M' [] mu t = c /\
+          ([[ M # [] # mu '|= Neg (All F) ]] -> [[ M # [c] # mu '|= Neg F ]]).
+  Proof using f.
+    intros mu hsubset.
+    set symbol := satisfying_symbol M F
+                    (mk_env M (combine vs (map (interpret_term M' [] mu)
+                                             (map (fun v : var => Free v) vs)))).
+    exists (proj1_sig symbol); split.
+    - cbn; unfold replace_interp_func.
+      rewrite -match_eq_dec_eq_bool; destruct (f == f).
+      2: { exfalso; now apply n. }
+      reflexivity.
+    - have hinterp := proj2_sig symbol.
+      intro hinterp'.
+      have e :
+        forall x : var,
+          set_in x (fv (Neg (All F))) ->
+          [[M # [] # mu '|= Free x]] =
+            [[M # [] # mk_env M
+                (combine vs (map (interpret_term M' [] mu) (map (fun v : var => Free v) vs)))
+                '|= Free x]].
+      { have H : forall l, map (interpret_term M' [] mu)
+                        (map (fun v : var => Free v) l) = map (fun x => option_get non_empty (mu x)) l.
+        { clear. intros l; induction l as [|x xs IHxs]; auto.
+          cbn. rewrite IHxs //. }
+        rewrite H. clear hinterp symbol. cbn. clear H M' t hinterp'.
+        intros x hin. specialize (hsubset x hin). induction vs as [|y ys IHys]; auto.
+        - now apply empty_spec in hsubset.
+        - cbn. rewrite -match_eq_dec_eq_bool; destruct (y == x); subst; auto.
+          rewrite IHys //.
+          cbn in hsubset; rewrite union_spec in hsubset; destruct hsubset; auto.
+          apply singleton_spec in H; congruence. }
+      rewrite only_fv_valuation_matters_in_forms.
+      + apply e.
+      + apply hinterp; rewrite -only_fv_valuation_matters_in_forms; auto.
+  Qed.
+
+  Lemma no_skolem_same_interp_term :
+    forall (rho : list M) (mu : env M var) (u : Term),
+      ~set_in f (function_symbols u) ->
+      interpret_term M' rho mu u = interpret_term M rho mu u.
+  Proof using F vs.
+    intros ??? hfresh. induction u using term_ind; auto.
+    cbn; unfold replace_interp_func.
+    cbn in hfresh; rewrite set_fold_left in hfresh.
+    rewrite -match_eq_dec_eq_bool; destruct (f == f0).
+    - exfalso; apply hfresh. rewrite union_spec; left. now apply singleton_spec.
+    - apply f_equal.
+      apply NNPP => save; apply hfresh; rewrite union_spec; right; apply NNPP => hfresh';
+        clear hfresh n; apply save; clear save.
+      induction l as [|u us IHus]; auto; cbn.
+      rewrite IHus.
+      + now apply Forall_tail in X.
+      + intro hin. apply hfresh'. cbn; rewrite set_fold_left union_spec; now right.
+      + apply Forall_inv in X. rewrite X //.
+        intro hin. apply hfresh'; cbn; rewrite set_fold_left union_spec empty_unitl; now left.
+  Qed.
+
+  Lemma no_skolem_same_interp_form :
+    forall (rho : list M) (mu : env M var) (G : Form),
+      ~set_in f (function_symbols G) ->
+      interpret_form M' rho mu G = interpret_form M rho mu G.
+  Proof using F t.
+    intros ??? hnin; revert rho; induction G; intro rho; cbn; auto.
+    - apply f_equal; cbn in hnin. induction l as [|u us IHus]; cbn; auto.
+      rewrite IHus.
+      + intro hin; apply hnin; cbn.
+        rewrite set_fold_left union_spec; now right.
+      + rewrite no_skolem_same_interp_term //.
+        intro hin; apply hnin; cbn.
+        rewrite set_fold_left union_spec empty_unitl; now left.
+    - rewrite IHG; auto.
+    - rewrite IHG1.
+      + intro hin. apply hnin. rewrite union_spec; now left.
+      + rewrite IHG2 //. intro hin; apply hnin; rewrite union_spec; now right.
+    - apply prodext => c. rewrite IHG; auto.
+  Qed.
+
+  Lemma satisfies_opening_with_sko :
+    forall (mu : env M var),
+      fv F \subseteq from_list vs ->
+      ~set_in f (function_symbols F) ->
+      [[ M # [] # mu '|= Neg (All F) ]] -> [[ M' # [] # mu '|= Neg F {0 \to Fun f (map (fun v => Free v) vs)} ]].
+  Proof using set_nat.
+    intros mu hsubset hnin hinterp.
+    change [[ M' # [] # mu '|= (Neg F) {0 \to t} ]]; unfold interpret.
+    rewrite (form_env_inst_commutes M' [] mu (Neg F) t).
+    - unfold t, isLocallyClosed; cbn. clear hsubset M' t.
+      induction vs; try now cbn.
+      cbn. now rewrite empty_unitl.
+    - rewrite app_nil_l.
+      destruct (satisfying_symbol_prop mu) as (c & ht & himp); auto.
+      unfold interpret. rewrite ht.
+      apply himp in hinterp.
+      rewrite no_skolem_same_interp_form; auto.
+  Qed.
+End RealReplacementModel.

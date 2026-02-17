@@ -14,7 +14,7 @@ Lemma EqDec_UIP :
   forall {A : Type} `{EqDec A} {x y : A} (p q : x = y), p = q.
 Proof.
   intros.
-  set g := fun x y (p : x = y) => match eqDec x y with
+  set g := fun x y (p : x = y) => match x == y with
     | left e => e
     | right n => False_ind (x = y) (n p)
     end.
@@ -70,30 +70,7 @@ Proof.
   - rewrite EqBool_neq in n. now rewrite n.
 Qed.
 
-(** ** Generic instances *)
-
-Section EqDecOtherInstances.
-  Context {A : Type} `{EqDec A}.
-
-  #[global] Instance eq_dec_bool : EqDec bool.
-  Proof using Type.
-    red. intros [] []; auto.
-    right; now intro.
-  Qed.
-
-  #[global] Instance eq_dec_list : EqDec (list A).
-  Proof using H.
-    intros xs; induction xs as [| x xs IHxs]; intro ys; destruct ys as [|y ys].
-    2,3: right; intro e; inversion e.
-    - now left.
-    - destruct (x == y).
-      2: right; intro e; injection e => e0 e1; now apply n.
-      destruct (IHxs ys).
-      + left; now rewrite e e0.
-      + right; intro e'; injection e' => e0 e1; now apply n.
-  Qed.
-End EqDecOtherInstances.
-
+(** ** Equivalence *)
 Section EquivEqBoolEqDec.
   Context (A : Type).
 
@@ -129,6 +106,12 @@ Section EquivEqBoolEqDec.
 End EquivEqBoolEqDec.
 
 (** ** Common instances *)
+
+#[global] Instance eq_dec_bool : EqDec bool.
+Proof using Type.
+  red. intros [] []; auto.
+  right; now intro.
+Qed.
 
 #[global] Instance eq_dec_nat : EqDec nat.
 Proof.
@@ -166,3 +149,44 @@ Fixpoint list_replace {A : Type} `{EqDec A} (l : list A) (x y : A) : list A :=
        | right _ => z
        end) :: list_replace zs x y
   end.
+
+Lemma trivial_pred_is_eq_for_unit :
+  forall x y : unit, (fun _ _ : unit => true) x y = true <-> x = y.
+Proof. intros [] []. now split. Qed.
+
+#[global] Instance eq_bool_unit : EqBool unit.
+Proof.
+  unshelve econstructor.
+  - exact (fun _ _ => true).
+  - apply trivial_pred_is_eq_for_unit.
+Defined.
+
+(** ** Generic instances *)
+
+Section EqDecOtherInstances.
+  Context {A : Type} `{EqDec A}.
+
+  #[global] Instance eq_dec_list : EqDec (list A).
+  Proof using H.
+    intros xs; induction xs as [| x xs IHxs]; intro ys; destruct ys as [|y ys].
+    2,3: right; intro e; inversion e.
+    - now left.
+    - destruct (x == y).
+      2: right; intro e; injection e => e0 e1; now apply n.
+      destruct (IHxs ys).
+      + left; now rewrite e e0.
+      + right; intro e'; injection e' => e0 e1; now apply n.
+  Qed.
+End EqDecOtherInstances.
+
+(** ** Monads *)
+
+Class Monad (M : Type -> Type) :=
+  { ret  : forall {A : Type}, A -> M A
+  ; bind : forall {A B : Type}, M A -> (A -> M B) -> M B }.
+
+Arguments bind {_ _ _ _}.
+
+Notation "x >>= f" := (bind x f) (at level 42, right associativity).
+
+Notation "x <- a ; b" := (a >>= fun x => b) (at level 81, right associativity, only parsing).

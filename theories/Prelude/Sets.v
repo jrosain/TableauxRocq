@@ -24,17 +24,21 @@ Class set {A : Type} :=
   ; inter : car -> car -> car
   ; diff  : car -> car -> car
   ; singleton : A -> car
+  ; subsetb : car -> car -> bool
 
   (** *** Extensionality property of sets *)
   ; set_ext : forall (s1 s2 : car), s1 = s2 <-> (forall (x : A), set_in x s1 <-> set_in x s2)
 
   (** *** Properties of defined operations *)
+  ; set_in_dec : forall (x : A) (s : car), set_in x s \/ ~set_in x s
   ; empty_spec : forall (x : A), set_in x empty_set -> False
   ; mem_spec : forall (x : A) (s : car), mem x s = true <-> set_in x s
   ; singleton_spec : forall (x y : A), set_in x (singleton y) <-> x = y
   ; union_spec : forall (x : A) (s1 s2 : car), set_in x (union s1 s2) <-> set_in x s1 \/ set_in x s2
   ; inter_spec : forall (x : A) (s1 s2 : car), set_in x (inter s1 s2) <-> set_in x s1 /\ set_in x s2
   ; diff_spec  : forall (x : A) (s1 s2 : car), set_in x (diff s1 s2) <-> set_in x s1 /\ ~ set_in x s2
+  ; subsetb_spec  : forall (s1 s2 : car),
+      subsetb s1 s2 = true <-> (forall (x : A), set_in x s1 -> set_in x s2)
   }.
 Arguments set : clear implicits.
 
@@ -342,6 +346,7 @@ Hint Unfold are_disjoint : set_db.
 Notation "\{ \}" := empty_set.
 Notation "\{ x \}" := (add x \{\}).
 Notation "\{ x , y , .. , z \}" := (add x (add y .. (add z \{\}) ..)).
+Notation "S1 \subseteq S2" := (subset S1 S2) (at level 40).
 
 (** ** Built-in instances *)
 
@@ -349,6 +354,8 @@ Notation "\{ x , y , .. , z \}" := (add x (add y .. (add z \{\}) ..)).
     import them or not. For instance, [SetComputationalInstances] will be annoying inside
     proofs, but will compute well once extracted / have a nice [decide] tactic. *)
 Module SetComputationalInstances.
+  Open Scope string_scope.
+
   Module Type SimpleOrderedType.
     Parameter t : Type.
 
@@ -457,6 +464,17 @@ Module SetComputationalInstances.
       - exact SetOfX_equal_eq.
     Defined.
 
+    Lemma SetOfX_in_dec :
+      forall (x : X.t) (s : SetOfX_.t),
+        SetOfX_.In x s \/ ~SetOfX_.In x s.
+    Proof. apply SetOfXProps.Dec.MSetDecideAuxiliary.dec_In. Qed.
+
+    Lemma SetOfX_subsetb_spec :
+      forall (s1 s2 : SetOfX_.t),
+        SetOfX_.subset s1 s2 = true <-> (forall (x : X.t), SetOfX_.In x s1 -> SetOfX_.In x s2).
+    Proof. intros ??; rewrite SetOfX_.subset_spec; reflexivity. Qed.
+
+
     #[global] Instance set_of_ordered : set X.t :=
       {| car := SetOfX_.t
 
@@ -469,15 +487,18 @@ Module SetComputationalInstances.
       ;  inter := SetOfX_.inter
       ;  diff := SetOfX_.diff
       ;  singleton := SetOfX_.singleton
+      ;  subsetb := SetOfX_.subset
 
       ;  set_ext := SetOfX_set_ext
 
+      ;  set_in_dec := SetOfX_in_dec
       ;  empty_spec := SetOfX_empty_spec
       ;  singleton_spec := SetOfX_singleton_spec
       ;  mem_spec x s := SetOfX_.mem_spec s x
       ;  union_spec x s1 s2 := SetOfX_.union_spec s1 s2 x
       ;  inter_spec x s1 s2 := SetOfX_.inter_spec s1 s2 x
-      ;  diff_spec := SetOfX_diff_spec |}.
+      ;  diff_spec := SetOfX_diff_spec
+      ;  subsetb_spec := SetOfX_subsetb_spec |}.
   End SetFromOrdered.
 
   (** Set of natural numbers. *)
@@ -510,8 +531,9 @@ Module SetComputationalInstances.
     Proof.
       split.
       - intros? H. induction x; red in H; auto.
-        destruct H. apply BinNat.N.lt_strorder in H; auto.
-        destruct H as (_ & H). apply IHx, H.
+        destruct H.
+        + apply BinNat.N.lt_strorder in H; auto.
+        + destruct H as (_ & H). apply IHx, H.
       - intros x; induction x; cbn; intros; destruct y, z; auto.
         + inversion H.
         + destruct H, H0.
