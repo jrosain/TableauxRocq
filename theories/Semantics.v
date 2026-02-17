@@ -488,6 +488,52 @@ Section SemanticsFacts.
       + rewrite -IHF //.
       + rewrite IHF //.
   Qed.
+
+  Lemma only_fv_valuation_matters_in_terms :
+    forall (M : Model pred func) (t : Term) (rho : list M) (sigma mu : env M var),
+      (forall (x : var), set_in x (fv t) -> [[ M # rho # sigma '|= Free x ]] = [[ M # rho # mu '|= Free x ]]) ->
+      [[ M # rho # sigma '|= t ]] = [[ M # rho # mu '|= t ]].
+  Proof using Type.
+    intros ????? heq; induction t using term_ind; auto.
+    - rewrite heq //. cbn; now apply singleton_spec.
+    - cbn; apply f_equal.
+      cbn in heq; induction l as [|u us IHus]; auto.
+      cbn; rewrite IHus.
+      + intros; apply heq; cbn.
+        rewrite set_fold_left empty_unitl union_spec; now right.
+      + now apply Forall_tail in X.
+      + apply Forall_inv in X; rewrite X //.
+        intros; apply heq; cbn.
+        rewrite set_fold_left empty_unitl union_spec; now left.
+  Qed.
+
+  Lemma only_fv_valuation_matters_in_forms :
+    forall (M : Model pred func) (F : Form) (rho : list M) (sigma mu : env M var),
+      (forall (x : var), set_in x (fv F) -> [[ M # rho # sigma '|= Free x ]] = [[ M # rho # mu '|= Free x ]]) ->
+      [[ M # rho # sigma '|= F ]] <-> [[ M # rho # mu '|= F ]].
+  Proof using Type.
+    intros ????? heq; generalize dependent rho; induction F; intros rho heq; auto; cbn.
+    - easy.
+    - have el : map (interpret_term M rho sigma) l = map (interpret_term M rho mu) l.
+      { induction l as [|t ts IHts]; auto.
+        cbn. change (interpret_term M rho sigma t) with ([[ M # rho # sigma '|= t ]]);
+          erewrite only_fv_valuation_matters_in_terms.
+        2: { intros x hin; apply heq; cbn.
+             rewrite set_fold_left empty_unitl union_spec. now left. }
+        unfold interpret. rewrite IHts //.
+        intros x hin; apply heq; cbn.
+        rewrite set_fold_left empty_unitl union_spec. now right. }
+      rewrite el //.
+    - rewrite IHF //.
+    - rewrite IHF1.
+      + intros; apply heq; cbn.
+        rewrite union_spec; now left.
+      + rewrite IHF2 //.
+        intros; apply heq. rewrite union_spec; now right.
+    - split; intros hinterp x.
+      + rewrite -IHF; auto.
+      + rewrite IHF; auto.
+  Qed.
 End SemanticsFacts.
 
 (** ** Replacement model *)
@@ -554,17 +600,44 @@ Section RealReplacementModel.
 
   Lemma satisfying_symbol_prop :
     forall (mu : env M var),
+      fv F \subseteq from_list vs ->
       exists (c : M),
         interpret_term M' [] mu t = c /\
           ([[ M # [] # mu '|= Neg (All F) ]] -> [[ M # [c] # mu '|= Neg F ]]).
-  Proof.
-    intros mu. exists (proj1_sig (satisfying_symbol M F mu)); split.
+  Proof using f.
+    intros mu hsubset.
+    set symbol := satisfying_symbol M F
+                    (mk_env M (combine vs (map (interpret_term M' [] mu)
+                                             (map (fun v : var => Free v) vs)))).
+    exists (proj1_sig symbol); split.
     - cbn; unfold replace_interp_func.
       rewrite -match_eq_dec_eq_bool; destruct (f == f).
       2: { exfalso; now apply n. }
-      admit. (* yes: [mu] only matters on the given input. *)
-    - apply (proj2_sig (satisfying_symbol M F mu)).
-  Admitted.
+      reflexivity.
+    - have hinterp := proj2_sig symbol.
+      intro hinterp'.
+      have e :
+        forall x : var,
+          set_in x (fv (Neg (All F))) ->
+          [[M # [] # mu '|= Free x]] =
+            [[M # [] # mk_env M
+                (combine vs (map (interpret_term M' [] mu) (map (fun v : var => Free v) vs)))
+                '|= Free x]].
+      { have H : forall l, map (interpret_term M' [] mu)
+                        (map (fun v : var => Free v) l) = map (fun x => option_get non_empty (mu x)) l.
+        { clear. intros l; induction l as [|x xs IHxs]; auto.
+          cbn. rewrite IHxs //. }
+        rewrite H. clear hinterp symbol. cbn. clear H M' t hinterp'.
+        intros x hin. specialize (hsubset x hin). induction vs as [|y ys IHys]; auto.
+        - now apply empty_spec in hsubset.
+        - cbn. rewrite -match_eq_dec_eq_bool; destruct (y == x); subst; auto.
+          rewrite IHys //.
+          cbn in hsubset; rewrite union_spec in hsubset; destruct hsubset; auto.
+          apply singleton_spec in H; congruence. }
+      rewrite only_fv_valuation_matters_in_forms.
+      + apply e.
+      + apply hinterp; rewrite -only_fv_valuation_matters_in_forms; auto.
+  Qed.
 
   Lemma no_skolem_same_interp_term :
     forall (rho : list M) (mu : env M var) (u : Term),
@@ -609,17 +682,18 @@ Section RealReplacementModel.
 
   Lemma satisfies_opening_with_sko :
     forall (mu : env M var),
+      fv F \subseteq from_list vs ->
       ~set_in f (function_symbols F) ->
       [[ M # [] # mu '|= Neg (All F) ]] -> [[ M' # [] # mu '|= Neg F {0 \to Fun f (map (fun v => Free v) vs)} ]].
   Proof using set_nat.
-    intros mu hnin hinterp.
+    intros mu hsubset hnin hinterp.
     change [[ M' # [] # mu '|= (Neg F) {0 \to t} ]]; unfold interpret.
     rewrite (form_env_inst_commutes M' [] mu (Neg F) t).
-    - unfold t, isLocallyClosed; cbn.
+    - unfold t, isLocallyClosed; cbn. clear hsubset M' t.
       induction vs; try now cbn.
       cbn. now rewrite empty_unitl.
     - rewrite app_nil_l.
-      destruct (satisfying_symbol_prop mu) as (c & ht & himp).
+      destruct (satisfying_symbol_prop mu) as (c & ht & himp); auto.
       unfold interpret. rewrite ht.
       apply himp in hinterp.
       rewrite no_skolem_same_interp_form; auto.

@@ -491,12 +491,14 @@ Section SkolemizationInstances.
       cbn in el0. rewrite el0.
       exists (replace_interp_func M F (symbol OuterSkolemizationData hsko) l0); split.
       + intros mu hdelta; apply satisfies_opening_with_sko; auto.
-        destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _).
-        intro hin; now apply hnin, hdelta.
+        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ H0) as (_ & e & _).
+          admit. (* todo *)
+        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _).
+          intro hin; now apply hnin, hdelta.
       + intros G mu hG. unfold interpret; rewrite no_skolem_same_interp_form; auto.
         destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _); cbn.
         intro hin; now apply hnin, hG.
-  Qed.
+  Admitted.
 
   Definition OuterSkolemization : Skolemization_ pred func var.
   Proof.
@@ -626,12 +628,13 @@ Section SkolemizationInstances.
       cbn in el0. rewrite el0.
       exists (replace_interp_func M F (symbol InnerSkolemizationData hsko) l0); split.
       + intros mu hdelta; apply satisfies_opening_with_sko; auto.
-        destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _).
-        intro hin; now apply hnin, hdelta.
+        * admit.
+        * destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _).
+          intro hin; now apply hnin, hdelta.
       + intros G mu hG. unfold interpret; rewrite no_skolem_same_interp_form; auto.
         destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _); cbn.
         intro hin. now apply hnin, hG.
-  Qed.
+  Admitted.
 
   Definition InnerSkolemization : Skolemization_ pred func var.
   Proof.
