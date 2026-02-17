@@ -79,7 +79,12 @@ Section SkolemizationDef.
           in_record f (join r1 r2) <-> in_record f r1 \/ in_record f r2
       ; value_record_spec1 :
         forall (f : func), @value_record RecordData f empty_record = None
-      }.
+      ; join_to_set :
+        forall (r1 r2 : RecordData),
+          to_set (join r1 r2) = to_set r1 \union to_set r2
+      ; single_to_set :
+        forall (f : func) (F : Form),
+          to_set (single_record RecordData f F) = singleton f }.
 
     Record SkoRecord :=
       { data :> SkoRecordData
@@ -253,6 +258,8 @@ Section SkolemizationInstances.
         rewrite mem_spec' union_spec in eunion. apply eunion; now right.
     - intro; cbn. destruct (mem f \{\}) eqn:eempty; auto.
       rewrite mem_spec in eempty. exfalso; eapply empty_spec; eauto.
+    - intros ??; now cbn.
+    - reflexivity.
   Qed.
 
   Definition sko_record_set : SkoRecord pred func var.

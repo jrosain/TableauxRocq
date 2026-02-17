@@ -1201,11 +1201,12 @@ Section Soundness.
     destruct F; try easy.
     cbn in hall; injection hall => el.
     rewrite -el in hin'.
-    have h : function_symbols (All F) = function_symbols (F {0 \to Free x}) by admit.
-    change (set_in f (function_symbols (F {0 \to Free x}))) in hin'.
-    rewrite -h in hin'. red in hpres. rewrite -hpres. eapply GetFunctSymbols_in; eauto.
+    have e : function_symbols (All F) = function_symbols (F {0 \to Free x}) by
+      now rewrite function_symbols_opening_all_free.
+     change (set_in f (function_symbols (F {0 \to Free x}))) in hin'.
+    rewrite -e in hin'. red in hpres. rewrite -hpres. eapply GetFunctSymbols_in; eauto.
     eapply in_get_ctx_in_all_formulas; eauto.
-  Admitted.
+  Qed.
 
   Lemma preserves_function_symbols_get_neg_all :
     forall {F G : Form} {B : Branch} {T : Tableau} {func_symbs : SetOfString} (t : Term)
@@ -1218,21 +1219,18 @@ Section Soundness.
     destruct F; try easy. destruct F; try easy.
     cbn in hnegall; injection hnegall => el.
     rewrite -el in hin'.
-    have h : function_symbols (Neg (All F)) \union function_symbols t =
-               function_symbols (Neg F{0 \to t}) by admit.
+    have h : function_symbols (Neg F{0 \to t}) \subseteq
+               function_symbols (Neg (All F)) \union function_symbols t.
+    { cbn; apply function_symbols_opening. }
     change (set_in f (function_symbols (Neg F {0 \to t}))) in hin'.
-    rewrite -h in hin'. red in hpres.
-    have hsko : to_set (add_symbol f0 (Neg (All F)) (symbols T)) =
-                  add f0 (to_set (symbols T)) by admit.
-    rewrite hsko; rewrite !union_spec in hin' |- *; destruct hin'.
-    - enough (h0 : set_in f (function_symbols (get_all_formulas T))).
-      { rewrite hpres in h0; rewrite union_spec in h0; destruct h0.
-        - now left.
-        - now do 2 right. }
+    specialize (h f hin'). rewrite union_spec in h. destruct h as [hF | ht].
+    - rewrite join_to_set union_comm union_assoc !union_spec.
+      right; rewrite -union_spec union_comm -hpres.
       eapply GetFunctSymbols_in; eauto.
       eapply in_get_ctx_in_all_formulas; eauto.
-    - right; left. now rewrite -esymb.
-  Admitted.
+    - rewrite join_to_set !union_spec. right; left.
+      rewrite single_to_set. rewrite -esymb //.
+  Qed.
 
   Lemma RuleTree_to_Sequence_preserves_function_symbols_last :
   forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}

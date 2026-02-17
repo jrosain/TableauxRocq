@@ -632,7 +632,7 @@ Section FunctionSymbols.
   Lemma function_symbols_opening :
     forall (F : Form) (t : Term) (n : nat),
       function_symbols (F{n \to t}) \subseteq
-        function_symbols (All F) \union function_symbols t.
+        function_symbols F \union function_symbols t.
   Proof using Type.
     intros F; induction F; intros t n.
     - now intros f contra%empty_spec.
@@ -680,7 +680,7 @@ Section FunctionSymbols.
 
   Lemma function_symbols_opening_form' :
     forall (F : Form) (t : Term) (n : nat),
-      function_symbols (All F) \subseteq
+      function_symbols F \subseteq
         function_symbols (F{n \to t}).
   Proof using Type.
     intros F; induction F; intros t n.
@@ -701,16 +701,25 @@ Section FunctionSymbols.
     - now apply IHF.
   Qed.
 
-  Lemma function_symbols_opening_free :
+  Lemma function_symbols_opening_all_free :
     forall (F : Form) (n : nat) (x : var),
       function_symbols (F{n \to Free x}) = function_symbols (All F).
   Proof using Type.
     intros ???. apply set_ext; intros f; split; intros hin.
-    - rewrite <-empty_unitr.
+    - cbn. rewrite <-empty_unitr.
       change \{\} with (function_symbols (Free x)).
       eapply function_symbols_opening; eauto.
     - now apply function_symbols_opening_form'.
   Qed.
+
+  (* Lemma function_symbols_opening_to_term : *)
+  (*   forall (F : Form) (n : nat) (t : Term), *)
+  (*     function_symbols (F{n \to t}) = function_symbols F \union function_symbols t. *)
+  (* Proof using Type. *)
+  (*   intros ???. apply set_ext; intros f; split; intros hin. *)
+  (*   - eapply function_symbols_opening; eauto. *)
+  (*   - now apply function_symbols_opening_form'. *)
+  (* Qed. *)
 End FunctionSymbols.
 
 (** ** Concrete instances *)
