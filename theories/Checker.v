@@ -1113,7 +1113,7 @@ Section Soundness.
         rewrite esymb in e; injection e => ->; eauto.
         have hsko' : sko t (Neg (All f)) (symbols T) (fv (get_context B T))
                        (function_symbols (get_all_formulas T)) = true.
-        { rewrite hpres //. }
+        { eapply is_sko_consistent; eauto. }
         eapply expansion_NegAll with (hsko := hsko'); eauto.
         * apply in_context_is_on_branch; eauto.
         * cbn in eget. change (Neg f {0 \to t}) with ((Neg f) {0 \to t}); injection eget => ->.
@@ -1140,7 +1140,7 @@ Section Soundness.
     rewrite union_spec in hin'; destruct hin' as [contra | hin'].
     - now apply empty_spec in contra.
     - change (set_in f (function_symbols (Neg (Neg F)))) in hin'.
-      red in hpres. rewrite -hpres. eapply GetFunctSymbols_in; eauto.
+      red in hpres. apply hpres. eapply GetFunctSymbols_in; eauto.
       eapply in_get_ctx_in_all_formulas; eauto.
   Qed.
 
@@ -1155,7 +1155,7 @@ Section Soundness.
     cbn in hnegor; injection hnegor => el.
     rewrite -el /Ctx.elements /Ctx.add /Ctx.singleton in hin'.
     change (set_in f (function_symbols (Neg (Or F1 F2)))) in hin'.
-    red in hpres. rewrite -hpres. eapply GetFunctSymbols_in; eauto.
+    red in hpres. apply hpres. eapply GetFunctSymbols_in; eauto.
     eapply in_get_ctx_in_all_formulas; eauto.
   Qed.
 
@@ -1171,7 +1171,7 @@ Section Soundness.
     change (set_in f (function_symbols F1)) in hin'.
     have hin'' : set_in f (function_symbols (Or F1 F2)).
     { rewrite union_spec; now left. }
-    red in hpres. rewrite -hpres. eapply GetFunctSymbols_in; eauto.
+    red in hpres. apply hpres. eapply GetFunctSymbols_in; eauto.
     eapply in_get_ctx_in_all_formulas; eauto.
   Qed.
 
@@ -1187,7 +1187,7 @@ Section Soundness.
     change (set_in f (function_symbols F2)) in hin'.
     have hin'' : set_in f (function_symbols (Or F1 F2)).
     { rewrite union_spec; now right. }
-    red in hpres. rewrite -hpres. eapply GetFunctSymbols_in; eauto.
+    red in hpres. apply hpres. eapply GetFunctSymbols_in; eauto.
     eapply in_get_ctx_in_all_formulas; eauto.
   Qed.
 
@@ -1204,7 +1204,7 @@ Section Soundness.
     have e : function_symbols (All F) = function_symbols (F {0 \to Free x}) by
       now rewrite function_symbols_opening_all_free.
      change (set_in f (function_symbols (F {0 \to Free x}))) in hin'.
-    rewrite -e in hin'. red in hpres. rewrite -hpres. eapply GetFunctSymbols_in; eauto.
+    rewrite -e in hin'. red in hpres. apply hpres. eapply GetFunctSymbols_in; eauto.
     eapply in_get_ctx_in_all_formulas; eauto.
   Qed.
 
@@ -1225,7 +1225,7 @@ Section Soundness.
     change (set_in f (function_symbols (Neg F {0 \to t}))) in hin'.
     specialize (h f hin'). rewrite union_spec in h. destruct h as [hF | ht].
     - rewrite join_to_set union_comm union_assoc !union_spec.
-      right; rewrite -union_spec union_comm -hpres.
+      right; rewrite -union_spec union_comm; apply hpres.
       eapply GetFunctSymbols_in; eauto.
       eapply in_get_ctx_in_all_formulas; eauto.
     - rewrite join_to_set !union_spec. right; left.
@@ -1258,10 +1258,10 @@ Section Soundness.
             eauto.
           -- eapply is_branch_of_extend_left; eauto.
           -- eapply extend_subset_preserves_function_symbols with
-               (l := Some (Ctx.elements l)) (l' := None); eauto.
-             ++ eapply preserves_function_symbols_get_neg_neg; eauto.
+               (l := Some (Ctx.elements l)) (l' := None) (T := T); eauto.
+             ++ reflexivity.
+             ++ cbn; eapply preserves_function_symbols_get_neg_neg; eauto.
              ++ apply preserves_function_symbols_None.
-             ++ cbn; now rewrite hexpand.
           -- cbn; erewrite get_context_extend_left; eauto.
 
       + have [ l [ eget [ hin esrch1 ] ] ] := alpha_rule_sound echk.
@@ -1275,9 +1275,9 @@ Section Soundness.
           -- eapply is_branch_of_extend_left; eauto.
           -- eapply extend_subset_preserves_function_symbols with
                (l := Some (Ctx.elements l)) (l' := None); eauto.
-             ++ eapply preserves_function_symbols_get_neg_or; eauto.
+             ++ reflexivity.
+             ++ cbn; eapply preserves_function_symbols_get_neg_or; eauto.
              ++ apply preserves_function_symbols_None.
-             ++ cbn; now rewrite hexpand.
           -- cbn; erewrite get_context_extend_left; eauto.
 
       + have [ l [ l' [ symbs1 [ eget [ hin [ esrch1 esrch2 ] ] ] ] ] ] := beta_rule_sound echk.
@@ -1315,9 +1315,9 @@ Section Soundness.
              ++ eapply extend_subset_preserves_function_symbols with
                   (l := Some (Ctx.elements l)) (l' := Some (Ctx.elements l'))
                   (T := T); eauto.
-                ** eapply preserves_function_symbols_get_or1; eauto.
-                ** eapply preserves_function_symbols_get_or2; eauto.
-                ** cbn; now rewrite hexpand.
+                ** reflexivity.
+                ** cbn; eapply preserves_function_symbols_get_or1; eauto.
+                ** cbn; eapply preserves_function_symbols_get_or2; eauto.
              ++ cbn; erewrite get_context_extend_left; eauto.
           -- exact hseq2.
           -- erewrite <-esrch2; f_equal.
@@ -1340,9 +1340,9 @@ Section Soundness.
           -- eapply is_branch_of_extend_left; eauto.
           -- eapply extend_subset_preserves_function_symbols with
                (l := Some [G{0 \to Free s0}]) (l' := None); eauto.
-             ++ eapply preserves_function_symbols_get_all; eauto.
+             ++ reflexivity.
+             ++ cbn; eapply preserves_function_symbols_get_all; eauto.
              ++ apply preserves_function_symbols_None.
-             ++ cbn; now rewrite hexpand.
           -- cbn; erewrite get_context_extend_left; eauto.
              rewrite /Ctx.add in esrch1; cbn. eassumption.
 
@@ -1355,8 +1355,10 @@ Section Soundness.
         * eapply IHR1 with (B := (B ++ [Left])%list)
                            (T := {| tree := t0; symbols := add_symbol a f (symbols T) |}); eauto.
           -- eapply is_branch_of_extend_left; eauto.
-          -- eapply extend_subset_preserves_function_symbols' with
+          -- eapply extend_subset_preserves_function_symbols with
                (l := Some [G{0 \to t}]) (l' := None); eauto.
+             ++ cbn. rewrite join_to_set. intros g hing.
+                rewrite union_spec; now right.
              ++ eapply preserves_function_symbols_get_neg_all; eauto.
                 erewrite (sko_function_symbols_sound sko hsko); eauto.
                 erewrite (symbol_sound sko hsko) in esymb'.
@@ -1391,10 +1393,10 @@ Section Soundness.
         have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
         have hbranchof1 := is_branch_of_extend_left hbranchof hexpand.
         have hsubl := preserves_function_symbols_get_neg_neg hpres hbranchof eget hin.
+        have hsubset : to_set (symbols T) \subseteq to_set (symbols {| tree := t; symbols := symbols T |})
+          by reflexivity.
         have hpres1 := extend_subset_preserves_function_symbols sko func_symbs hbranchof hpres
-                         hsubl (preserves_function_symbols_None T func_symbs).
-        specialize (hpres1 {| tree := t; symbols := symbols T |}); cbn in hpres1.
-        rewrite hexpand in hpres1; specialize (hpres1 eq_refl).
+                         hsubset hsubl (preserves_function_symbols_None T func_symbs) hexpand.
         rewrite /Ctx.union /Ctx.elements in esrch1, ectx1; rewrite -ectx1 in esrch1.
         specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
                       record s0 func_symbs hbranchof1 hpres1 esrch1 eseq1).
@@ -1414,10 +1416,10 @@ Section Soundness.
         have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
         have hbranchof1 := is_branch_of_extend_left hbranchof hexpand.
         have hsubl := preserves_function_symbols_get_neg_or hpres hbranchof eget hin.
+        have hsubset : to_set (symbols T) \subseteq to_set (symbols {| tree := t; symbols := symbols T |})
+          by reflexivity.
         have hpres1 := extend_subset_preserves_function_symbols sko func_symbs hbranchof hpres
-                         hsubl (preserves_function_symbols_None T func_symbs).
-        specialize (hpres1 {| tree := t; symbols := symbols T |}); cbn in hpres1.
-        rewrite hexpand in hpres1; specialize (hpres1 eq_refl).
+                         hsubset hsubl (preserves_function_symbols_None T func_symbs) hexpand.
         rewrite /Ctx.union /Ctx.elements in esrch1, ectx1; rewrite -ectx1 in esrch1.
         specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
                       record s0 func_symbs hbranchof1 hpres1 esrch1 eseq1).
@@ -1444,10 +1446,10 @@ Section Soundness.
         rewrite -ectx1 in esrch1; rewrite -ectx2 in esrch2.
         have hsubl1 := preserves_function_symbols_get_or1 hpres hbranchof eget hin.
         have hsubl2 := preserves_function_symbols_get_or2 hpres hbranchof eget hin.
+        have hsubset : to_set (symbols T) \subseteq to_set (symbols {| tree := t; symbols := symbols T |})
+          by reflexivity.
         have hpres1 := extend_subset_preserves_function_symbols sko func_symbs hbranchof hpres
-                         hsubl1 hsubl2.
-        specialize (hpres1 {| tree := t; symbols := symbols T |}); cbn in hpres1.
-        rewrite hexpand in hpres1; specialize (hpres1 eq_refl).
+                         hsubset hsubl1 hsubl2 hexpand.
 
         specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
                       symbs1 s0 func_symbs hbranchof1 hpres1 esrch1 eseq1).
@@ -1565,10 +1567,10 @@ Section Soundness.
         have hbranchof1 := is_branch_of_extend_left hbranchof hexpand.
         have hsubl := preserves_function_symbols_get_all s0 hpres hbranchof eget hin.
         have hsubl' := preserves_function_symbols_None T func_symbs.
+        have hsubset : to_set (symbols T) \subseteq to_set (symbols {| tree := t; symbols := symbols T |})
+          by reflexivity.
         have hpres1 := extend_subset_preserves_function_symbols sko func_symbs hbranchof hpres
-                         hsubl hsubl'.
-        specialize (hpres1 {| tree := t; symbols := symbols T |}); cbn in hpres1.
-        rewrite hexpand in hpres1; specialize (hpres1 eq_refl).
+                         hsubset hsubl (preserves_function_symbols_None T func_symbs) hexpand.
         rewrite /Ctx.add /Ctx.elements in esrch1, ectx1. cbn in ectx1; rewrite -ectx1 in esrch1.
         specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
                       record s1 func_symbs hbranchof1 hpres1 esrch1 eseq1).
@@ -1597,9 +1599,12 @@ Section Soundness.
                          {| tree := t0; symbols := add_symbol f0 f (symbols T) |} func_symbs.
         change (to_set (add_symbol f0 f (symbols T))) with
           (to_set (symbols {| tree := t0; symbols := add_symbol f0 f (symbols T) |})) in hsubl.
-        have hpres1 := extend_subset_preserves_function_symbols'
-                         sko func_symbs hbranchof hpres hsubl hsubl'.
-        cbn in hpres1; rewrite hexpand in hpres1; specialize (hpres1 eq_refl).
+        have hsubset : to_set (symbols T) \subseteq
+                         to_set (symbols
+                                   {| tree := t0; symbols := add_symbol f0 f (symbols T) |}).
+        { cbn. rewrite join_to_set; intros g hing; rewrite union_spec; now right. }
+        have hpres1 := extend_subset_preserves_function_symbols
+                         sko func_symbs hbranchof hpres hsubset hsubl hsubl' hexpand.
         rewrite /Ctx.add /Ctx.elements in esrch1, ectx1. cbn in ectx1; rewrite -ectx1 in esrch1.
         specialize (IHR1 sigma (B ++ [Left])%list
                          {| tree := t0; symbols := add_symbol f0 f (symbols T) |}

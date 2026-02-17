@@ -121,6 +121,12 @@ Section SkolemizationDef.
       forall {t : Term} {F : Form} {symbs : sko_record data} {fvs : set_var} {func_symbols : set_func}
         (hsko : is_sko data t F symbs fvs func_symbols = true) (t : Term),
         List.In t (args data hsko) -> exists (x : var), t = Free x
+    ; is_sko_consistent :
+      forall {t : Term} {F : Form} {symbs : sko_record data} {fvs : set_var}
+        {func_symbols func_symbols' : set_func},
+        func_symbols \subseteq func_symbols' ->
+        is_sko data t F symbs fvs func_symbols' = true ->
+        is_sko data t F symbs fvs func_symbols = true
     ; is_sko_sound :
       forall {t : Term} {F : Form} {symbs : sko_record data} {fvs : set_var} {func_symbols : set_func}
         (hsko : is_sko data t (Neg (All F)) symbs fvs func_symbols = true) (M : Model pred func),
@@ -469,6 +475,16 @@ Section SkolemizationInstances.
     - intros ??????? hin. destruct t; try easy.
       have [ _ [ _ hfree ] ] := OuterSkolemization_is_sko_pred_sound _ _ _ _ hsko.
       now apply hfree.
+    - intros ?????? hsubset e; cbn in *.
+      destruct t; try easy; cbn in *.
+      unfold OuterSkolemization_is_sko_pred. rewrite andb_true_intro; split; auto.
+      + rewrite andb_true_intro; split; auto.
+        * rewrite Bool.negb_true_iff mem_spec'; intro.
+          apply OuterSkolemization_is_sko_pred_sound in e; destruct e as [hin _].
+          now apply hin, hsubset.
+        * apply OuterSkolemization_is_sko_pred_sound in e; destruct e as [ _ [e _] ].
+          rewrite eqbIsEq //.
+      + apply andb_prop in e; now destruct e.
     - intros ????? hsko ?.
       destruct t; try inversion hsko.
       destruct (OuterSkolemization_args_vars hsko) as (l0 & el0).
@@ -595,7 +611,16 @@ Section SkolemizationInstances.
     - intros ??????? hin. destruct t; try easy.
       have [ _ [ _ hfree ] ] := InnerSkolemization_is_sko_pred_sound _ _ _ _ hsko.
       now apply hfree.
-    - intros ????? hsko ?.
+    - intros ?????? hsubset e; cbn in *.
+      destruct t; try easy; cbn in *.
+      unfold InnerSkolemization_is_sko_pred. rewrite andb_true_intro; split; auto.
+      + rewrite andb_true_intro; split; auto.
+        * rewrite Bool.negb_true_iff mem_spec'; intro.
+          apply InnerSkolemization_is_sko_pred_sound in e; destruct e as [hin _].
+          now apply hin, hsubset.
+        * apply InnerSkolemization_is_sko_pred_sound in e; destruct e as [ _ [e _] ].
+          rewrite eqbIsEq //.
+      + apply andb_prop in e; now destruct e.    - intros ????? hsko ?.
       destruct t; try inversion hsko.
       destruct (InnerSkolemization_args_vars hsko) as (l0 & el0).
       cbn in el0. rewrite el0.
