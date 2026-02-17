@@ -1240,7 +1240,7 @@ Section Soundness.
       CheckProof__aux sko func_symbs (get_context B T) sigma (symbols T) R =
         ret {| status := true; symbs := record |} ->
       preserves_function_symbols (last s (mkLeaf sko)) func_symbs.
-  Proof.
+  Proof using Type.
     intros R; induction R as [ l | R1 IHR1 r R2 IHR2 ];
       intros ?????? hbranchof hpres eseq echk.
 
@@ -1285,24 +1285,49 @@ Section Soundness.
         destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
         destruct (RuleTree_to_Sequence__aux _ _ _) eqn:hseq1; try easy.
         destruct (RuleTree_to_Sequence__aux (B ++ [Right])%list _ _) eqn:hseq2; try easy.
+        have hbranchof1 :
+          is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |} :=
+          is_branch_of_extend_left hbranchof hexpand.
+        have [ T1' [ hnleaf ereplace ] ] := RuleTree_to_Sequence_branch hbranchof1 hseq1.
+        have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
+        { clear; induction B; cbn; intro; congruence. }
+
+        have hbranchof2 : is_branch_of (B ++ [Right])%list (last s0 (mkLeaf sko)).
+        { eapply is_branch_of_replace_child_oth.
+          3: eassumption.
+          all: eauto.
+          eapply is_branch_of_extend_right; eauto. }
+
+        have ectx2' : get_context (B ++ [Right])%list t = get_context (B ++ [Right])%list
+                                                             (last s0 (mkLeaf sko)).
+        { eapply get_context_replace_child_oth.
+          3: eassumption.
+          all: eauto.
+          eapply is_branch_of_extend_right; eauto. }
+
         injection eseq => <-. rewrite app_comm_cons last_app.
         * eapply RuleTree_to_Sequence_not_nil; eauto.
         * eapply IHR2 with (B := (B ++ [Right])%list) (T := last s0 (mkLeaf sko)).
-          -- admit. (* already done in other places *)
+          -- assumption.
           -- eapply IHR1 with (B := (B ++ [Left])%list)
                               (T := {| tree := t; symbols := symbols T |});
                eauto.
-             ++ eapply is_branch_of_extend_left; eauto.
              ++ eapply extend_subset_preserves_function_symbols with
-                  (l := Some (Ctx.elements l)) (l' := Some (Ctx.elements l')); eauto.
+                  (l := Some (Ctx.elements l)) (l' := Some (Ctx.elements l'))
+                  (T := T); eauto.
                 ** eapply preserves_function_symbols_get_or1; eauto.
                 ** eapply preserves_function_symbols_get_or2; eauto.
                 ** cbn; now rewrite hexpand.
              ++ cbn; erewrite get_context_extend_left; eauto.
           -- exact hseq2.
           -- erewrite <-esrch2; f_equal.
-             ++ admit. (* already done in other places *)
-             ++ admit. (* already done in other places. *)
+             ++ rewrite -ectx2'.
+                erewrite get_context_extend_right; eauto.
+             ++ symmetry; eapply RuleTree_to_Sequence_symbols.
+                3: apply hseq1.
+                all: eauto.
+                rewrite -esrch1.
+                unfold Ctx.union. erewrite <-get_context_extend_left; eauto.
 
       + have [ G [ eget [ hin esrch1 ] ] ] := gamma_rule_sound echk.
         rewrite eget in eseq.
@@ -1333,17 +1358,14 @@ Section Soundness.
           -- eapply extend_subset_preserves_function_symbols' with
                (l := Some [G{0 \to t}]) (l' := None); eauto.
              ++ eapply preserves_function_symbols_get_neg_all; eauto.
-                rewrite (is_func hsko); rewrite (symbol_sound sko hsko) in esymb'.
-                injection esymb' => ->.
-                cbn; rewrite set_fold_left; apply set_ext; intros g; split; intros hin0.
-                ** rewrite union_spec in hin0; destruct hin0; auto.
-                   (* todo: args sound i.e. only free variables *) admit.
-                ** rewrite union_spec; now left.
+                erewrite (sko_function_symbols_sound sko hsko); eauto.
+                erewrite (symbol_sound sko hsko) in esymb'.
+                injection esymb' => -> //.
              ++ apply preserves_function_symbols_None.
           -- cbn; erewrite get_context_extend_left; eauto.
              rewrite /Ctx.add in esrch1; cbn. injection esymb => ->.
              eassumption.
-  Admitted.
+  Qed.
 
   Lemma CheckProof_Some_RuleTree_to_Sequence_is_expansion_sequence :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
@@ -1565,8 +1587,12 @@ Section Soundness.
         destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
         have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
         have hbranchof1 := is_branch_of_extend_left hbranchof hexpand.
-        have hapi : function_symbols t = singleton f0 by admit.
-        have hsubl := preserves_function_symbols_get_neg_all t f0 hpres hbranchof eget hin hapi.
+        have hskosymb : function_symbols t = singleton f0.
+        { erewrite (sko_function_symbols_sound sko hsko); eauto.
+          erewrite (symbol_sound sko hsko) in esymb; eauto.
+          injection esymb => -> //. }
+        have hsubl := preserves_function_symbols_get_neg_all t f0 hpres hbranchof eget hin
+                        hskosymb.
         have hsubl' := preserves_function_symbols_None
                          {| tree := t0; symbols := add_symbol f0 f (symbols T) |} func_symbs.
         change (to_set (add_symbol f0 f (symbols T))) with
@@ -1585,7 +1611,7 @@ Section Soundness.
           eapply RuleTree_to_Sequence_snd_expansion; eauto.
         * injection eseq => es0. rewrite -es0 nth_error_S in ei, ei'.
           eapply IHR1; eauto.
-  Admitted.
+  Qed.
 
   Lemma CheckProof_Some_RuleTree_to_Sequence_closed :
     forall {R : RuleTree} {sigma : Substitution string Term} {B B' : Branch}
@@ -1855,13 +1881,11 @@ Section Soundness.
     - eapply CheckProof_Some_RuleTree_to_Sequence_is_expansion_sequence; eauto.
       1: apply is_branch_of_nil.
       2: apply esrch.
-      red; cbn. rewrite app_nil_r.
-      have hapi : to_set empty_record = \{\} by admit.
-      rewrite hapi empty_unitr //.
+      red; cbn. rewrite app_nil_r empty_to_set empty_unitr //.
     - split.
-      + erewrite RuleTree_to_Sequence_hd; eauto. now cbn.
+      + erewrite RuleTree_to_Sequence_hd; eauto.
       + eapply CheckProof_Some_Sequence_closed; eauto.
-  Admitted.
+  Qed.
 End Soundness.
 
 (** ** 3. Extended Syntax *)

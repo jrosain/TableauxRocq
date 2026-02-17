@@ -84,7 +84,8 @@ Section SkolemizationDef.
           to_set (join r1 r2) = to_set r1 \union to_set r2
       ; single_to_set :
         forall (f : func) (F : Form),
-          to_set (single_record RecordData f F) = singleton f }.
+          to_set (single_record RecordData f F) = singleton f
+      ; empty_to_set : @to_set RecordData empty_record = \{\} }.
 
     Record SkoRecord :=
       { data :> SkoRecordData
@@ -116,6 +117,10 @@ Section SkolemizationDef.
       forall {t : Term} {F : Form} {symbs : sko_record data} {fvs : set_var} {func_symbols : set_func}
         (hsko : is_sko data t F symbs fvs func_symbols = true),
         t = Fun (symbol data hsko) (args data hsko)
+    ; args_sound :
+      forall {t : Term} {F : Form} {symbs : sko_record data} {fvs : set_var} {func_symbols : set_func}
+        (hsko : is_sko data t F symbs fvs func_symbols = true) (t : Term),
+        List.In t (args data hsko) -> exists (x : var), t = Free x
     ; is_sko_sound :
       forall {t : Term} {F : Form} {symbs : sko_record data} {fvs : set_var} {func_symbols : set_func}
         (hsko : is_sko data t (Neg (All F)) symbs fvs func_symbols = true) (M : Model pred func),
@@ -190,6 +195,51 @@ Section SkoDefs.
       apply f_equal. exact (is_func hsko).
     } now cbn.
   Qed.
+
+  Lemma sko_function_symbols_args :
+    forall {t : Term} {F : Form} {symbs : sko_record sko} {fvs : set_var} {func_symbols : set_func}
+      (hsko : is_sko sko t F symbs fvs func_symbols = true),
+      function_symbols (args sko hsko) = \{\}.
+  Proof using pred.
+    intros. have h := is_func hsko. specialize (h sko).
+    destruct t; try easy. injection h => <- _.
+    have hfree := args_sound hsko.
+    specialize (hfree sko). injection h => el _.
+    have hfree' : forall t : Syntax.Term func var, List.In t l -> exists x : var, t = Free x.
+    { intros; apply hfree. now destruct el. }
+    clear hfree el h hsko func_symbols fvs symbs F a.
+    induction l as [|v vs IHvs]; auto.
+    cbn; rewrite set_fold_left empty_unitl -IHvs.
+    - intros; apply hfree'. now right.
+    - apply set_ext; intros g; split; intros hin.
+      + rewrite union_spec in hin; destruct hin as [contra | hvs]; auto.
+        * have [x e] : exists x : var, v = Free x.
+          { apply hfree'. now left. }
+          rewrite e in contra; cbn in contra.
+          now apply empty_spec in contra.
+        * rewrite set_fold_left union_spec in hvs; destruct hvs; auto.
+      + rewrite union_spec. right. rewrite set_fold_left union_spec.
+        now left.
+  Qed.
+
+  Lemma sko_function_symbols_sound :
+    forall {t : Term} {F : Form} {symbs : sko_record sko} {fvs : set_var} {func_symbols : set_func}
+      (hsko : is_sko sko t F symbs fvs func_symbols = true),
+      function_symbols t = singleton (symbol sko hsko).
+  Proof using pred.
+    intros ??????. etransitivity. {
+      apply f_equal. exact (is_func hsko).
+    } cbn. rewrite set_fold_left; apply set_ext; intros f; split; intros hin.
+    - rewrite union_spec in hin; destruct hin as [hsingl | contra]; auto.
+      have h := sko_function_symbols_args hsko.
+      have e :
+        (fold_left (fun (s : set_atom func) (b : Syntax.Term func var) => s \union function_symbols b)
+           (args sko hsko) \{ \}) =
+          function_symbols (args sko hsko).
+      { reflexivity. }
+      rewrite e h in contra. now apply empty_spec in contra.
+    - rewrite union_spec; now left.
+  Qed.
 End SkoDefs.
 
 (** ** Some classic instances *)
@@ -259,6 +309,7 @@ Section SkolemizationInstances.
     - intro; cbn. destruct (mem f \{\}) eqn:eempty; auto.
       rewrite mem_spec in eempty. exfalso; eapply empty_spec; eauto.
     - intros ??; now cbn.
+    - reflexivity.
     - reflexivity.
   Qed.
 
@@ -415,6 +466,9 @@ Section SkolemizationInstances.
   Proof using Type.
     constructor.
     - apply OuterSkolemization_isFunc.
+    - intros ??????? hin. destruct t; try easy.
+      have [ _ [ _ hfree ] ] := OuterSkolemization_is_sko_pred_sound _ _ _ _ hsko.
+      now apply hfree.
     - intros ????? hsko ?.
       destruct t; try inversion hsko.
       destruct (OuterSkolemization_args_vars hsko) as (l0 & el0).
@@ -538,6 +592,9 @@ Section SkolemizationInstances.
   Proof using Type.
     constructor.
     - apply InnerSkolemization_isFunc.
+    - intros ??????? hin. destruct t; try easy.
+      have [ _ [ _ hfree ] ] := InnerSkolemization_is_sko_pred_sound _ _ _ _ hsko.
+      now apply hfree.
     - intros ????? hsko ?.
       destruct t; try inversion hsko.
       destruct (InnerSkolemization_args_vars hsko) as (l0 & el0).
