@@ -375,21 +375,21 @@ Section SkolemizationInstances.
 
       As the fact that it's a functorial term is already given by [SkoWrapper_is_sko],
       we focus on defining the other aspects here. *)
-  Definition OuterSkolemization_is_sko_pred (fvs : set_var) (func_symbols : set_func) (f : func)
-    (l : list Term) : bool :=
-    negb (mem f func_symbols) &&
+  Definition OuterSkolemization_is_sko_pred (F : Form) (fvs : set_var)
+    (func_symbols : set_func) (f : func) (l : list Term) : bool :=
+    negb (mem f func_symbols) && subsetb (fv F) fvs &&
       eqb (fv l) fvs && forallb is_free l.
 
   Lemma OuterSkolemization_is_sko_pred_sound :
-    forall (fvs : set_var) (func_symbols : set_func) (f : func) (l : list Term),
-      OuterSkolemization_is_sko_pred fvs func_symbols f l = true ->
-      ~(set_in f func_symbols) /\
-        fv l = fvs /\
+    forall (fvs : set_var) (func_symbols : set_func) (F : Form) (f : func) (l : list Term),
+      OuterSkolemization_is_sko_pred F fvs func_symbols f l = true ->
+      ~(set_in f func_symbols) /\ fv F \subseteq fvs /\ fv l = fvs /\
         (forall (t : Term), List.In t l -> exists (x : var), t = Free x).
   Proof using Type.
-    intros ???? [ [ hfresh%Bool.negb_true_iff e ]%andb_prop hfree ]%andb_prop;
+    intros ????? [ [ [hfresh%Bool.negb_true_iff hsub]%andb_prop e ]%andb_prop hfree ]%andb_prop;
       repeat split.
     - rewrite -mem_spec' //.
+    - now rewrite subsetb_spec in hsub.
     - rewrite -eqbIsEq //.
     - rewrite forallb_forall in hfree; intros ? hin; specialize (hfree t hin).
       now apply is_free_sound in hfree.
@@ -401,8 +401,8 @@ Section SkolemizationInstances.
     - exact sko_record_set.
     (* in outer skolemization, we simply need to keep track of which symbols have been
        instantiated *)
-    - intros t _ _ fvs symbs2.
-      exact (SkoWrapper_is_sko t (OuterSkolemization_is_sko_pred fvs symbs2)).
+    - intros t F _ fvs symbs2.
+      exact (SkoWrapper_is_sko t (OuterSkolemization_is_sko_pred F fvs symbs2)).
     - intros t ???? hsko. apply (SkoWrapper_symbol t hsko).
     - intros t ???? hsko. apply (SkoWrapper_args t hsko).
   Defined.
@@ -416,7 +416,7 @@ Section SkolemizationInstances.
     intros ??????. set largs := args OuterSkolemizationData hsko.
     destruct t; try inversion hsko; cbn in hsko.
     have eargs : largs = l by reflexivity. rewrite eargs.
-    have [ _ [ _ hargs ] ] := OuterSkolemization_is_sko_pred_sound _ _ _ _ H0.
+    have [ _ [ _ [ _ hargs ] ] ] := OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H0.
     clear largs eargs H0 hsko.
     induction l as [|t ts IHts].
     - now exists [].
@@ -434,7 +434,7 @@ Section SkolemizationInstances.
       OuterSkolemizationData t F symbs fvs func_symbols = true -> isLocallyClosed t.
   Proof using Type.
     intros ????? hsko; destruct t; cbn in *; try (inversion hsko; fail).
-    apply OuterSkolemization_is_sko_pred_sound in hsko; destruct hsko as (_ & _ & hfv).
+    apply OuterSkolemization_is_sko_pred_sound in hsko; destruct hsko as (_ & _ & _ & hfv).
     clear func_symbols symbs F; induction l as [|t ts IHts]; unfold isLocallyClosed; cbn;
       unfold is_empty; auto.
     change (bv t \union bv_list ts = \{\}); apply is_empty_union; split.
@@ -473,16 +473,19 @@ Section SkolemizationInstances.
     constructor.
     - apply OuterSkolemization_isFunc.
     - intros ??????? hin. destruct t; try easy.
-      have [ _ [ _ hfree ] ] := OuterSkolemization_is_sko_pred_sound _ _ _ _ hsko.
+      have [ _ [ _ [ _ hfree ] ] ] := OuterSkolemization_is_sko_pred_sound _ _ _ _ _ hsko.
       now apply hfree.
     - intros ?????? hsubset e; cbn in *.
       destruct t; try easy; cbn in *.
       unfold OuterSkolemization_is_sko_pred. rewrite andb_true_intro; split; auto.
       + rewrite andb_true_intro; split; auto.
-        * rewrite Bool.negb_true_iff mem_spec'; intro.
-          apply OuterSkolemization_is_sko_pred_sound in e; destruct e as [hin _].
-          now apply hin, hsubset.
-        * apply OuterSkolemization_is_sko_pred_sound in e; destruct e as [ _ [e _] ].
+        * rewrite andb_true_intro; split; auto.
+          -- rewrite Bool.negb_true_iff mem_spec'; intro.
+             apply OuterSkolemization_is_sko_pred_sound in e; destruct e as [hin _].
+             now apply hin, hsubset.
+          -- apply OuterSkolemization_is_sko_pred_sound in e; destruct e as [ _ [hsub _] ].
+             rewrite subsetb_spec //.
+        * apply OuterSkolemization_is_sko_pred_sound in e; destruct e as [ _ [_ [ e _ ] ] ].
           rewrite eqbIsEq //.
       + apply andb_prop in e; now destruct e.
     - intros ????? hsko ?.
@@ -491,14 +494,20 @@ Section SkolemizationInstances.
       cbn in el0. rewrite el0.
       exists (replace_interp_func M F (symbol OuterSkolemizationData hsko) l0); split.
       + intros mu hdelta; apply satisfies_opening_with_sko; auto.
-        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ H0) as (_ & e & _).
-          admit. (* todo *)
-        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _).
+        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H0) as (_ & hfvs & e & _).
+          intros x hin; specialize (hfvs x hin). rewrite -e in hfvs. rewrite el0 in hfvs.
+          clear hsko e H0 el0; induction l0 as [|v vs IHvs].
+          -- now apply empty_spec in hfvs.
+          -- cbn; rewrite union_spec. cbn in hfvs; rewrite union_spec in hfvs.
+             destruct hfvs.
+             ++ now left.
+             ++ right; now apply IHvs.
+        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H0) as (hnin & _ & _).
           intro hin; now apply hnin, hdelta.
       + intros G mu hG. unfold interpret; rewrite no_skolem_same_interp_form; auto.
-        destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _); cbn.
+        destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H0) as (hnin & _ & _); cbn.
         intro hin; now apply hnin, hG.
-  Admitted.
+  Qed.
 
   Definition OuterSkolemization : Skolemization_ pred func var.
   Proof.
@@ -628,13 +637,20 @@ Section SkolemizationInstances.
       cbn in el0. rewrite el0.
       exists (replace_interp_func M F (symbol InnerSkolemizationData hsko) l0); split.
       + intros mu hdelta; apply satisfies_opening_with_sko; auto.
-        * admit.
+        * destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (_ & e & _).
+          rewrite el0 in e; cbn in e. rewrite -e.
+          clear. induction l0 as [|v vs IHvs].
+          -- now intros x hin%empty_spec.
+          -- cbn; intros x hin; rewrite !union_spec in hin |- *.
+             destruct hin.
+             ++ now left.
+             ++ right; now apply IHvs.
         * destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _).
           intro hin; now apply hnin, hdelta.
       + intros G mu hG. unfold interpret; rewrite no_skolem_same_interp_form; auto.
         destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _); cbn.
         intro hin. now apply hnin, hG.
-  Admitted.
+  Qed.
 
   Definition InnerSkolemization : Skolemization_ pred func var.
   Proof.

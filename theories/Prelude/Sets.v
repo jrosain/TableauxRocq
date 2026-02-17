@@ -24,6 +24,7 @@ Class set {A : Type} :=
   ; inter : car -> car -> car
   ; diff  : car -> car -> car
   ; singleton : A -> car
+  ; subsetb : car -> car -> bool
 
   (** *** Extensionality property of sets *)
   ; set_ext : forall (s1 s2 : car), s1 = s2 <-> (forall (x : A), set_in x s1 <-> set_in x s2)
@@ -36,6 +37,8 @@ Class set {A : Type} :=
   ; union_spec : forall (x : A) (s1 s2 : car), set_in x (union s1 s2) <-> set_in x s1 \/ set_in x s2
   ; inter_spec : forall (x : A) (s1 s2 : car), set_in x (inter s1 s2) <-> set_in x s1 /\ set_in x s2
   ; diff_spec  : forall (x : A) (s1 s2 : car), set_in x (diff s1 s2) <-> set_in x s1 /\ ~ set_in x s2
+  ; subsetb_spec  : forall (s1 s2 : car),
+      subsetb s1 s2 = true <-> (forall (x : A), set_in x s1 -> set_in x s2)
   }.
 Arguments set : clear implicits.
 
@@ -466,6 +469,12 @@ Module SetComputationalInstances.
         SetOfX_.In x s \/ ~SetOfX_.In x s.
     Proof. apply SetOfXProps.Dec.MSetDecideAuxiliary.dec_In. Qed.
 
+    Lemma SetOfX_subsetb_spec :
+      forall (s1 s2 : SetOfX_.t),
+        SetOfX_.subset s1 s2 = true <-> (forall (x : X.t), SetOfX_.In x s1 -> SetOfX_.In x s2).
+    Proof. intros ??; rewrite SetOfX_.subset_spec; reflexivity. Qed.
+
+
     #[global] Instance set_of_ordered : set X.t :=
       {| car := SetOfX_.t
 
@@ -478,6 +487,7 @@ Module SetComputationalInstances.
       ;  inter := SetOfX_.inter
       ;  diff := SetOfX_.diff
       ;  singleton := SetOfX_.singleton
+      ;  subsetb := SetOfX_.subset
 
       ;  set_ext := SetOfX_set_ext
 
@@ -487,7 +497,8 @@ Module SetComputationalInstances.
       ;  mem_spec x s := SetOfX_.mem_spec s x
       ;  union_spec x s1 s2 := SetOfX_.union_spec s1 s2 x
       ;  inter_spec x s1 s2 := SetOfX_.inter_spec s1 s2 x
-      ;  diff_spec := SetOfX_diff_spec |}.
+      ;  diff_spec := SetOfX_diff_spec
+      ;  subsetb_spec := SetOfX_subsetb_spec |}.
   End SetFromOrdered.
 
   (** Set of natural numbers. *)
