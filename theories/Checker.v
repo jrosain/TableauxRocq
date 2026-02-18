@@ -2105,7 +2105,7 @@ Module Export ExtendedSyntax.
                          (Checker.Leaf None))
                       (Checker.BetaOr (snd fs))
                       (Checker.Node
-                         (Checker.Node T1'
+                         (Checker.Node T2'
                             (Checker.AlphaNegNeg (hd (Neg Bot) (tl (snd (fst fs)))))
                             (Checker.Leaf None))
                          (Checker.AlphaNegOr (last (snd (fst fs)) (Neg Bot)))
