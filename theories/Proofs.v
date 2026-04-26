@@ -1279,6 +1279,11 @@ End ConcreteProofInstances.
 Module TreeTactics.
   Ltac infer_branch_infos :=
     match goal with
+    | [ e : expand_tableau_branch ?sko ?l ?l' ?B ?T = Some ?T' |- _ ] =>
+        apply (expand_tableau_branch_Some__aux sko) in e
+    | _ => idtac
+    end;
+    match goal with
     | [ hb : is_branch_of ?B ?T |- _ ] =>
         let T0 := fresh "T" in
         let hnl := fresh "hnleaf" in
@@ -1312,12 +1317,40 @@ Module TreeTactics.
         | [ e : expand_tableau_branch__aux None None B T = Some ?T' |- _ ] =>
             let hb' := fresh "hbranchof" in
             have hb' := is_branch_of_extend_None hb e
+        | _ => idtac
+        end
+    | _ => fail 0 "No inferable data on branches from this context"
+    end.
+
+  Ltac infer_ctx_infos :=
+    match goal with
+    | [ hb : is_branch_of ?B ?T, e : get_context ?B ?T = ?Gamma |- _ ] =>
+        match goal with
+        | [ eexp : expand_tableau_branch__aux (Some ?l) ?l' B T = Some ?T' |- _ ] =>
+            let ectx := fresh "ectx" in
+            have ectx := get_context_extend_left hb eexp e
+        | _ => idtac
+        end;
+        match goal with
+        | [ eexp : expand_tableau_branch__aux ?l (Some ?l') B T = Some ?T' |- _ ] =>
+            let ectx := fresh "ectx" in
+            have ectx := get_context_extend_right hb eexp e
+        | _ => idtac
+        end
+    | _ => idtac
+    end;
+    match goal with
+    | [ hb : is_branch_of ?B ?T |- _ ] =>
+        match goal with
+        | [ hb' : is_branch_of ?B' T |- _ ] =>
+            match goal with
+            | [ ne : B <> B', e : replace_child B' T ?T' = Some ?T0 |- _ ] =>
+                let ectx := fresh "ectx" in
+                have ectx := get_context_replace_child_oth hb hb' ne e
+            | _ => idtac
+            end
+        | _ => idtac
         end
     | _ => idtac
     end.
-
-(* is_branch_of_replace_child_oth_inv *)
-(* is_branch_of_replace_child_oth *)
-(* is_branch_of_extend_oth *)
-(* expand_tableau_branch_Some_is_branch_of *)
 End TreeTactics.

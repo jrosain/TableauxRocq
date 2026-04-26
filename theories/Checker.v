@@ -505,14 +505,44 @@ Ltac on_unary_cases tac :=
 Ltac on_alpha_cases tac :=
   only 1-2: tac.
 
+Ltac on_beta_case tac :=
+  only 3 : tac.
+
 Ltac on_gamma_case tac :=
   only 4: tac.
 
 Ltac on_delta_case tac :=
   only 5: tac.
 
-Ltac apply_rules_soundness :=
-  fail 0 "Cannot apply any rule soundness inference in this context".
+Ltac simplify_chk_rec_call :=
+  let rf := fresh "rf" in
+  let eg := fresh "eget" in
+  let hin := fresh "hin" in
+  let echk := fresh "echk" in
+  let G := fresh "G" in
+  match goal with
+  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (AlphaNegNeg ?f) ?R2) =
+            ret {| status := true; symbs := ?s' |} |- _ ] =>
+      apply alpha_rule_sound in e; destruct e as (rf & eg & hin & echk)
+  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (AlphaNegOr ?f) ?R2) =
+            ret {| status := true; symbs := ?s' |} |- _ ] =>
+      apply alpha_rule_sound in e; destruct e as (rf & eg & hin & echk)
+  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (BetaOr ?f) ?R2) =
+            ret {| status := true; symbs := ?s' |} |- _ ] =>
+      let rf' := fresh "rf" in
+      let echk' := fresh "echk" in
+      apply beta_rule_sound in e; destruct e as (rf & rf' & hin & echk & echk')
+  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (GammaAll ?F ?x) ?R2) =
+            ret {| status := true; symbs := ?s' |} |- _ ] =>
+      apply gamma_rule_sound in e; destruct e as (G & eget & hin & echk)
+  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (DeltaNegAll ?F ?t) ?R2) =
+            ret {| status := true; symbs := ?s' |} |- _ ] =>
+      let f := fresh "f" in
+      let hsko := fresh "hsko" in
+      let esymb := fresh "esymb" in
+      apply delta_rule_sound in e; destruct e as (f & G & eget & hin & hsko & esymb & echk)
+  | _ => fail 0 "Cannot extract any equation from an auxiliary call to CheckProof in the context"
+  end; try easy.
 
 Section RuleTreeToSequence_Lemmas.
   Context {sko : Skolemization}.
@@ -564,7 +594,7 @@ Section RuleTreeToSequence_Lemmas.
 
       all: injection e => <-.
 
-      (** In the unary cases: directly call the the induciton hypothesis on the left branch. *)
+      (** In the unary cases: directly call the induction hypothesis on the left branch. *)
       all:
         on_alpha_cases
           ltac:(destruct (IHR1 (B ++ [Left])%list {| tree := t0; symbols := symbols T |}
@@ -627,13 +657,48 @@ Section RuleTreeToSequence_Lemmas.
     (* Case: [Leaf] *)
     - exists [T]; auto.
 
-    (* Case: [Node]. TODO: factor out the boilerplate code. *)
-    - destruct r.
+    (* Case: [Node]. *)
+    - destruct r;
+        simplify_chk_rec_call.
 
-      (* Cases: alpha rules *)
-      + have foo := alpha_rule_sound e.
-destruct_inductive_CheckProof_alpha_equation_and_infer.
-        destruct (IHR1 (B ++ [Left])%list record record' func_symbs T0 hbranchof0
+      (** On unary rules, we start by expanding the tableau as we expect. *)
+      all:
+        on_alpha_cases
+          ltac:(have [ T0 hexpand ] := is_branch_of_expand_tableau_branch sko
+                                         (Some rf) None hbranchof);
+        on_beta_case
+          ltac:(have [ T0 hexpand ] := is_branch_of_expand_tableau_branch sko
+                                         (Some rf) (Some rf0) hbranchof);
+        on_gamma_case
+          ltac:(have [ T0 hexpand ] := is_branch_of_expand_tableau_branch sko
+                                         (Some [opening_form 0 (Free s) G]) None hbranchof);
+        on_delta_case
+          ltac:(have [ T0 hexpand ] := is_branch_of_expand_tableau_branch sko
+                                         (Some [opening_form 0 t G]) None hbranchof);
+        infer_branch_infos; infer_ctx_infos.
+
+      (** Then, we can almost directly conclude by getting the sequence yielded by the
+          inductive hypothesis. *)
+      all:
+        on_alpha_cases
+          ltac:(destruct (IHR1 (B ++ [Left])%list record record' func_symbs T0 hbranchof0
+                            (Ctx.union rf Gamma) echk ectx) as (seq & hseq));
+        on_gamma_case
+          ltac:(destruct (IHR1 (B ++ [Left])%list record record' func_symbs T0 hbranchof0
+                            (Ctx.add (G{0 \to Free s}) Gamma) echk ectx) as (seq & hseq));
+        on_delta_case
+          ltac:(destruct (IHR1 (B ++ [Left])%list (add_symbol f0 f record) record' func_symbs
+                               {| tree := T0; symbols := (add_symbol f0 f (symbols T0)) |}
+                               hbranchof0 (Ctx.add (G{0 \to t}) Gamma) echk ectx) as (seq & hseq)).
+
+      (** Finally, we can simply conclude the unary cases by giving the current tableau (T)
+          followed by the sequence given by the previous step. *)
+      all:
+        on_unary_cases
+          ltac:(exists (T :: seq); cbn; by rewrite eget hexpand _ hseq).
+      (* todo: esymbs *)
+
+      + destruct (IHR1 (B ++ [Left])%list record record' func_symbs T0 hbranchof0
                     (Ctx.union l Gamma) hnext ectx) as (s & hseq).
         exists (T :: s); cbn.
         rewrite eget (expand_tableau_branch_Some__aux sko hexpand) esymbs hseq.
