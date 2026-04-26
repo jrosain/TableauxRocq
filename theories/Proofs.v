@@ -1280,7 +1280,8 @@ Module TreeTactics.
   Ltac infer_branch_infos :=
     match goal with
     | [ e : expand_tableau_branch ?sko ?l ?l' ?B ?T = Some ?T' |- _ ] =>
-        apply (expand_tableau_branch_Some__aux sko) in e
+        let eexpand := fresh "eexpand" in
+        have eexpand := expand_tableau_branch_Some__aux sko e
     | _ => idtac
     end;
     match goal with
