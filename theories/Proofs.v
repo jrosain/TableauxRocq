@@ -39,6 +39,13 @@ Section Tableaux.
   (** A [Branch] of a tableau is a succession of [BranchingStep]s. *)
   Definition Branch := list BranchingStep.
 
+  Lemma branch_extend_left_right :
+    forall (B : Branch), B ++ [Left] <> B ++ [Right].
+  Proof using Type.
+    induction B; try easy.
+    cbn; intro e; apply IHB; injection e => -> //.
+  Qed.
+
   Definition EmptyBranch : Branch := [].
 
   (** A [Branch] [is_branch_of] a [TableauTree] whenever the list of branching steps describes
@@ -1267,3 +1274,50 @@ Module ConcreteProofInstances.
 
   Definition Tableau := @Tableau string string string.
 End ConcreteProofInstances.
+
+(** Exposing tactics to simplify manipulation of trees. *)
+Module TreeTactics.
+  Ltac infer_branch_infos :=
+    match goal with
+    | [ hb : is_branch_of ?B ?T |- _ ] =>
+        let T0 := fresh "T" in
+        let hnl := fresh "hnleaf" in
+        let hc := fresh "hchild" in
+        have [ T0 [ hnl hc ] ] := is_branch_of_get_child_at hb;
+        match goal with
+        | [ e : expand_tableau_branch__aux (Some ?l) (Some ?l') B T = Some ?T' |- _ ] =>
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_left hb e;
+            let hnb := fresh "hnbranchof" in
+            have hnb := is_branch_of_extend_left' hb e;
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_right hb e
+        | [ e : expand_tableau_branch__aux (Some ?l) None B T = Some ?T' |- _ ] =>
+            let T := fresh "T" in
+            let hnl := fresh "hnleaf" in
+            let er := fresh "erepl" in
+            have [ T [ hnl er ] ] := replace_expand_Left hb;
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_left hb e;
+            let hnb := fresh "hnbranchof" in
+            have hnb := is_branch_of_extend_left' hb e
+        | [ e : expand_tableau_branch__aux (Some ?l) ?l' B T = Some ?T' |- _ ] =>
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_left hb e;
+            let hnb := fresh "hnbranchof" in
+            have hnb := is_branch_of_extend_left' hb e
+        | [ e : expand_tableau_branch__aux ?l (Some ?l') B T = Some ?T' |- _ ] =>
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_right hb e
+        | [ e : expand_tableau_branch__aux None None B T = Some ?T' |- _ ] =>
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_None hb e
+        end
+    | _ => idtac
+    end.
+
+(* is_branch_of_replace_child_oth_inv *)
+(* is_branch_of_replace_child_oth *)
+(* is_branch_of_extend_oth *)
+(* expand_tableau_branch_Some_is_branch_of *)
+End TreeTactics.
