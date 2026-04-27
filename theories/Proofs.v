@@ -1354,4 +1354,24 @@ Module TreeTactics.
         end
     | _ => idtac
     end.
+
+  Ltac infer_replace_child_infos :=
+    match goal with
+    | [ hb : is_branch_of ?B ?T |- _ ] =>
+        match goal with
+        | [ hb' : is_branch_of ?B' T |- _ ] =>
+            match goal with
+            | [ ne : B <> B', e : replace_child B' T ?T' = Some ?T0 |- _ ] =>
+                let hb0 := fresh "hbranchof" in
+                let ectx := fresh "ectx" in
+                have hb0 := is_branch_of_replace_child_oth hb hb' ne e;
+                have ectx := get_context_replace_child_oth hb hb' ne e
+            | _ => fail 0 "Cannot infer replacement infos in this context: either [B <> B'] is
+                          not in the context or there are no replace_child equations in it"
+            end
+        | _ => fail 0 "Cannot infer replacement infos in this context: only 1 is_branch_of in
+                      the context"
+        end
+    | _ => fail 0 "Cannot infer replacement infos in this context: no is_branch_of in the context"
+    end.
 End TreeTactics.

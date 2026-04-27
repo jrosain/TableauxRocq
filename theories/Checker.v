@@ -547,6 +547,8 @@ Ltac simplify_chk_rec_call :=
   | _ => fail 0 "Cannot extract any equation from an auxiliary call to CheckProof in the context"
   end; try easy.
 
+Ltac infer_replace_child_ctx := fail 0 "Not yet implemented".
+
 Section RuleTreeToSequence_Lemmas.
   Context {sko : Skolemization}.
 
@@ -643,6 +645,31 @@ Section RuleTreeToSequence_Lemmas.
       rewrite hreplace2 app_comm_cons last_app //.
       eapply RuleTree_to_Sequence_not_nil; eauto.
   Qed.
+End RuleTreeToSequence_Lemmas.
+
+Ltac infer_replace_child_helper tmp :=
+  let T0 := fresh "T" in
+  let hnl := fresh "hnleaf" in
+  let erepl := fresh "ereplace" in
+  match goal with
+  | [ hb : is_branch_of (?B ++ ?B')%list ?T |- _ ] =>
+      match goal with
+      | [ e : RuleTree_to_Sequence__aux _ _ _ = Some _ |- _ ] =>
+          have [ T0 [ hnl erepl ] ] := RuleTree_to_Sequence_branch hb e;
+                                       have tmp := (not_eq_sym (branch_extend_left_right B))
+                                                | _ => fail 0 "Cannot infer replacement infos in this context: missing RuleTree_to_Sequence__aux equation"
+      end
+  | _ => fail 0 "Cannot infer replacement infos in this context: missing is_branch_of"
+  end.
+
+Ltac infer_replace_child_ctx ::=
+  let tmp := fresh "tmp" in
+  infer_replace_child_helper tmp; infer_replace_child_infos; clear tmp.
+
+Section RuleTreeToSequence_Lemmas2.
+  Context {sko : Skolemization}.
+
+  Let Tableau := Tableau sko.
 
   (** Then, we can show that whenever the [CheckProof__aux] algorithm finds a result,
       then the algorithm [RuleTree_to_Sequence__aux] converts the [RuleTree] to a [Sequence]
@@ -711,24 +738,13 @@ Section RuleTreeToSequence_Lemmas.
       destruct (IHR1 (B ++ [Left])%list record symbs func_symbs T0 hbranchof0
                   (Ctx.union rf Gamma) echk ectx) as (s1 & hseq1).
 
-      (* todo: automate the following *)
-      have [ T1' [ hnleaf0 ereplace ] ] := RuleTree_to_Sequence_branch hbranchof0 hseq1.
-
-      have hbranchof2' : is_branch_of (B ++ [Right])%list (last s1 (mkLeaf sko)).
-      { eapply is_branch_of_replace_child_oth.
-        3: exact (not_eq_sym (branch_extend_left_right B)).
-        all: eauto. }
-      have ectx2' : get_context (B ++ [Right])%list T0 = get_context (B ++ [Right])%list
-                                                           (last s1 (mkLeaf sko)).
-      { eapply get_context_replace_child_oth.
-        3: exact (not_eq_sym (branch_extend_left_right B)).
-        all: eauto. }
-      rewrite ectx2' in ectx0; auto.
-      (* todo: until here *)
+      (** Replace the context of [T0] to the context of the last element of [s1]. *)
+      infer_replace_child_ctx.
+      rewrite ectx1 in ectx0; auto.
 
       (** Using the inferred context fact, we can get the sequence given by the right child. *)
       destruct (IHR2 (B ++ [Right])%list symbs record' func_symbs (last s1 (mkLeaf sko))
-                  hbranchof2' (Ctx.union rf0 Gamma) echk0 ectx0) as (s2 & hseq2).
+                  hbranchof2 (Ctx.union rf0 Gamma) echk0 ectx0) as (s2 & hseq2).
 
       (** And conclude by giving the expected sequence. *)
       exists (T :: removelast s1 ++ s2); cbn.
@@ -773,99 +789,74 @@ Section RuleTreeToSequence_Lemmas.
         destruct (trivial_contradiction _); try easy.
         injection esrch => -> //.
 
-    - destruct r; cbn in eseq.
+    - destruct r;
+        simplify_chk_rec_call;
+        simplify_seq_rec_call;
+        infer_branch_infos.
 
-      + apply alpha_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch1).
-        rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |} :=
-          is_branch_of_extend_left hbranchof hexpand.
-        rewrite /Ctx.union /Ctx.elements in esrch1, ectx1; rewrite -ectx1 in esrch1.
-        rewrite (IHR1 sigma (B ++ [Left])%list _ _ _ s0 hbranchof1 esrch1 eseq1).
-        have hs0 : s0 <> [] by eapply RuleTree_to_Sequence_not_nil; eauto.
-        injection eseq => <-; cbn. destruct s0; easy.
+      (** In order to use the induction hypothesis, we add a small lemma on contexts. *)
+      all:
+        have ectx1 := get_context_extend_left hbranchof eexp eq_refl;
+        on_unary_cases
+          ltac:(rewrite /Ctx.union /Ctx.elements /Ctx.add in echk, ectx1;
+                injection eget => eget1; subst; cbn in ectx1; rewrite -ectx1 in echk).
 
-      + apply alpha_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch1).
-        rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |} :=
-          is_branch_of_extend_left hbranchof hexpand.
-        rewrite /Ctx.union /Ctx.elements in esrch1, ectx1; rewrite -ectx1 in esrch1.
-        rewrite (IHR1 sigma (B ++ [Left])%list _ _ _ s0 hbranchof1 esrch1 eseq1).
-        have hs0 : s0 <> [] by eapply RuleTree_to_Sequence_not_nil; eauto.
-        injection eseq => <-; cbn. destruct s0; easy.
+      (** Moreover, as the induction hypothesis depends on tableaux, we must specify the
+          symbols in each case. *)
+      all:
+        on_alpha_cases
+          ltac:(change (is_branch_of
+                          (B ++ [Left])%list
+                          {| tree := t0; symbols := symbols T |}) in hbranchof0);
+        on_gamma_case
+          ltac:(change (is_branch_of
+                          (B ++ [Left])%list
+                          {| tree := t; symbols := symbols T |}) in hbranchof0);
+        on_delta_case
+          ltac:(injection esymb => esymb'; subst;
+                change (is_branch_of
+                          (B ++ [Left])%list
+                          {| tree := t0; symbols := add_symbol f0 f (symbols T) |})
+                                    in hbranchof0).
 
-      + apply beta_rule_sound in esrch;
-          destruct esrch as (l & l' & symbs & eget & hin & esrch1 & esrch2).
-        rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        destruct (RuleTree_to_Sequence__aux (B ++ [Right])%list _ _) eqn:eseq2; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have ectx2 := get_context_extend_right hbranchof hexpand eq_refl.
-        have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}
-          := is_branch_of_extend_left hbranchof hexpand.
-        have hbranchof2 := is_branch_of_extend_right hbranchof hexpand.
-        rewrite /Ctx.union /Ctx.elements in esrch1, ectx1, esrch2, ectx2.
-        rewrite -ectx1 in esrch1; rewrite -ectx2 in esrch2.
+      (** Then, we can apply the induction hypothesis in the unary cases. *)
+      all:
+        on_unary_cases
+          ltac:(rewrite (IHR1 sigma (B ++ [Left])%list _ _ _ _ hbranchof0 echk eseq0);
+                injection eseq => <-; cbn; set sequence := (x in symbols (last x (mkLeaf sko)))).
 
-        have esymbs' : symbs = symbols (last s0 (mkLeaf sko)).
-        { eapply IHR1; eauto. }
+      (** And we can conclude as the sequence cannot be empty. *)
+      all:
+        on_unary_cases
+          ltac:(fold sequence;
+                have hsequence : sequence <> [] by eapply RuleTree_to_Sequence_not_nil; eauto);
+        on_unary_cases
+          ltac:(destruct sequence; easy).
 
-        rewrite esymbs' in esrch2. injection eseq => <-.
-        rewrite app_comm_cons last_app.
-        { eapply RuleTree_to_Sequence_not_nil; eauto. }
+      (** We do the same work for the other branch in the binary case. *)
+      have ectx2 := get_context_extend_right hbranchof eexp eq_refl.
+      rewrite /Ctx.union /Ctx.elements in echk, ectx1, echk0, ectx2;
+        injection eget0 => eget0'; subst; rewrite -ectx1 in echk; rewrite -ectx2 in echk0.
 
-        have [ T1' [ hnleaf ereplace ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
-        have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
-        { clear; induction B; cbn; intro; congruence. }
+      (** By induction hypothesis, we directly get that symbs are the symbols of the last
+          tableau of the sequence of the left child. *)
+      have esymbs' : symbs = symbols (last s0 (mkLeaf sko)).
+      { eapply IHR1; [| |apply eseq0]; eauto. }
 
-        have hbranchof2' : is_branch_of (B ++ [Right])%list (last s0 (mkLeaf sko)).
-        { eapply is_branch_of_replace_child_oth.
-          3: eassumption.
-          all: eauto. }
+      rewrite esymbs' in echk0.
+      injection eseq => <-; rewrite app_comm_cons last_app.
+      { eapply RuleTree_to_Sequence_not_nil; eauto. }
 
-        have ectx2' : get_context (B ++ [Right])%list t = get_context (B ++ [Right])%list
-                                                             (last s0 (mkLeaf sko)).
-        { eapply get_context_replace_child_oth.
-          3: eassumption.
-          all: eauto. }
+      change (is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |})
+        in hbranchof0.
+      change (is_branch_of (B ++ [Right])%list {| tree := t; symbols := symbols T |})
+        in hbranchof1.
+      infer_replace_child_ctx.
 
-        eapply IHR2; eauto.
-        rewrite -ectx2'; eauto.
-
-      + apply gamma_rule_sound in esrch; destruct esrch as (F & eget & hin & esrch1).
-        rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |} :=
-          is_branch_of_extend_left hbranchof hexpand.
-        rewrite /Ctx.add /Ctx.elements in esrch1, ectx1; cbn in ectx1; rewrite -ectx1 in esrch1.
-        rewrite (IHR1 sigma (B ++ [Left])%list _ _ _ s1 hbranchof1 esrch1 eseq1).
-        have hs0 : s1 <> [] by eapply RuleTree_to_Sequence_not_nil; eauto.
-        injection eseq => <-; cbn. destruct s1; easy.
-
-      + apply delta_rule_sound in esrch; destruct esrch as
-          (f0 & F & eget & hin & hsko & esymb & esrch1).
-        rewrite eget esymb in eseq.
-        destruct (expand_tableau_branch__aux _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have hbranchof1 : is_branch_of
-                            (B ++ [Left])%list
-                            {| tree := t0; symbols := add_symbol f0 f (symbols T) |} :=
-          is_branch_of_extend_left hbranchof hexpand.
-        rewrite /Ctx.add /Ctx.elements in esrch1, ectx1; cbn in ectx1; rewrite -ectx1 in esrch1.
-        rewrite (IHR1 sigma (B ++ [Left])%list _ _ _ s0 hbranchof1 esrch1 eseq1).
-        have hs0 : s0 <> [] by eapply RuleTree_to_Sequence_not_nil; eauto.
-        injection eseq => <-; cbn. destruct s0; easy.
+      eapply IHR2; eauto.
+      rewrite -ectx; eauto.
   Qed.
-End RuleTreeToSequence_Lemmas.
+End RuleTreeToSequence_Lemmas2.
 
 Section Soundness.
   Context (sko : Skolemization).
