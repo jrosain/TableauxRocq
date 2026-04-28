@@ -1,0 +1,93 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<link href="resources/coqdoc.css" rel="stylesheet" type="text/css" />
+<link href="resources/coqdocjs.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="resources/config.js"></script>
+<script type="text/javascript" src="resources/coqdocjs.js"></script>
+</head>
+
+<body onload="document.getElementById('content').focus()">
+  <div id="header">
+    <span class="left">
+      <span class="modulename"> <script> document.write(document.title) </script> </span>
+    </span>
+
+    <span class="button" id="toggle-proofs"></span>
+
+    <span class="right">
+      <a href="../">Project Page</a>
+      <a href="./indexpage.html"> Index </a>
+      <a href="./toc.html"> Table of Contents </a>
+    </span>
+</div>
+    <div id="content" tabindex="-1" onblur="document.getElementById('content').focus()">
+    <div id="main">
+<h1 class="libtitle">Tableaux.Prelude.Atoms</h1>
+
+<div class="code">
+</div>
+
+<div class="doc">
+<a id="lab2"></a><h1 class="section">Prelude.Atoms: the types that are suitable to make free variables</h1>
+
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Tableaux</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <a class="idref" href="Tableaux.Prelude.Init.html#"><span class="id" title="library">Prelude.Init</span></a>.<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Tableaux</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <a class="idref" href="Tableaux.Prelude.Classes.html#"><span class="id" title="library">Prelude.Classes</span></a>.<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Tableaux</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <a class="idref" href="Tableaux.Prelude.Sets.html#"><span class="id" title="library">Prelude.Sets</span></a>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab3"></a><h2 class="section">The typeclass of atoms</h2>
+
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Record</span> <a id="Atom" class="idref" href="#Atom"><span class="id" title="record">Atom</span></a> :=<br/>
+&nbsp;&nbsp;{ <a id="atom" class="idref" href="#atom"><span class="id" title="projection">atom</span></a> :&gt; <span class="id" title="keyword">Type</span><br/>
+&nbsp;&nbsp;; <a id="eqb_atom" class="idref" href="#eqb_atom"><span class="id" title="projection">eqb_atom</span></a> :: <a class="idref" href="Tableaux.Prelude.Classes.html#EqBool"><span class="id" title="class">EqBool</span></a> <a class="idref" href="Tableaux.Prelude.Atoms.html#atom:2"><span class="id" title="method">atom</span></a><br/>
+&nbsp;&nbsp;; <a id="set_atom" class="idref" href="#set_atom"><span class="id" title="projection">set_atom</span></a> : <a class="idref" href="Tableaux.Prelude.Sets.html#set"><span class="id" title="class">set</span></a> <a class="idref" href="Tableaux.Prelude.Atoms.html#atom:2"><span class="id" title="method">atom</span></a> }.<br/>
+<span class="id" title="keyword">Arguments</span> <a class="idref" href="Tableaux.Prelude.Atoms.html#set_atom"><span class="id" title="projection">set_atom</span></a> : <span class="id" title="tactic">clear</span> <span class="id" title="var">implicits</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+<a id="lab4"></a><h2 class="section">Some usual instantiations, hidden under an importable module.</h2>
+
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Module</span> <a id="AtomComputationalInstances" class="idref" href="#AtomComputationalInstances"><span class="id" title="module">AtomComputationalInstances</span></a>.<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Export</span> <a class="idref" href="Tableaux.Prelude.Sets.html#SetComputationalInstances"><span class="id" title="module">SetComputationalInstances</span></a>.<br/>
+
+<br/>
+&nbsp;&nbsp;#[<span class="id" title="var">global</span>] <span class="id" title="var">Canonical</span> <span class="id" title="keyword">Structure</span> <a id="AtomComputationalInstances.nat_atom" class="idref" href="#AtomComputationalInstances.nat_atom"><span class="id" title="definition">nat_atom</span></a> : <a class="idref" href="Tableaux.Prelude.Atoms.html#Atom"><span class="id" title="record">Atom</span></a> :=<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;{| <a class="idref" href="Tableaux.Prelude.Atoms.html#atom"><span class="id" title="projection">atom</span></a> := <a class="idref" href="http://rocq-prover.org/doc/V9.0.1/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;;  <a class="idref" href="Tableaux.Prelude.Atoms.html#eqb_atom"><span class="id" title="projection">eqb_atom</span></a> := <a class="idref" href="Tableaux.Prelude.Classes.html#eq_bool_nat"><span class="id" title="instance">eq_bool_nat</span></a><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;;  <a class="idref" href="Tableaux.Prelude.Atoms.html#set_atom"><span class="id" title="projection">set_atom</span></a> := <a class="idref" href="Tableaux.Prelude.Sets.html#SetComputationalInstances.SetOfNat"><span class="id" title="definition">SetOfNat</span></a> |}.<br/>
+
+<br/>
+&nbsp;&nbsp;#[<span class="id" title="var">global</span>] <span class="id" title="var">Canonical</span> <span class="id" title="keyword">Structure</span> <a id="AtomComputationalInstances.string_atom" class="idref" href="#AtomComputationalInstances.string_atom"><span class="id" title="definition">string_atom</span></a> : <a class="idref" href="Tableaux.Prelude.Atoms.html#Atom"><span class="id" title="record">Atom</span></a> :=<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;{| <a class="idref" href="Tableaux.Prelude.Atoms.html#atom"><span class="id" title="projection">atom</span></a> := <span class="id" title="inductive">string</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;;  <a class="idref" href="Tableaux.Prelude.Atoms.html#eqb_atom"><span class="id" title="projection">eqb_atom</span></a> := <a class="idref" href="Tableaux.Prelude.Classes.html#eq_bool_string"><span class="id" title="instance">eq_bool_string</span></a><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;;  <a class="idref" href="Tableaux.Prelude.Atoms.html#set_atom"><span class="id" title="projection">set_atom</span></a> := <a class="idref" href="Tableaux.Prelude.Sets.html#SetComputationalInstances.SetOfString"><span class="id" title="definition">SetOfString</span></a> |}.<br/>
+<span class="id" title="keyword">End</span> <a class="idref" href="Tableaux.Prelude.Atoms.html#AtomComputationalInstances"><span class="id" title="module">AtomComputationalInstances</span></a>.<br/>
+</div>
+</div>
+<div id="footer">
+  Generated by <a href="http://coq.inria.fr/">coqdoc</a> and improved with <a href="https://github.com/coq-community/coqdocjs">CoqdocJS</a>
+</div>
+</div>
+</body>
+
+</html>
