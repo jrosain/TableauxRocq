@@ -2,10 +2,10 @@ all: RocqMakefile
 	make -f RocqMakefile
 
 RocqMakefile:
-	sh devtools/configure.sh
+	bash devtools/configure.sh
 
 config:
-	sh devtools/configure.sh
+	bash devtools/configure.sh
 
 clean:
 	make clean -f RocqMakefile
@@ -13,7 +13,7 @@ clean:
 install:
 	make install -f RocqMakefile
 
-doc:
+doc: RocqMakefile
 	COQMAKEFILE=RocqMakefile COQDOCJS_DIR=devtools make coqdoc -f RocqMakefile
-	sh devtools/make-index.sh
+	bash devtools/make-index.sh
 	cp devtools/extra/index.html html/
