@@ -466,15 +466,20 @@ Ltac simplify_seq_rec_call :=
   let eexp := fresh "eexp" in
   match goal with
   | [ e : RuleTree_to_Sequence__aux ?B ?T (Node ?R1 (AlphaNegNeg ?f) ?R2) = Some _ |- _ ] =>
-      cbn in e; destruct (get_neg_neg f) eqn:eget
+      let e' := fresh e in
+      (have e' := e); cbn in e'; destruct (get_neg_neg f) eqn:eget
   | [ e : RuleTree_to_Sequence__aux ?B ?T (Node ?R1 (AlphaNegOr ?f) ?R2) = Some _ |- _ ] =>
-      cbn in e; destruct (get_neg_or f) eqn:eget
+      let e' := fresh e in
+      (have e' := e); cbn in e'; destruct (get_neg_or f) eqn:eget
   | [ e : RuleTree_to_Sequence__aux ?B ?T (Node ?R1 (BetaOr ?f) ?R2) = Some _ |- _ ] =>
-      cbn in e; destruct (get_or f) eqn:eget
+      let e' := fresh e in
+      (have e' := e); cbn in e'; destruct (get_or f) eqn:eget
   | [ e : RuleTree_to_Sequence__aux ?B ?T (Node ?R1 (GammaAll ?f ?x) ?R2) = Some _ |- _ ] =>
-      cbn in e; destruct (get_all f) eqn:eget
+      let e' := fresh e in
+      (have e' := e); cbn in e'; destruct (get_all f) eqn:eget
   | [ e : RuleTree_to_Sequence__aux ?B ?T (Node ?R1 (DeltaNegAll ?f ?t) ?R2) = Some _ |- _ ] =>
-      cbn in e; destruct (get_neg_all f) eqn:eget
+      let e' := fresh e in
+      (have e' := e); cbn in e'; destruct (get_neg_all f) eqn:eget
   | _ => fail 0 "Cannot extract any equation from an auxiliary call to RuleTree_to_Sequence in the context"
   end; try easy;
   destruct (expand_tableau_branch__aux _ _ _ _) eqn:eexp; try easy;
@@ -495,7 +500,7 @@ Ltac simplify_seq_rec_call :=
        let eseq := fresh "eseq" in
        destruct (RuleTree_to_Sequence__aux (B ++ [Right])%list T R) eqn:eseq; try easy
   | _ => idtac
-  end; cbn in *.
+  end.
 
 Ltac on_unary_cases tac :=
   (* apply tac on the unary cases; update this tactic when updating the algorithm *)
@@ -521,6 +526,10 @@ Ltac on_gamma_case tac :=
 Ltac on_delta_case tac :=
   only 5: tac.
 
+Ltac on_alpha_gamma_cases tac :=
+  only 1-2,4: tac;
+  swap 3 4.
+
 Ltac simplify_chk_rec_call :=
   let rf := fresh "rf" in
   let eg := fresh "eget" in
@@ -530,26 +539,32 @@ Ltac simplify_chk_rec_call :=
   match goal with
   | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (AlphaNegNeg ?f) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
-      apply alpha_rule_sound in e; destruct e as (rf & eg & hin & echk)
+      let e' := fresh e in
+      (have e' := alpha_rule_sound e); destruct e' as (rf & eg & hin & echk)
   | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (AlphaNegOr ?f) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
-      apply alpha_rule_sound in e; destruct e as (rf & eg & hin & echk)
+      let e' := fresh e in
+      (have e' := alpha_rule_sound e); destruct e' as (rf & eg & hin & echk)
   | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (BetaOr ?f) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
       let rf' := fresh "rf" in
       let echk' := fresh "echk" in
       let symbs' := fresh "symbs" in
       let eget := fresh "eget" in
-      apply beta_rule_sound in e; destruct e as (rf & rf' & symbs & eget & hin & echk & echk')
+      let e' := fresh e in
+      (have e' := beta_rule_sound e);
+      destruct e' as (rf & rf' & symbs & eget & hin & echk & echk')
   | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (GammaAll ?F ?x) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
-      apply gamma_rule_sound in e; destruct e as (G & eget & hin & echk)
+      let e' := fresh e in
+      (have e' := gamma_rule_sound e); destruct e' as (G & eget & hin & echk)
   | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (DeltaNegAll ?F ?t) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
       let f := fresh "f" in
       let hsko := fresh "hsko" in
       let esymb := fresh "esymb" in
-      apply delta_rule_sound in e; destruct e as (f & G & eget & hin & hsko & esymb & echk)
+      let e' := fresh e in
+      (have e' := delta_rule_sound e); destruct e' as (f & G & eget & hin & hsko & esymb & echk)
   | _ => fail 0 "Cannot extract any equation from an auxiliary call to CheckProof in the context"
   end; try easy.
 
@@ -567,7 +582,7 @@ Section RuleTreeToSequence_Lemmas.
     - cbn in e; injection e => <-; now intro.
     - destruct r;
         simplify_seq_rec_call;
-        injection e => <-; easy.
+        injection e0 => <-; easy.
   Qed.
 
   Lemma RuleTree_to_Sequence_hd :
@@ -578,7 +593,7 @@ Section RuleTreeToSequence_Lemmas.
     - injection e => <- //.
     - destruct r;
         simplify_seq_rec_call;
-        injection e => <-; easy.
+        injection e0 => <-; easy.
   Qed.
 
   (** First, we show that [RuleTree_to_Sequence__aux] only affects the subtree starting at
@@ -601,7 +616,7 @@ Section RuleTreeToSequence_Lemmas.
         simplify_seq_rec_call;
         infer_branch_infos.
 
-      all: injection e => <-.
+      all: injection e0 => <-.
 
       (** In the unary cases: directly call the induction hypothesis on the left branch. *)
       all:
@@ -669,6 +684,20 @@ Ltac infer_replace_child_helper tmp :=
 Ltac infer_replace_child_ctx :=
   let tmp := fresh "tmp" in
   infer_replace_child_helper tmp; infer_replace_child_infos; clear tmp.
+
+(** infer_replace_child_ctx where the symbols of the hbranchof are changed to the ones of T *)
+Ltac infer_replace_child_ctx' T :=
+  match goal with
+  | [ hbl : is_branch_of (?B ++ [Left])%list ?t |- _ ] =>
+      match goal with
+      | [ hbr : is_branch_of (B ++ [Right])%list t |- _ ] =>
+          change (is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}) in hbl;
+          change (is_branch_of (B ++ [Right])%list {| tree := t; symbols := symbols T |}) in hbr
+      | _ => fail 0 "No is_branch_of to replace"
+      end
+  | _ => fail 0 "No is_branch_of to replace"
+  end;
+  infer_replace_child_ctx.
 
 Section RuleTreeToSequence_Lemmas2.
   Context {sko : Skolemization}.
@@ -826,8 +855,8 @@ Section RuleTreeToSequence_Lemmas2.
       (** Then, we can apply the induction hypothesis in the unary cases. *)
       all:
         on_unary_cases
-          ltac:(rewrite (IHR1 sigma (B ++ [Left])%list _ _ _ _ hbranchof0 echk eseq0);
-                injection eseq => <-; cbn; set sequence := (x in symbols (last x (mkLeaf sko)))).
+          ltac:(rewrite (IHR1 sigma (B ++ [Left])%list _ _ _ _ hbranchof0 echk eseq1);
+                injection eseq0 => <-; cbn; set sequence := (x in symbols (last x (mkLeaf sko)))).
 
       (** And we can conclude as the sequence cannot be empty. *)
       all:
@@ -845,17 +874,13 @@ Section RuleTreeToSequence_Lemmas2.
       (** By induction hypothesis, we directly get that symbs are the symbols of the last
           tableau of the sequence of the left child. *)
       have esymbs' : symbs = symbols (last s0 (mkLeaf sko)).
-      { eapply IHR1; [| |apply eseq0]; eauto. }
+      { eapply IHR1; [| |apply eseq1]; eauto. }
 
       rewrite esymbs' in echk0.
-      injection eseq => <-; rewrite app_comm_cons last_app.
+      injection eseq0 => <-; rewrite app_comm_cons last_app.
       { eapply RuleTree_to_Sequence_not_nil; eauto. }
 
-      change (is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |})
-        in hbranchof0.
-      change (is_branch_of (B ++ [Right])%list {| tree := t; symbols := symbols T |})
-        in hbranchof1.
-      infer_replace_child_ctx.
+      infer_replace_child_ctx' T.
 
       eapply IHR2; eauto.
       rewrite -ectx; eauto.
@@ -892,7 +917,7 @@ Section Soundness.
       all:
         destruct s; try easy;
         destruct s; try easy;
-        injection eseq => eseq' eseq''; injection esnd => esnd';
+        injection eseq0 => eseq' eseq''; injection esnd => esnd';
         rewrite eseq'' -esnd'.
 
       (** Get the real formula. *)
@@ -927,7 +952,7 @@ Section Soundness.
 
       (** And we can conclude by applying [RuleTree_to_Sequence_hd] in [eseq0]. *)
       all:
-        try (apply RuleTree_to_Sequence_hd in eseq0; by cbn in eseq0).
+        try (apply RuleTree_to_Sequence_hd in eseq1; by cbn in eseq1).
 
       (** Case: beta rule. This case is a bit tricky as we remove the last element of the
           sequence of the left child. Consequently, there are two cases:
@@ -946,10 +971,10 @@ Section Soundness.
             injection eget => -> ->; cbn; rewrite eexp.
 
         (** Case 1: [s0] has exactly one element. *)
-        * apply RuleTree_to_Sequence_hd in eseq0, eseq1; cbn in eseq0, eseq', eseq1;
-            rewrite eseq' in eseq1; cbn in eseq1; congruence.
+        * apply RuleTree_to_Sequence_hd in eseq1, eseq2; cbn in eseq1, eseq', eseq2;
+            rewrite eseq' in eseq2; cbn in eseq2; congruence.
         (** Case 2: [s0] has more than one element. *)
-        * apply RuleTree_to_Sequence_hd in eseq0; cbn in eseq0, eseq'.
+        * apply RuleTree_to_Sequence_hd in eseq1; cbn in eseq1, eseq'.
           injection eseq' => _ eseq''; congruence.
 
       (** Case: delta rules. In this case, we have to manage the Skolem symbols stored.
@@ -965,13 +990,13 @@ Section Soundness.
             branch. *)
         * cbn in eget0; change (Neg f {0 \to t}) with ((Neg f) {0 \to t}); injection eget0 => ->;
             rewrite eexp.
-          apply RuleTree_to_Sequence_hd in eseq0; cbn in eseq0;
-            destruct T'; injection eseq0; intros; cbn; congruence.
+          apply RuleTree_to_Sequence_hd in eseq1; cbn in eseq1;
+            destruct T'; injection eseq1; intros; cbn; congruence.
 
         (** Finally, we conclude this last branch by using the soundness of the symbols of a
             Skolemization process. *)
-        * apply RuleTree_to_Sequence_hd in eseq0; cbn in eseq0;
-            injection eseq0 => ->; cbn.
+        * apply RuleTree_to_Sequence_hd in eseq1; cbn in eseq1;
+            injection eseq1 => ->; cbn.
 
           (have esymb1 := symbol_sound sko hsko);
           (have esymb2 := symbol_sound sko hsko');
@@ -1120,7 +1145,7 @@ Section Soundness.
           it's not as easy, but the latter fact still holds. *)
       all:
         on_unary_cases
-          ltac:(injection eseq => <-; rewrite last_cons;
+          ltac:(injection eseq0 => <-; rewrite last_cons;
                                  [eapply RuleTree_to_Sequence_not_nil; eauto|]);
         on_alpha_cases
           ltac:(eapply IHR1 with (B := (B ++ [Left])%list)
@@ -1156,13 +1181,9 @@ Section Soundness.
 
           Once we have shown this, we can apply the induction hypothesis of the right child
           before applying the induction hypothesis of the left child. *)
-      + change (is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |})
-          in hbranchof0;
-          change (is_branch_of (B ++ [Right])%list {| tree := t; symbols := symbols T |})
-          in hbranchof1;
-          infer_replace_child_ctx.
+      + infer_replace_child_ctx' T.
 
-        injection eseq => <-; rewrite app_comm_cons last_app;
+        injection eseq0 => <-; rewrite app_comm_cons last_app;
                          [eapply RuleTree_to_Sequence_not_nil; eauto|].
 
         (** Before applying the induction hypotheses, we simplify the context a bit. *)
@@ -1186,8 +1207,8 @@ Section Soundness.
           -- rewrite -ectx;
                erewrite get_context_extend_right; eauto.
              by cbn; unfold Ctx.union.
-          -- symmetry; eapply RuleTree_to_Sequence_symbols; [| |apply eseq0]; eauto.
-             cbn; rewrite -echk0; unfold Ctx.union.
+          -- symmetry; eapply RuleTree_to_Sequence_symbols; [| |apply eseq1]; eauto.
+             cbn in *; rewrite -echk0; unfold Ctx.union.
              erewrite <-get_context_extend_left; eauto.
 
       (** Case: [GammaAll]. *)
@@ -1238,136 +1259,140 @@ Section Soundness.
         simplify_seq_rec_call;
         infer_branch_infos.
 
-      + have ectx0 := get_context_extend_left hbranchof eexp eq_refl.
-        have hsubl := preserves_function_symbols_get_neg_neg hpres hbranchof eget0 hin.
-        have hsubset :
-          to_set (symbols T) \subseteq to_set (symbols {| tree := t0; symbols := symbols T |})
-          by reflexivity.
-        have hpres1 := extend_subset_preserves_function_symbols sko func_symbs hbranchof hpres
-                         hsubset hsubl (preserves_function_symbols_None T func_symbs) eexp.
-        injection eget=>erf; subst.
-        rewrite /Ctx.union /Ctx.elements in echk, ectx0; rewrite -ectx0 in echk.
-        specialize (IHR1 sigma (B ++ [Left])%list {| tree := t0; symbols := symbols T |}
-                      record s0 func_symbs hbranchof0 hpres1 echk eseq0).
-        intros i Ti Ti' ei ei'; destruct i.
-        * rewrite nth_error_0 in ei.
-          erewrite RuleTree_to_Sequence_hd in ei.
-          injection ei => <-.
-          eapply RuleTree_to_Sequence_snd_expansion; eauto.
-        * injection eseq => es0. rewrite -es0 nth_error_S in ei, ei'.
-          eapply IHR1; eauto.
+      (** In all the cases, we want to specialize the induction hypotheses in order to have
+          the assumption that the sequences of the children are expansion sequences.
 
-      + have [ l [ eget [ hin esrch1 ] ] ] := alpha_rule_sound esrch.
-        have heseq := eseq. have hesrch := esrch.
-        cbn in eseq; rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have hbranchof1 := is_branch_of_extend_left hbranchof hexpand.
-        have hsubl := preserves_function_symbols_get_neg_or hpres hbranchof eget hin.
-        have hsubset : to_set (symbols T) \subseteq to_set (symbols {| tree := t; symbols := symbols T |})
-          by reflexivity.
-        have hpres1 := extend_subset_preserves_function_symbols sko func_symbs hbranchof hpres
-                         hsubset hsubl (preserves_function_symbols_None T func_symbs) hexpand.
-        rewrite /Ctx.union /Ctx.elements in esrch1, ectx1; rewrite -ectx1 in esrch1.
-        specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
-                      record s0 func_symbs hbranchof1 hpres1 esrch1 eseq1).
-        intros i Ti Ti' ei ei'; destruct i.
-        * rewrite nth_error_0 in ei.
-          erewrite RuleTree_to_Sequence_hd in ei; eauto.
-          injection ei => <-.
-          eapply RuleTree_to_Sequence_snd_expansion; eauto.
-        * injection eseq => es0. rewrite -es0 nth_error_S in ei, ei'.
-          eapply IHR1; eauto.
+          To do so, we must show that the next tableau preserves the function symbols.
+          We can do that generically for the alpha and gamma cases. *)
+      all:
+        on_alpha_neg_neg
+          ltac:(have hsubl := preserves_function_symbols_get_neg_neg hpres hbranchof eget0 hin);
+        on_alpha_neg_or
+          ltac:(have hsubl := preserves_function_symbols_get_neg_or hpres hbranchof eget0 hin);
+        on_gamma_case
+          ltac:(have hsubl := preserves_function_symbols_get_all s0 hpres hbranchof eget0 hin);
+        on_alpha_cases
+          ltac:(have hsubset :
+                 to_set (symbols T) \subseteq to_set (symbols {| tree := t0; symbols := symbols T |})
+                 by reflexivity);
+        on_gamma_case
+          ltac:(have hsubset :
+                 to_set (symbols T) \subseteq to_set (symbols {| tree := t; symbols := symbols T |})
+                 by reflexivity);
+        on_alpha_gamma_cases
+          ltac:(have hpres1 := extend_subset_preserves_function_symbols sko func_symbs
+                                 hbranchof hpres hsubset hsubl
+                                 (preserves_function_symbols_None T func_symbs) eexp).
 
-      + have [ l [ l' [ symbs1 [ eget [ hin [ esrch1 esrch2 ] ] ] ] ] ] := beta_rule_sound esrch.
-        have heseq := eseq. have hesrch := esrch.
-        cbn in eseq; rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
-        destruct (RuleTree_to_Sequence__aux (B ++ [Right])%list _ _) eqn:eseq2; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have ectx2 := get_context_extend_right hbranchof hexpand eq_refl.
-        have hbranchof1 : is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |}
-          := is_branch_of_extend_left hbranchof hexpand.
-        have hbranchof2 := is_branch_of_extend_right hbranchof hexpand.
-        rewrite /Ctx.union /Ctx.elements in esrch1, ectx1, esrch2, ectx2.
-        rewrite -ectx1 in esrch1; rewrite -ectx2 in esrch2.
+      (** In order to apply the induction hypothesis on the alpha & gamma cases, we must
+          update the context. *)
+      all:
+        on_alpha_gamma_cases
+          ltac:((have ectx0 := get_context_extend_left hbranchof eexp eq_refl);
+                injection eget => eget'; subst;
+                rewrite /Ctx.add /Ctx.union /Ctx.elements in echk, ectx0; cbn in ectx0;
+                rewrite -ectx0 in echk).
+
+      (** Then, we can indeed specialize our induction hypotheses. *)
+      all:
+        on_alpha_cases
+          ltac:(specialize (IHR1 sigma (B ++ [Left])%list {| tree := t0; symbols := symbols T |}
+                              record s0 func_symbs hbranchof0 hpres1 echk eseq1));
+        on_gamma_case
+          ltac:(specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
+                              record s1 func_symbs hbranchof0 hpres1 echk eseq1)).
+
+      (** Next, we must simply consider the two cases when [i] is 0 or not to show the
+          remaining goals in the alpha and gamma cases. We actually define a local tactic
+          to do so in order to also solve the delta case, which is similar. *)
+      Ltac solve_expansion eseq0 IHR1 :=
+        let es0 := fresh "es0" in
+        intros i Ti Ti' ei ei'; destruct i;
+        [rewrite nth_error_0 in ei; erewrite RuleTree_to_Sequence_hd in ei; eauto;
+         injection ei => <-; eapply RuleTree_to_Sequence_snd_expansion; eauto|
+          injection eseq0 => es0; rewrite -es0 nth_error_S in ei, ei'; eapply IHR1; eauto].
+
+      (** In alpha cases, we can simply use the [solve_expansion] tactic. *)
+      + solve_expansion eseq0 IHR1.
+
+      + solve_expansion eseq0 IHR1.
+
+      (** Case: [BetaOr].
+
+          We start by specializing the two induction hypotheses. *)
+      + destruct p; injection eget0 => e0 e1; subst.
+        have ectx1 := get_context_extend_left hbranchof eexp eq_refl.
+        have ectx2 := get_context_extend_right hbranchof eexp eq_refl.
+        rewrite /Ctx.union /Ctx.elements in echk, ectx1, echk0, ectx2.
+        rewrite -ectx1 in echk; rewrite -ectx2 in echk0.
         have hsubl1 := preserves_function_symbols_get_or1 hpres hbranchof eget hin.
         have hsubl2 := preserves_function_symbols_get_or2 hpres hbranchof eget hin.
         have hsubset : to_set (symbols T) \subseteq to_set (symbols {| tree := t; symbols := symbols T |})
           by reflexivity.
         have hpres1 := extend_subset_preserves_function_symbols sko func_symbs hbranchof hpres
-                         hsubset hsubl1 hsubl2 hexpand.
-
+                         hsubset hsubl1 hsubl2 eexp.
         specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
-                      symbs1 s0 func_symbs hbranchof1 hpres1 esrch1 eseq1).
-
-        have [T1' [ hnleaf ereplace ] ] := RuleTree_to_Sequence_branch hbranchof1 eseq1.
-        have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
-        { clear; induction B; cbn; intro; congruence. }
-
-        have hbranchof2' : is_branch_of (B ++ [Right])%list (last s0 (mkLeaf sko)).
-        { eapply is_branch_of_replace_child_oth.
-          3: eassumption.
-          all: eauto. }
-        have ectx2' : get_context (B ++ [Right])%list t = get_context (B ++ [Right])%list
-                                                             (last s0 (mkLeaf sko)).
-        { eapply get_context_replace_child_oth.
-          3: eassumption.
-          all: eauto. }
-        rewrite ectx2' in esrch2; auto.
-        have esymbs2 : symbols (last s0 (mkLeaf sko)) = symbs1.
+                      symbs s0 func_symbs hbranchof0 hpres1 echk eseq1).
+        infer_replace_child_ctx' T.
+        rewrite ectx in echk0; auto.
+        have esymbs : symbols (last s0 (mkLeaf sko)) = symbs.
         { symmetry; eapply RuleTree_to_Sequence_symbols.
           3: eauto.
-          - apply hbranchof1.
-          - cbn. apply esrch1. }
+          - apply hbranchof0.
+          - cbn. apply echk. }
         have hpres2 := RuleTree_to_Sequence_preserves_function_symbols_last
-                         hbranchof1 hpres1 eseq1 esrch1.
-
-        rewrite -esymbs2 in esrch2.
+                         hbranchof0 hpres1 eseq1 echk.
+        rewrite -esymbs in echk0.
         specialize (IHR2 sigma (B ++ [Right])%list (last s0 (mkLeaf sko))
-                      record s1 func_symbs hbranchof2' hpres2 esrch2 eseq2).
+                      record s1 func_symbs hbranchof2 hpres2 echk0 eseq2).
 
-        intros i Ti Ti' ei ei'.
+        (** Then, there are multiple cases:
+            (i) if [i] is [0], then we can use [RuleTree_to_Sequence_snd_expansion] to conclude.
+            (ii) otherwise, there are three other cases:
+                 (iii) if [i < #|s0| - 1], then the specialization of the first induction
+                       hypothesis is enough to conclude.
+                 (iv) if [i = #|s0| - 1], either [#|s0| = 1] and we go back to case (i), or
+                      [#|s0| > 1], in which case [Ti] is the second-to-last element of [s0],
+                      which reduces to the last one---that is crucially also the first one of
+                      [s1].
+                 (v)  if [i > #|s0| - 1], then the specialization of the second induction
+                      hypothesis is enough to conclude. *)
+        intros i Ti Ti' ei ei'; destruct (i == 0).
 
-        (* If [i] is [0], then we do as for the others cases *)
-        destruct (i == 0).
-        * subst; rewrite nth_error_0 in ei.
-          erewrite RuleTree_to_Sequence_hd in ei; eauto.
-          injection ei => <-.
-          eapply RuleTree_to_Sequence_snd_expansion; eauto.
-        * injection eseq => es; rewrite -es in ei, ei'.
+        (** Case (i) *)
+        * subst; rewrite nth_error_0 in ei;
+            erewrite RuleTree_to_Sequence_hd in ei; eauto;
+            injection ei => <-;
+            eapply RuleTree_to_Sequence_snd_expansion; eauto.
 
-          (* Otherwise, there are 3 cases: either [i < #|s0| - 1] and we get the property
-             out of [s0], either [i > #|s0| - 1] and we get the property out of [s1], or
-             [i = #|s0| - 1]. *)
-          destruct (i == (#|s0| - 1)).
+        (** Case (ii) *)
+        * injection eseq0 => es; rewrite -es in ei, ei';
+                            destruct (i == (#|s0| - 1)).
 
-          -- subst. have hs0 : #|s0| > 0 by lia.
+          (** Case (iv) *)
+          -- subst; have hs0 : #|s0| > 0 by lia.
              rewrite PeanoNat.Nat.sub_1_r PeanoNat.Nat.succ_pred_pos // in ei'.
              rewrite app_comm_cons nth_error_app1 in ei.
-             1: { cbn; rewrite removelast_length; lia. }
+             1: cbn; rewrite removelast_length; lia.
              rewrite app_comm_cons nth_error_app2 in ei'.
-             1: { cbn; rewrite removelast_length; lia. }
+             1: cbn; rewrite removelast_length; lia.
              cbn in ei'; rewrite removelast_length PeanoNat.Nat.succ_pred_pos //
                            PeanoNat.Nat.sub_diag nth_error_0 in ei'.
              erewrite RuleTree_to_Sequence_hd in ei'; eauto.
 
-             (* Then, here, either [#|s0| = 1] (and we go back to the earlier case), or
-                [#|s0| > 1], in which case [Ti] is the second-to-last element of [s0],
-                which reduces to the last one. *)
              destruct (#|s0| == 1).
 
-             ++ injection ei' => <-. rewrite e in ei; cbn in ei. injection ei => <-.
-                have e' : Some (last s0 (mkLeaf sko)) = s0.(0).
-                { do 2 (destruct s0; try easy). }
+             (** Case [#|s0| == 1] *)
+             ++ injection ei' => <-; rewrite e in ei; cbn in ei; injection ei => <-.
+                have e' : Some (last s0 (mkLeaf sko)) = s0.(0)
+                  by do 2 (destruct s0; try easy).
                 eapply RuleTree_to_Sequence_snd_expansion; eauto.
-                have eremovelast : removelast s0 = [].
-                { do 2 (destruct s0; try easy). }
+                have eremovelast : removelast s0 = []
+                 by do 2 (destruct s0; try easy).
                 rewrite eremovelast nth_error_S app_nil_l; cbn[tl].
                 rewrite nth_error_0; erewrite RuleTree_to_Sequence_hd; eauto.
 
+             (** Case [#|s0| <> 1] *)
              ++ have eremovelast : (T :: removelast s0).(#|s0| - 1) =
                                      s0.(#|s0| - 2).
                 { replace (#|s0| - 1) with (S (#|s0| - 2)) by lia.
@@ -1377,72 +1402,51 @@ Section Soundness.
                   - rewrite -app_removelast_last //.
                     intro; subst. rewrite length_nil in hs0; auto. }
                 rewrite eremovelast in ei.
-                have elast : Some (last s0 (mkLeaf sko)) = s0.(#|s0| - 1).
-                { rewrite -last_nth_error //; intro; subst; easy. }
+                have elast : Some (last s0 (mkLeaf sko)) = s0.(#|s0| - 1)
+                  by rewrite -last_nth_error //; intro; subst; easy.
                 rewrite elast in ei'.
                 eapply IHR1; eauto.
                 now replace (S (#| s0 | - 2)) with (#|s0| - 1) by lia.
 
-          (* Now, we check whether [i < #|s0| - 1] or [i > #|s0| - 1] and conclude. *)
           -- destruct (Compare_dec.le_gt_dec i (#|s0| - 1)) as [hle | hlt].
+
+             (** Case (iii) *)
              ++ inversion hle; try easy.
-                have hlt : i < #|s0| - 1 by lia.
+                have hlt : i < #|s0| - 1 by lia;
                 clear H H0 hle.
                 rewrite app_comm_cons !nth_error_app1 in ei, ei'.
                 1,2: cbn; rewrite removelast_length PeanoNat.Nat.succ_pred_pos; lia.
                 rewrite nth_error_S in ei'.
-                have hs0 : #|s0| > 1.
-                { apply Compare_dec.not_le; intro hle; inversion hle; lia. }
+                have hs0 : #|s0| > 1
+                  by apply Compare_dec.not_le; intro hle'; inversion hle'; lia.
                 have eTi : (T :: removelast s0).(i) = s0.(i - 1).
                 { replace i with (S (i - 1)) by lia; cbn.
                   rewrite PeanoNat.Nat.sub_0_r removelast_nth_error //.
                   transitivity i; auto; lia. }
-                rewrite eTi in ei.
-                rewrite removelast_nth_error in ei'; auto.
+                rewrite eTi in ei; rewrite removelast_nth_error in ei'; auto.
                 eapply IHR1; eauto.
                 rewrite PeanoNat.Nat.sub_1_r PeanoNat.Nat.succ_pred_pos //; lia.
+
+             (** Case (v) *)
              ++ rewrite app_comm_cons !nth_error_app2 in ei, ei'.
                 1,2: cbn; rewrite removelast_length; lia.
                 eapply IHR2; eauto.
                 rewrite -PeanoNat.Nat.sub_succ_l //.
                 cbn; rewrite removelast_length; lia.
 
-      + have [ l [ eget [ hin esrch1 ] ] ] := gamma_rule_sound esrch.
-        have heseq := eseq. have hesrch := esrch.
-        cbn in eseq; rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have hbranchof1 := is_branch_of_extend_left hbranchof hexpand.
-        have hsubl := preserves_function_symbols_get_all s0 hpres hbranchof eget hin.
-        have hsubl' := preserves_function_symbols_None T func_symbs.
-        have hsubset : to_set (symbols T) \subseteq to_set (symbols {| tree := t; symbols := symbols T |})
-          by reflexivity.
-        have hpres1 := extend_subset_preserves_function_symbols sko func_symbs hbranchof hpres
-                         hsubset hsubl (preserves_function_symbols_None T func_symbs) hexpand.
-        rewrite /Ctx.add /Ctx.elements in esrch1, ectx1. cbn in ectx1; rewrite -ectx1 in esrch1.
-        specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
-                      record s1 func_symbs hbranchof1 hpres1 esrch1 eseq1).
-        intros i Ti Ti' ei ei'; destruct i.
-        * rewrite nth_error_0 in ei.
-          erewrite RuleTree_to_Sequence_hd in ei; eauto.
-          injection ei => <-.
-          eapply RuleTree_to_Sequence_snd_expansion; eauto.
-        * injection eseq => es0. rewrite -es0 nth_error_S in ei, ei'.
-          eapply IHR1; eauto.
+      (** Case: [GammaAll] *)
+      + solve_expansion eseq0 IHR1.
 
-      + have [ f0 [ l [ eget [ hin [ hsko [ esymb esrch1 ] ] ] ] ] ] := delta_rule_sound esrch.
-        have heseq := eseq. have hesrch := esrch.
-        cbn in eseq; rewrite eget esymb in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have hbranchof1 := is_branch_of_extend_left hbranchof hexpand.
+      (** Case: [DeltaNegAll]
+
+          We have to redo all the grueling work of specializing the first induction hypothesis
+          as the skolem symbols kick in here. *)
+      + have ectx1 := get_context_extend_left hbranchof eexp eq_refl.
         have hskosymb : function_symbols t = singleton f0.
         { erewrite (sko_function_symbols_sound sko hsko); eauto.
-          erewrite (symbol_sound sko hsko) in esymb; eauto.
-          injection esymb => -> //. }
-        have hsubl := preserves_function_symbols_get_neg_all t f0 hpres hbranchof eget hin
+          erewrite (symbol_sound sko hsko) in esymb0; eauto.
+          rewrite -esymb0 in esymb; injection esymb => -> //. }
+        have hsubl := preserves_function_symbols_get_neg_all t f0 hpres hbranchof eget0 hin
                         hskosymb.
         have hsubl' := preserves_function_symbols_None
                          {| tree := t0; symbols := add_symbol f0 f (symbols T) |} func_symbs.
@@ -1450,21 +1454,16 @@ Section Soundness.
           (to_set (symbols {| tree := t0; symbols := add_symbol f0 f (symbols T) |})) in hsubl.
         have hsubset : to_set (symbols T) \subseteq
                          to_set (symbols
-                                   {| tree := t0; symbols := add_symbol f0 f (symbols T) |}).
-        { cbn. rewrite join_to_set; intros g hing; rewrite union_spec; now right. }
+                                   {| tree := t0; symbols := add_symbol f0 f (symbols T) |})
+           by (cbn; rewrite join_to_set; intros g hing; rewrite union_spec; now right).
         have hpres1 := extend_subset_preserves_function_symbols
-                         sko func_symbs hbranchof hpres hsubset hsubl hsubl' hexpand.
-        rewrite /Ctx.add /Ctx.elements in esrch1, ectx1. cbn in ectx1; rewrite -ectx1 in esrch1.
+                         sko func_symbs hbranchof hpres hsubset hsubl hsubl' eexp.
+        rewrite /Ctx.add /Ctx.elements in echk, ectx1; cbn in ectx1.
+        injection eget => eget'; injection esymb => esymb'; subst; rewrite -ectx1 in echk.
         specialize (IHR1 sigma (B ++ [Left])%list
                          {| tree := t0; symbols := add_symbol f0 f (symbols T) |}
-                      record s0 func_symbs hbranchof1 hpres1 esrch1 eseq1).
-        intros i Ti Ti' ei ei'; destruct i.
-        * rewrite nth_error_0 in ei.
-          erewrite RuleTree_to_Sequence_hd in ei; eauto.
-          injection ei => <-.
-          eapply RuleTree_to_Sequence_snd_expansion; eauto.
-        * injection eseq => es0. rewrite -es0 nth_error_S in ei, ei'.
-          eapply IHR1; eauto.
+                         record s0 func_symbs hbranchof0 hpres1 echk eseq1).
+        solve_expansion eseq0 IHR1.
   Qed.
 
   Lemma CheckProof_Some_RuleTree_to_Sequence_closed :
