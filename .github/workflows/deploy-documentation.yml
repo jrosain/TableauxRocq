@@ -1,0 +1,46 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'release/**'
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v18
+        with:
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Documentation
+        run: nix-shell --run "make doc"
+
+      - name: Deploy Documentation
+        env:
+          PAT: ${{ secrets.PAT_PUSH_DOC }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+
+          git checkout documentation
+
+          git pull origin documentation --rebase
+
+          mv html $(echo ${BRANCH} | sed -e 's/release\///g')
+
+          if [[ -n $(git status --porcelain) ]]; then
+            git add .
+            git commit -m"chore: update documentation (auto-pushed by GitHub Actions)"
+            git push https://${PAT}@github.com/${REPO}.git documentation
+          else
+            echo "No changes to commit, exiting."
+          fi
