@@ -1213,6 +1213,12 @@ Section Soundness.
              eassumption.
   Qed.
 
+  (** By combining the expansion lemma and the previous lemma about preservation of function
+      symbols, we get by a tedious induction that the sequence given by [RuleTree_to_Sequence]
+      is an expansion sequence whenever the rule tree is a checked proof.
+
+      The tedious case comes with the beta rule, when there are many different cases depending
+      on the given index. *)
   Lemma CheckProof_Some_RuleTree_to_Sequence_is_expansion_sequence :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
       {T : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : SetOfString},
@@ -1227,26 +1233,25 @@ Section Soundness.
     - cbn in eseq; injection eseq => <-.
       apply is_expansion_sequence_singleton.
 
-    - destruct r.
+    - destruct r;
+        simplify_chk_rec_call;
+        simplify_seq_rec_call;
+        infer_branch_infos.
 
-      + have [ l [ eget [ hin esrch1 ] ] ] := alpha_rule_sound esrch.
-        have heseq := eseq. have hesrch := esrch.
-        cbn in eseq; rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux (B ++ [Left])%list _ _) eqn:eseq1; try easy.
-        have ectx1 := get_context_extend_left hbranchof hexpand eq_refl.
-        have hbranchof1 := is_branch_of_extend_left hbranchof hexpand.
-        have hsubl := preserves_function_symbols_get_neg_neg hpres hbranchof eget hin.
-        have hsubset : to_set (symbols T) \subseteq to_set (symbols {| tree := t; symbols := symbols T |})
+      + have ectx0 := get_context_extend_left hbranchof eexp eq_refl.
+        have hsubl := preserves_function_symbols_get_neg_neg hpres hbranchof eget0 hin.
+        have hsubset :
+          to_set (symbols T) \subseteq to_set (symbols {| tree := t0; symbols := symbols T |})
           by reflexivity.
         have hpres1 := extend_subset_preserves_function_symbols sko func_symbs hbranchof hpres
-                         hsubset hsubl (preserves_function_symbols_None T func_symbs) hexpand.
-        rewrite /Ctx.union /Ctx.elements in esrch1, ectx1; rewrite -ectx1 in esrch1.
-        specialize (IHR1 sigma (B ++ [Left])%list {| tree := t; symbols := symbols T |}
-                      record s0 func_symbs hbranchof1 hpres1 esrch1 eseq1).
+                         hsubset hsubl (preserves_function_symbols_None T func_symbs) eexp.
+        injection eget=>erf; subst.
+        rewrite /Ctx.union /Ctx.elements in echk, ectx0; rewrite -ectx0 in echk.
+        specialize (IHR1 sigma (B ++ [Left])%list {| tree := t0; symbols := symbols T |}
+                      record s0 func_symbs hbranchof0 hpres1 echk eseq0).
         intros i Ti Ti' ei ei'; destruct i.
         * rewrite nth_error_0 in ei.
-          erewrite RuleTree_to_Sequence_hd in ei; eauto.
+          erewrite RuleTree_to_Sequence_hd in ei.
           injection ei => <-.
           eapply RuleTree_to_Sequence_snd_expansion; eauto.
         * injection eseq => es0. rewrite -es0 nth_error_S in ei, ei'.
