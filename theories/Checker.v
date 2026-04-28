@@ -553,8 +553,6 @@ Ltac simplify_chk_rec_call :=
   | _ => fail 0 "Cannot extract any equation from an auxiliary call to CheckProof in the context"
   end; try easy.
 
-Ltac infer_replace_child_ctx := fail 0 "Not yet implemented".
-
 Section RuleTreeToSequence_Lemmas.
   Context {sko : Skolemization}.
 
@@ -668,7 +666,7 @@ Ltac infer_replace_child_helper tmp :=
   | _ => fail 0 "Cannot infer replacement infos in this context: missing is_branch_of"
   end.
 
-Ltac infer_replace_child_ctx ::=
+Ltac infer_replace_child_ctx :=
   let tmp := fresh "tmp" in
   infer_replace_child_helper tmp; infer_replace_child_infos; clear tmp.
 
@@ -974,12 +972,13 @@ Section Soundness.
             Skolemization process. *)
         * apply RuleTree_to_Sequence_hd in eseq0; cbn in eseq0;
             injection eseq0 => ->; cbn.
-          
+
           (have esymb1 := symbol_sound sko hsko);
           (have esymb2 := symbol_sound sko hsko');
           congruence.
   Qed.
 
+  (** Some bureaucratic lemmas. *)
   Lemma preserves_function_symbols_None :
     forall (T : Tableau) (func_symbs : SetOfString),
       function_symbols (@None (list Form)) \subseteq func_symbs \union to_set (symbols T).
@@ -1089,140 +1088,128 @@ Section Soundness.
       rewrite single_to_set. rewrite -esymb //.
   Qed.
 
+  (** We show that, for every tableau which preserves a given set of function symbols,
+      the last tableau of the sequence yielded by [RuleTree_to_Sequence] also preserves
+      this same set of function symbols.
+
+      Intuitively, this means that the only function symbols that are added to tableaux
+      of a valid sequence are the Skolem symbols that get created along the proof, but
+      no other function symbol gets introduced. *)
   Lemma RuleTree_to_Sequence_preserves_function_symbols_last :
   forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
-      {T : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : SetOfString},
-      is_branch_of B T -> preserves_function_symbols T func_symbs ->
-      RuleTree_to_Sequence__aux B T R = Some s ->
-      CheckProof__aux sko func_symbs (get_context B T) sigma (symbols T) R =
-        ret {| status := true; symbs := record |} ->
-      preserves_function_symbols (last s (mkLeaf sko)) func_symbs.
+    {T : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : SetOfString},
+    is_branch_of B T -> preserves_function_symbols T func_symbs ->
+    RuleTree_to_Sequence__aux B T R = Some s ->
+    CheckProof__aux sko func_symbs (get_context B T) sigma (symbols T) R =
+      ret {| status := true; symbs := record |} ->
+    preserves_function_symbols (last s (mkLeaf sko)) func_symbs.
   Proof using Type.
     intros R; induction R as [ l | R1 IHR1 r R2 IHR2 ];
       intros ?????? hbranchof hpres eseq echk.
 
     - cbn in eseq; injection eseq => es. rewrite -es; now cbn.
 
-    - destruct r; cbn in eseq.
+    - destruct r;
+        simplify_chk_rec_call;
+        simplify_seq_rec_call;
+        infer_branch_infos.
 
-      + have [ l [ eget [ hin esrch1 ] ] ] := alpha_rule_sound echk.
-        rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:hseq; try easy.
-        injection eseq => <-. rewrite last_cons.
-        * eapply RuleTree_to_Sequence_not_nil; eauto.
-        * eapply IHR1 with (B := (B ++ [Left])%list) (T := {| tree := t; symbols := symbols T |});
-            eauto.
-          -- eapply is_branch_of_extend_left; eauto.
-          -- eapply extend_subset_preserves_function_symbols with
-               (l := Some (Ctx.elements l)) (l' := None) (T := T); eauto.
-             ++ reflexivity.
-             ++ cbn; eapply preserves_function_symbols_get_neg_neg; eauto.
-             ++ apply preserves_function_symbols_None.
-          -- cbn; erewrite get_context_extend_left; eauto.
+      (** As was the case for the previous proof, the alpha and gamma cases are both
+          straightforward as it suffices to apply the induction hypothesis: the last
+          element of [s] is the same as the last element of [s0]. In the delta case,
+          it's not as easy, but the latter fact still holds. *)
+      all:
+        on_unary_cases
+          ltac:(injection eseq => <-; rewrite last_cons;
+                                 [eapply RuleTree_to_Sequence_not_nil; eauto|]);
+        on_alpha_cases
+          ltac:(eapply IHR1 with (B := (B ++ [Left])%list)
+                                 (T := {| tree := t0; symbols := symbols T |}); eauto;
+               [|cbn; erewrite get_context_extend_left; eauto; injection eget => <-; eassumption]);
+        on_gamma_case
+          ltac:(eapply IHR1 with (B := (B ++ [Left])%list)
+                                 (T := {| tree := t; symbols := symbols T |}); eauto;
+                [|cbn; erewrite get_context_extend_left; eauto; injection eget => ->; eassumption]).
 
-      + have [ l [ eget [ hin esrch1 ] ] ] := alpha_rule_sound echk.
-        rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:hseq; try easy.
-        injection eseq => <-. rewrite last_cons.
-        * eapply RuleTree_to_Sequence_not_nil; eauto.
-        * eapply IHR1 with (B := (B ++ [Left])%list) (T := {| tree := t; symbols := symbols T |});
-            eauto.
-          -- eapply is_branch_of_extend_left; eauto.
-          -- eapply extend_subset_preserves_function_symbols with
-               (l := Some (Ctx.elements l)) (l' := None); eauto.
-             ++ reflexivity.
-             ++ cbn; eapply preserves_function_symbols_get_neg_or; eauto.
-             ++ apply preserves_function_symbols_None.
-          -- cbn; erewrite get_context_extend_left; eauto.
+      (** In the alpha cases & the gamma case, we can reduce the proof to needing to show that
+          their respective rule preserves the function symbols. *)
+      all:
+        on_alpha_cases
+          ltac:(eapply extend_subset_preserves_function_symbols with
+                 (l := Some (Ctx.elements t)) (l' := None) (T := T); eauto;
+                [reflexivity| |apply preserves_function_symbols_None]);
+        on_gamma_case
+          ltac:(eapply extend_subset_preserves_function_symbols with
+                 (l := Some [f0{0 \to Free s0}]) (l' := None) (T := T); eauto;
+                [reflexivity| |apply preserves_function_symbols_None]).
 
-      + have [ l [ l' [ symbs1 [ eget [ hin [ esrch1 esrch2 ] ] ] ] ] ] := beta_rule_sound echk.
-        rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:hseq1; try easy.
-        destruct (RuleTree_to_Sequence__aux (B ++ [Right])%list _ _) eqn:hseq2; try easy.
-        have hbranchof1 :
-          is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |} :=
-          is_branch_of_extend_left hbranchof hexpand.
-        have [ T1' [ hnleaf ereplace ] ] := RuleTree_to_Sequence_branch hbranchof1 hseq1.
-        have ebranch : (B ++ [Right])%list <> (B ++ [Left])%list.
-        { clear; induction B; cbn; intro; congruence. }
+      (** Case: [AlphaNegNeg]. *)
+      + cbn; eapply preserves_function_symbols_get_neg_neg; eauto.
 
-        have hbranchof2 : is_branch_of (B ++ [Right])%list (last s0 (mkLeaf sko)).
-        { eapply is_branch_of_replace_child_oth.
-          3: eassumption.
-          all: eauto.
-          eapply is_branch_of_extend_right; eauto. }
+      (** Case: [AlphaNegOr]. *)
+      + cbn; eapply preserves_function_symbols_get_neg_or; eauto.
 
-        have ectx2' : get_context (B ++ [Right])%list t = get_context (B ++ [Right])%list
-                                                             (last s0 (mkLeaf sko)).
-        { eapply get_context_replace_child_oth.
-          3: eassumption.
-          all: eauto.
-          eapply is_branch_of_extend_right; eauto. }
+      (** Case: [BetaOr].
 
-        injection eseq => <-. rewrite app_comm_cons last_app.
-        * eapply RuleTree_to_Sequence_not_nil; eauto.
-        * eapply IHR2 with (B := (B ++ [Right])%list) (T := last s0 (mkLeaf sko)).
-          -- assumption.
-          -- eapply IHR1 with (B := (B ++ [Left])%list)
-                              (T := {| tree := t; symbols := symbols T |});
-               eauto.
-             ++ eapply extend_subset_preserves_function_symbols with
-                  (l := Some (Ctx.elements l)) (l' := Some (Ctx.elements l'))
-                  (T := T); eauto.
-                ** reflexivity.
-                ** cbn; eapply preserves_function_symbols_get_or1; eauto.
-                ** cbn; eapply preserves_function_symbols_get_or2; eauto.
-             ++ cbn; erewrite get_context_extend_left; eauto.
-          -- exact hseq2.
-          -- erewrite <-esrch2; f_equal.
-             ++ rewrite -ectx2'.
-                erewrite get_context_extend_right; eauto.
-             ++ symmetry; eapply RuleTree_to_Sequence_symbols.
-                3: apply hseq1.
-                all: eauto.
-                rewrite -esrch1.
-                unfold Ctx.union. erewrite <-get_context_extend_left; eauto.
+          This case is slightly more involved, as now the last element of [s] is not from the
+          sequence of the left child, but of the right child.
 
-      + have [ G [ eget [ hin esrch1 ] ] ] := gamma_rule_sound echk.
-        rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:hseq; try easy.
-        injection eseq => <-. rewrite last_cons.
-        * eapply RuleTree_to_Sequence_not_nil; eauto.
-        * eapply IHR1 with (B := (B ++ [Left])%list) (T := {| tree := t; symbols := symbols T |});
-            eauto.
-          -- eapply is_branch_of_extend_left; eauto.
-          -- eapply extend_subset_preserves_function_symbols with
-               (l := Some [G{0 \to Free s0}]) (l' := None); eauto.
-             ++ reflexivity.
-             ++ cbn; eapply preserves_function_symbols_get_all; eauto.
-             ++ apply preserves_function_symbols_None.
-          -- cbn; erewrite get_context_extend_left; eauto.
-             rewrite /Ctx.add in esrch1; cbn. eassumption.
+          Once we have shown this, we can apply the induction hypothesis of the right child
+          before applying the induction hypothesis of the left child. *)
+      + change (is_branch_of (B ++ [Left])%list {| tree := t; symbols := symbols T |})
+          in hbranchof0;
+          change (is_branch_of (B ++ [Right])%list {| tree := t; symbols := symbols T |})
+          in hbranchof1;
+          infer_replace_child_ctx.
 
-      + have [ f0 [ G [ eget [ hin [ hsko [ esymb esrch1 ] ] ] ] ] ] := delta_rule_sound echk.
-        rewrite eget in eseq. destruct (get_symbol _) eqn:esymb'; try easy.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:hseq; try easy.
-        injection eseq => <-. rewrite last_cons.
-        * eapply RuleTree_to_Sequence_not_nil; eauto.
+        injection eseq => <-; rewrite app_comm_cons last_app;
+                         [eapply RuleTree_to_Sequence_not_nil; eauto|].
+
+        (** Before applying the induction hypotheses, we simplify the context a bit. *)
+        destruct p; cbn in eget0; injection eget0 => e e0; subst.
+
+        (** We can now apply the induction hypotheses and the bureaucratic lemmas. *)
+        eapply IHR2 with (B := (B ++ [Right])%list) (T := last s0 (mkLeaf sko)).
+        * assumption.
         * eapply IHR1 with (B := (B ++ [Left])%list)
-                           (T := {| tree := t0; symbols := add_symbol a f (symbols T) |}); eauto.
-          -- eapply is_branch_of_extend_left; eauto.
+                           (T := {| tree := t; symbols := symbols T |});
+            eauto.
           -- eapply extend_subset_preserves_function_symbols with
-               (l := Some [G{0 \to t}]) (l' := None); eauto.
-             ++ cbn. rewrite join_to_set. intros g hing.
-                rewrite union_spec; now right.
-             ++ eapply preserves_function_symbols_get_neg_all; eauto.
-                erewrite (sko_function_symbols_sound sko hsko); eauto.
-                erewrite (symbol_sound sko hsko) in esymb'.
-                injection esymb' => -> //.
-             ++ apply preserves_function_symbols_None.
+               (l := Some (Ctx.elements rf)) (l' := Some (Ctx.elements rf0))
+               (T := T); eauto.
+             ++ reflexivity.
+             ++ cbn; eapply preserves_function_symbols_get_or1; eauto.
+             ++ cbn; eapply preserves_function_symbols_get_or2; eauto.
           -- cbn; erewrite get_context_extend_left; eauto.
-             rewrite /Ctx.add in esrch1; cbn. injection esymb => ->.
+        * assumption.
+        * erewrite <-echk1; f_equal.
+          -- rewrite -ectx;
+               erewrite get_context_extend_right; eauto.
+             by cbn; unfold Ctx.union.
+          -- symmetry; eapply RuleTree_to_Sequence_symbols; [| |apply eseq0]; eauto.
+             cbn; rewrite -echk0; unfold Ctx.union.
+             erewrite <-get_context_extend_left; eauto.
+
+      (** Case: [GammaAll]. *)
+      + cbn; eapply preserves_function_symbols_get_all; eauto.
+
+      (** Case: [DeltaNegAll].
+
+          In this case, we can apply the induction hypothesis with the extended symbols.
+          As a formula is instantiated with the Skolem function, its function symbol appears
+          in the subsequent tableau and allows us to show the property. *)
+      + eapply IHR1 with (B := (B ++ [Left])%list)
+                         (T := {| tree := t0; symbols := add_symbol a f (symbols T) |}); eauto.
+        * eapply extend_subset_preserves_function_symbols with
+            (l := Some [f1{0 \to t}]) (l' := None); eauto.
+          -- cbn; rewrite join_to_set.
+             intros g hing; rewrite union_spec; now right.
+          -- eapply preserves_function_symbols_get_neg_all; eauto.
+             erewrite (sko_function_symbols_sound sko hsko); eauto.
+             by rewrite (symbol_sound sko hsko) in esymb0; injection esymb0 => ->.
+          -- apply preserves_function_symbols_None.
+        * cbn; erewrite get_context_extend_left; eauto.
+          rewrite /Ctx.add in echk0; cbn; injection esymb => ->; injection eget => ->;
              eassumption.
   Qed.
 
