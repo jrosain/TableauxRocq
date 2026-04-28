@@ -20,7 +20,7 @@ theories["examples"]=""
 for key in ${!theories[@]}; do
 	for link in $(echo "$index" | grep -o "${key}/[^\\.]*\.v"); do
 		new_link=$(echo $link | sed -e "s#${key}/#${theories[${key}]}#g" \
-					   | sed -e 's/\.v/\.html/g')
+					   | sed -e 's/\.v/\.html/g' | sed -e 's@/@.@g')
 		index=$(echo "$index" | sed -e "s#${link}#${new_link}#g")
 	done
 done

@@ -3,6 +3,7 @@ var coqdocjs = coqdocjs || {};
 coqdocjs.repl = {
     "forall": "∀",
     "exists": "∃",
+    "fun": "λ",
     "~": "¬",
     "/\\": "∧",
     "\\/": "∨",
@@ -57,7 +58,6 @@ coqdocjs.repl = {
 	"\\to": "→",
 	"\\in": "∈",
 	"\\subseteq": "⊆",
-	"\\models": "⊧",
 	"[[": "〚",
 	"]]": "〛",
 	":=": "≔",
@@ -66,6 +66,8 @@ coqdocjs.repl = {
 	"\\union": "∪",
 	"\\inter": "∩",
 	"\\equiv": "≡",
+	"|>": "▷",
+	"|=": "⊧",
 };
 
 coqdocjs.subscr = {
@@ -82,6 +84,6 @@ coqdocjs.subscr = {
 };
 
 coqdocjs.replInText = ["-->", "<=>", "->", "<-", ":=", "\\to", "\\in", "\\models", "\\union",
-					   "\\inter", "\\equiv", "Bot", "Neg", "[[", "]]"];
+					   "=>", "\\inter", "\\equiv", "Bot", "Neg", "[[", "]]", "|>", "|="];
 
 coqdocjs.transparent = ["Defined"];
