@@ -1,4 +1,4 @@
-(** * Reflect: sound and complete algorithm to "search" for tableaux proofs *)
+(** * Checker: sound algorithm to check a tableau proof *)
 
 From Tableaux Require Import Core.
 From Tableaux Require Import ExtendedSyntax.
@@ -7,7 +7,7 @@ From Stdlib Require Import Lia.
 
 (** In this file, we implement a tableau proof checker procedure.
 
-    It returns a boolean if the tableau is closed. We show that this procedure
+    It returns true if the tableau is closed. We show that this procedure
     is sound, which makes it possible to output proof certificates from this
     algorithm. *)
 
@@ -503,6 +503,12 @@ Ltac on_unary_cases tac :=
   (* swaps back the binary case at the 3rd position. *)
   swap 4 5; swap 3 4.
 
+Ltac on_alpha_neg_neg tac :=
+  only 1: tac.
+
+Ltac on_alpha_neg_or tac :=
+  only 2: tac.
+
 Ltac on_alpha_cases tac :=
   only 1-2: tac.
 
@@ -880,95 +886,98 @@ Section Soundness.
 
     - cbn in eseq. injection eseq => eseq'; rewrite -eseq' in esnd; inversion esnd.
 
-    - destruct r; cbn in eseq, esrch.
+    - destruct r;
+        simplify_chk_rec_call;
+        simplify_seq_rec_call.
 
-      + apply alpha_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch);
-          rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
-        erewrite RuleTree_to_Sequence_hd in esnd; eauto.
-        injection esnd => <-.
-        do 2 (destruct f; try easy).
-        eapply expansion_NegNeg; eauto.
-        * apply in_context_is_on_branch; eauto.
-        * cbn in eget; unfold Ctx.singleton in eget. rewrite eget.
-          unfold Ctx.elements in hexpand; cbn.
-          now rewrite hexpand.
+      (** Get the two tableaux to relate in the conclusion. *)
+      all:
+        destruct s; try easy;
+        destruct s; try easy;
+        injection eseq => eseq' eseq''; injection esnd => esnd';
+        rewrite eseq'' -esnd'.
 
-      + apply alpha_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch);
-          rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
-        erewrite RuleTree_to_Sequence_hd in esnd; eauto.
-        injection esnd => <-.
-        do 2 (destruct f; try easy).
-        eapply expansion_NegOr; eauto.
-        * apply in_context_is_on_branch; eauto.
-        * cbn in eget; unfold Ctx.singleton in eget. rewrite eget.
-          unfold Ctx.elements in hexpand; cbn.
-          now rewrite hexpand.
+      (** Get the real formula. *)
+      all:
+        on_alpha_cases
+          ltac:(do 2 (destruct f; try easy));
+        on_beta_case
+          ltac:(destruct f; try easy);
+        on_gamma_case
+          ltac:(destruct f; try easy);
+        on_delta_case
+          ltac:(do 2 (destruct f; try easy));
+        subst.
 
-      + apply beta_rule_sound in esrch; destruct esrch as
-          (l & l' & rec & eget & hin & esrch1 & esrch2); rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        destruct (RuleTree_to_Sequence__aux (B ++ [Right])%list _ _) eqn:eseq2; try easy.
-        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
-        have hs0 : s0 <> []. { eapply RuleTree_to_Sequence_not_nil; eauto. }
-        destruct f; try easy. destruct s0; try easy.
-        destruct s0.
-        * erewrite RuleTree_to_Sequence_hd in esnd; eauto.
-          cbn in esnd; injection esnd => <-.
-          eapply expansion_Or; eauto.
-          -- apply in_context_is_on_branch; eauto.
-          -- cbn in eget; unfold Ctx.singleton in eget.
-             injection eget => -> ->; cbn.
-             rewrite hexpand.
-             have h := RuleTree_to_Sequence_hd eseq1. injection h => -> //.
-        * cbn in esnd. injection esnd => <-.
-          have h := RuleTree_to_Sequence_hd eseq1. injection h => -> //.
-          eapply expansion_Or; eauto.
-          -- apply in_context_is_on_branch; eauto.
-          -- cbn in eget; unfold Ctx.singleton in eget.
-             injection eget => -> ->; cbn.
-             rewrite hexpand //.
+      (** Apply the respective expansion rules on easy (alpha and gamma) cases. *)
+      all:
+        on_alpha_neg_neg
+          ltac:(eapply expansion_NegNeg; eauto; [apply in_context_is_on_branch; eauto|]; cbn);
+        on_alpha_neg_or
+          ltac:(eapply expansion_NegOr; eauto; [apply in_context_is_on_branch; eauto|]; cbn);
+        on_gamma_case
+          ltac:(eapply expansion_All with (x := s0); eauto;
+                [apply in_context_is_on_branch; eauto|]; cbn).
 
-      + apply gamma_rule_sound in esrch; destruct esrch as (l & eget & hin & esrch);
-          rewrite eget in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
-        erewrite RuleTree_to_Sequence_hd in esnd; eauto.
-        injection esnd => <-.
-        destruct f; try easy.
-        eapply expansion_All with (x := s0); eauto.
-        * apply in_context_is_on_branch; eauto.
-        * cbn in eget; injection eget => ->.
-          cbn; now rewrite hexpand.
+      (** In the unfolded cases, we can use [eexp] to simplify the goal. *)
+      all:
+        on_alpha_cases
+          ltac:(cbn in eget0; rewrite /Ctx.singleton /Ctx.elements in eget0, eexp;
+                rewrite eget0 eexp);
+        on_gamma_case
+          ltac:(cbn in eget0; injection eget0 => ->; cbn; rewrite eexp).
 
-      + apply delta_rule_sound in esrch;
-          destruct esrch as (f0 & F & eget & hin & hsko & esymb & esrch);
-          rewrite eget esymb in eseq.
-        destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand; try easy.
-        destruct (RuleTree_to_Sequence__aux _ _ _) eqn:eseq1; try easy.
-        injection eseq => eseq'; rewrite -eseq' nth_error_S nth_error_0 in esnd.
-        erewrite RuleTree_to_Sequence_hd in esnd; eauto.
-        injection esnd => <-.
-        do 2 (destruct f; try easy).
-        have e := symbol_sound sko hsko.
-        rewrite esymb in e; injection e => ->; eauto.
-        have hsko' : sko t (Neg (All f)) (symbols T) (fv (get_context B T))
-                       (function_symbols (get_all_formulas T)) = true.
-        { eapply is_sko_consistent; eauto. }
-        eapply expansion_NegAll with (hsko := hsko'); eauto.
-        * apply in_context_is_on_branch; eauto.
-        * cbn in eget. change (Neg f {0 \to t}) with ((Neg f) {0 \to t}); injection eget => ->.
-          cbn; now rewrite hexpand.
-        * cbn. have esymb1 := symbol_sound sko hsko.
-          have esymb2 := symbol_sound sko hsko'.
-          rewrite esymb1 in esymb2; injection esymb2 => -> //.
+      (** And we can conclude by applying [RuleTree_to_Sequence_hd] in [eseq0]. *)
+      all:
+        try (apply RuleTree_to_Sequence_hd in eseq0; by cbn in eseq0).
+
+      (** Case: beta rule. This case is a bit tricky as we remove the last element of the
+          sequence of the left child. Consequently, there are two cases:
+          - either [s0] has exactly one element, and in this case we have to show that
+            [t0 |> head s1]. This is done by showing that [T'] is the head of [s1].
+          - either [s0] has more than one element, and in this case we have to show that
+            [t0 |> head s0], which is similar as the previous easy cases. *)
+      + have hs0 : s0 <> [] by eapply RuleTree_to_Sequence_not_nil; eauto.
+        destruct s0; try easy; destruct s0.
+
+        (** In both cases, we apply the [expansion_Or] rule and use [eexp]
+            to simplify the goal. *)
+        all:
+          eapply expansion_Or; eauto; [apply in_context_is_on_branch; eauto|];
+          destruct p as [f1s f2s]; cbn in eget; unfold Ctx.singleton in eget;
+            injection eget => -> ->; cbn; rewrite eexp.
+
+        (** Case 1: [s0] has exactly one element. *)
+        * apply RuleTree_to_Sequence_hd in eseq0, eseq1; cbn in eseq0, eseq', eseq1;
+            rewrite eseq' in eseq1; cbn in eseq1; congruence.
+        (** Case 2: [s0] has more than one element. *)
+        * apply RuleTree_to_Sequence_hd in eseq0; cbn in eseq0, eseq'.
+          injection eseq' => _ eseq''; congruence.
+
+      (** Case: delta rules. In this case, we have to manage the Skolem symbols stored.
+          Hence, we start by deriving the Skolemization condition on the first tableau. *)
+      + have hsko' : sko t (Neg (All f)) (symbols t1) (fv (get_context B t1))
+                       (function_symbols (get_all_formulas t1)) = true by
+          (have e := symbol_sound sko hsko); rewrite esymb0 in e; eapply is_sko_consistent; eauto.
+
+        eapply expansion_NegAll with (hsko := hsko'); eauto;
+          [apply in_context_is_on_branch; eauto| |].
+
+        (** We then use the same techniques as in the previous cases to conclude the first
+            branch. *)
+        * cbn in eget0; change (Neg f {0 \to t}) with ((Neg f) {0 \to t}); injection eget0 => ->;
+            rewrite eexp.
+          apply RuleTree_to_Sequence_hd in eseq0; cbn in eseq0;
+            destruct T'; injection eseq0; intros; cbn; congruence.
+
+        (** Finally, we conclude this last branch by using the soundness of the symbols of a
+            Skolemization process. *)
+        * apply RuleTree_to_Sequence_hd in eseq0; cbn in eseq0;
+            injection eseq0 => ->; cbn.
+          
+          (have esymb1 := symbol_sound sko hsko);
+          (have esymb2 := symbol_sound sko hsko');
+          congruence.
   Qed.
 
   Lemma preserves_function_symbols_None :
