@@ -5,8 +5,16 @@ proofs in Rocq, and (ii) outputing *optimized* tableaux proofs for fast certific
 
 **Table of contents**
 
+- [Documentation](#documentation)
 - [Installation and Local Compilation](#installation-and-local-compilation)
 - [Outputing Proofs using TableauxRocq](#outputing-proofs-using-tableauxrocq)
+
+## Documentation
+
+Documentation gets automatically deployed for each version of `TableauxRocq`. The
+documentation following the development version (e.g., tracking the `master` branch)
+can be accessed at [jrosain.github.io/TableauxRocq/master](https://jrosain.github.io/TableauxRocq/master/).  
+Documentation for a specific version is linked on the associated `release/` branch.
 
 ## Installation and Local Compilation
 
