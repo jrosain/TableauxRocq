@@ -39,6 +39,13 @@ Section Tableaux.
   (** A [Branch] of a tableau is a succession of [BranchingStep]s. *)
   Definition Branch := list BranchingStep.
 
+  Lemma branch_extend_left_right :
+    forall (B : Branch), B ++ [Left] <> B ++ [Right].
+  Proof using Type.
+    induction B; try easy.
+    cbn; intro e; apply IHB; injection e => -> //.
+  Qed.
+
   Definition EmptyBranch : Branch := [].
 
   (** A [Branch] [is_branch_of] a [TableauTree] whenever the list of branching steps describes
@@ -1267,3 +1274,104 @@ Module ConcreteProofInstances.
 
   Definition Tableau := @Tableau string string string.
 End ConcreteProofInstances.
+
+(** Exposing tactics to simplify manipulation of trees. *)
+Module TreeTactics.
+  Ltac infer_branch_infos :=
+    match goal with
+    | [ e : expand_tableau_branch ?sko ?l ?l' ?B ?T = Some ?T' |- _ ] =>
+        let eexpand := fresh "eexpand" in
+        have eexpand := expand_tableau_branch_Some__aux sko e
+    | _ => idtac
+    end;
+    match goal with
+    | [ hb : is_branch_of ?B ?T |- _ ] =>
+        let T0 := fresh "T" in
+        let hnl := fresh "hnleaf" in
+        let hc := fresh "hchild" in
+        have [ T0 [ hnl hc ] ] := is_branch_of_get_child_at hb;
+        match goal with
+        | [ e : expand_tableau_branch__aux (Some ?l) (Some ?l') B T = Some ?T' |- _ ] =>
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_left hb e;
+            let hnb := fresh "hnbranchof" in
+            have hnb := is_branch_of_extend_left' hb e;
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_right hb e
+        | [ e : expand_tableau_branch__aux (Some ?l) None B T = Some ?T' |- _ ] =>
+            let T := fresh "T" in
+            let hnl := fresh "hnleaf" in
+            let er := fresh "erepl" in
+            have [ T [ hnl er ] ] := replace_expand_Left hb;
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_left hb e;
+            let hnb := fresh "hnbranchof" in
+            have hnb := is_branch_of_extend_left' hb e
+        | [ e : expand_tableau_branch__aux (Some ?l) ?l' B T = Some ?T' |- _ ] =>
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_left hb e;
+            let hnb := fresh "hnbranchof" in
+            have hnb := is_branch_of_extend_left' hb e
+        | [ e : expand_tableau_branch__aux ?l (Some ?l') B T = Some ?T' |- _ ] =>
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_right hb e
+        | [ e : expand_tableau_branch__aux None None B T = Some ?T' |- _ ] =>
+            let hb' := fresh "hbranchof" in
+            have hb' := is_branch_of_extend_None hb e
+        | _ => idtac
+        end
+    | _ => fail 0 "No inferable data on branches from this context"
+    end.
+
+  Ltac infer_ctx_infos :=
+    match goal with
+    | [ hb : is_branch_of ?B ?T, e : get_context ?B ?T = ?Gamma |- _ ] =>
+        match goal with
+        | [ eexp : expand_tableau_branch__aux (Some ?l) ?l' B T = Some ?T' |- _ ] =>
+            let ectx := fresh "ectx" in
+            have ectx := get_context_extend_left hb eexp e
+        | _ => idtac
+        end;
+        match goal with
+        | [ eexp : expand_tableau_branch__aux ?l (Some ?l') B T = Some ?T' |- _ ] =>
+            let ectx := fresh "ectx" in
+            have ectx := get_context_extend_right hb eexp e
+        | _ => idtac
+        end
+    | _ => idtac
+    end;
+    match goal with
+    | [ hb : is_branch_of ?B ?T |- _ ] =>
+        match goal with
+        | [ hb' : is_branch_of ?B' T |- _ ] =>
+            match goal with
+            | [ ne : B <> B', e : replace_child B' T ?T' = Some ?T0 |- _ ] =>
+                let ectx := fresh "ectx" in
+                have ectx := get_context_replace_child_oth hb hb' ne e
+            | _ => idtac
+            end
+        | _ => idtac
+        end
+    | _ => idtac
+    end.
+
+  Ltac infer_replace_child_infos :=
+    match goal with
+    | [ hb : is_branch_of ?B ?T |- _ ] =>
+        match goal with
+        | [ hb' : is_branch_of ?B' T |- _ ] =>
+            match goal with
+            | [ ne : B <> B', e : replace_child B' T ?T' = Some ?T0 |- _ ] =>
+                let hb0 := fresh "hbranchof" in
+                let ectx := fresh "ectx" in
+                have hb0 := is_branch_of_replace_child_oth hb hb' ne e;
+                have ectx := get_context_replace_child_oth hb hb' ne e
+            | _ => fail 0 "Cannot infer replacement infos in this context: either [B <> B'] is
+                          not in the context or there are no replace_child equations in it"
+            end
+        | _ => fail 0 "Cannot infer replacement infos in this context: only 1 is_branch_of in
+                      the context"
+        end
+    | _ => fail 0 "Cannot infer replacement infos in this context: no is_branch_of in the context"
+    end.
+End TreeTactics.
