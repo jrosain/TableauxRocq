@@ -1,8 +1,12 @@
 # TableauxRocq Source Code
 
-This folder contains the `Rocq` source code for the paper:
-
+This folder contains the `Rocq` source code for the paper
 *TableauxRocq: A Deep Embedding of Free-Variable Tableaux in Rocq*.
+
+> [!NOTE]
+> This version is an unofficial release made to browse through the code of the aforementioned paper.
+> It can be used as a library, but the API is still a bit rough and many changes will take
+> place before the first official release.
 
 **Table of contents**
 
