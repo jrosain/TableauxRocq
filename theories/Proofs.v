@@ -6,26 +6,152 @@
     [Sequence]. We define what it means for a [TableauProof] to be closed, and show that,
     list of formulas [Neg F :: Gamma], if this context has a tableau proof, then [Gamma |= F]. *)
 
-From Stdlib Require Import Classical.
 From Stdlib Require Import Lia.
 
 From Tableaux Require Import Semantics.
 From Tableaux Require Import Skolemization.
 From Tableaux Require Import Syntax.
 
-Notation "x \in l" := (List.In x l) (at level 30).
+(** We start by specifying the operations required by a context.
+
+    A [Module Type] is used in order to provide a programming abstraction.
+    Implementation(s) are given below.
+
+    We export this module as [Ctx]. Note that no operations of [Ctx] simplify. This allows to
+    easily change the implementation without affecting any proof. *)
+Module Type ICtx.
+  Section Def.
+    Context {pred func var : Atom}.
+
+    Let Form := Form pred func var.
+
+    Parameter t : Atom -> Atom -> Atom -> Type.
+
+    Let t := t pred func var.
+
+    Parameter empty : t.
+    Parameter eq  : t -> t -> Prop.
+    Parameter from_list : list Form -> t.
+    Parameter fv : t -> set_atom var.
+    Parameter existsb : (Form -> bool) -> t -> bool.
+    Parameter mem : Form -> t -> bool.
+    Parameter In : Form -> t -> Prop.
+    Parameter singleton : Form -> t.
+    Parameter add : Form -> t -> t.
+    Parameter elements : t -> list Form.
+    Parameter union : t -> t -> t.
+    Parameter pr : t -> string.
+    Parameter to_form : t -> Form.
+
+    Parameter mem_spec : forall (F : Form) (Gamma : t), mem F Gamma = true <-> In F Gamma.
+    Parameter existsb_exists :
+      forall (P : Form -> bool) (Gamma : t),
+        existsb P Gamma = true <-> (exists F : Form, In F Gamma /\ P F = true).
+    Parameter in_or_union :
+      forall (F : Form) (Gamma1 Gamma2 : t),
+        In F (union Gamma1 Gamma2) <-> In F Gamma1 \/ In F Gamma2.
+    Parameter union_emptyr :
+      forall (Gamma : t), union Gamma empty = Gamma.
+    Parameter union_emptyl :
+      forall (Gamma : t), union empty Gamma = Gamma.
+    Parameter union_assoc :
+      forall (Gamma1 Gamma2 Gamma3 : t),
+        union (union Gamma1 Gamma2) Gamma3 =
+          union Gamma1 (union Gamma2 Gamma3).
+  End Def.
+End ICtx.
+
+Module ListCtx <: ICtx.
+  Section Def.
+    Context {pred func var : Atom}.
+
+    Let Form := Form pred func var.
+
+    (** We box the list in order to make list notations not work for contexts. *)
+    Record t_ := Mk { obj : list Form }.
+    Definition t := t_.
+    Definition empty := Mk [].
+    Definition eq : t -> t -> Prop := eq.
+    Definition from_list (l : list Form) : t := Mk l.
+    Definition elements (Gamma : t) : list Form :=
+      let 'Mk obj := Gamma in obj.
+
+    Definition fv (Gamma : t) : set_atom var := fv (elements Gamma).
+    Definition existsb (pred : Form -> bool) (Gamma : t) : bool := List.existsb pred (elements Gamma).
+    Definition mem (F : Form) (Gamma : t) : bool := list_mem F (elements Gamma).
+    Definition In (F : Form) (Gamma : t) : Prop := List.In F (elements Gamma).
+    Definition singleton (F : Form) : t := from_list [F].
+    Definition add (F : Form) (Gamma : t) : t := from_list (F :: elements Gamma).
+    Definition union (Gamma1 Gamma2 : t) : t :=
+      from_list (elements Gamma1 ++ elements Gamma2).
+    #[local] Open Scope string_scope.
+    Definition pr : t -> string := fun _ => "Not yet implemented".
+    Definition to_form (Gamma : t) := ls_to_form (elements Gamma).
+
+    Lemma mem_spec :
+      forall (F : Form) (Gamma : t),
+        mem F Gamma = true <-> In F Gamma.
+    Proof using Type. intros F []; cbn; apply list_mem_spec. Qed.
+
+    Lemma existsb_exists :
+      forall (P : Form -> bool) (Gamma : t),
+        existsb P Gamma = true <-> (exists F : Form, In F Gamma /\ P F = true).
+    Proof using Type. intros P []; cbn; apply existsb_exists. Qed.
+
+    Lemma in_or_union :
+      forall (F : Form) (Gamma1 Gamma2 : t),
+        In F (union Gamma1 Gamma2) <-> In F Gamma1 \/ In F Gamma2.
+    Proof using Type.
+      intros ? [] []; cbn; split; intro h.
+      - by apply in_app_or.
+      - by apply in_or_app.
+    Qed.
+
+    Lemma union_emptyr :
+      forall (Gamma : t), union Gamma empty = Gamma.
+    Proof using Type.
+      intros []; unfold empty; destruct empty; unfold union, from_list; cbn; f_equal;
+        apply app_nil_r.
+    Qed.
+
+    Lemma union_emptyl :
+      forall (Gamma : t), union empty Gamma = Gamma.
+    Proof using Type.
+      intros []; unfold empty; destruct empty; unfold union, from_list; cbn; f_equal;
+        apply app_nil_l.
+    Qed.
+
+    Lemma union_assoc :
+      forall (Gamma1 Gamma2 Gamma3 : t),
+        union (union Gamma1 Gamma2) Gamma3 =
+          union Gamma1 (union Gamma2 Gamma3).
+    Proof using Type.
+      intros [Gamma1] [Gamma2] [Gamma3]; unfold union; cbn; f_equal; by rewrite app_assoc.
+    Qed.
+  End Def.
+  #[global] Arguments t : clear implicits.
+End ListCtx.
+
+Module Ctx := ListCtx.
+Opaque Ctx.t Ctx.empty Ctx.eq Ctx.from_list Ctx.fv Ctx.existsb Ctx.mem Ctx.In Ctx.singleton
+  Ctx.add Ctx.elements Ctx.union Ctx.to_form.
+Notation "F \in Gamma" := (Ctx.In F Gamma) (at level 30).
+
+#[global] Instance GetFunctSymbs_Ctx {pred func var : Atom} :
+  @GetFunctSymbols func (Ctx.t pred func var) := fun Gamma => function_symbols (Ctx.elements Gamma).
 
 (** ** Tableaux *)
 Section Tableaux.
   Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
 
   Let Form := Form pred func var.
+  Let Ctx := Ctx.t pred func var.
 
-  Inductive TableauTree : Type :=
+  Inductive TableauTree :=
   | Leaf
-  | Node (T1 : TableauTree) (Gamma : list Form) (T2 : TableauTree) : TableauTree.
+  | Node (T1 : TableauTree) (Gamma : Ctx) (T2 : TableauTree) : TableauTree.
 
-  Inductive BranchingStep : Type := Left | Right.
+  Inductive BranchingStep := Left | Right.
 
   #[global] Instance EqDec_BranchingStep : EqDec BranchingStep.
   Proof using Type.
@@ -38,9 +164,10 @@ Section Tableaux.
 
   (** A [Branch] of a tableau is a succession of [BranchingStep]s. *)
   Definition Branch := list BranchingStep.
+  Notation "B \rhd d" := (B ++ [d]) (at level 20).
 
   Lemma branch_extend_left_right :
-    forall (B : Branch), B ++ [Left] <> B ++ [Right].
+    forall (B : Branch), B \rhd Left <> B \rhd Right.
   Proof using Type.
     induction B; try easy.
     cbn; intro e; apply IHB; injection e => -> //.
@@ -51,12 +178,12 @@ Section Tableaux.
   (** A [Branch] [is_branch_of] a [TableauTree] whenever the list of branching steps describes
       a path from the root of the [TableauTree] to a node without children. *)
   Inductive is_branch_of : Branch -> TableauTree -> Prop :=
-  | is_branch_of_nil : forall (Gamma : list Form), is_branch_of EmptyBranch (Node Leaf Gamma Leaf)
+  | is_branch_of_nil : forall (Gamma : Ctx), is_branch_of EmptyBranch (Node Leaf Gamma Leaf)
   | is_branch_of_left :
-    forall (T1 T2 : TableauTree) (Gamma : list Form) (B : Branch),
+    forall (T1 T2 : TableauTree) (Gamma : Ctx) (B : Branch),
       is_branch_of B T1 -> is_branch_of (Left :: B) (Node T1 Gamma T2)
   | is_branch_of_right :
-    forall (T1 T2 : TableauTree) (Gamma : list Form) (B : Branch),
+    forall (T1 T2 : TableauTree) (Gamma : Ctx) (B : Branch),
       is_branch_of B T2 -> is_branch_of (Right :: B) (Node T1 Gamma T2).
 
   Lemma is_branch_of_dec :
@@ -84,12 +211,12 @@ Section Tableaux.
       a path from the root of the [TableauTree] to any node of the tree. *)
   Inductive is_subbranch_of : Branch -> TableauTree -> Prop :=
   | is_subbranch_of_node :
-    forall (Gamma : list Form) (T1 T2 : TableauTree), is_subbranch_of EmptyBranch (Node T1 Gamma T2)
+    forall (Gamma : Ctx) (T1 T2 : TableauTree), is_subbranch_of EmptyBranch (Node T1 Gamma T2)
   | is_subbranch_of_left :
-    forall (T1 T2 : TableauTree) (Gamma : list Form) (B : Branch),
+    forall (T1 T2 : TableauTree) (Gamma : Ctx) (B : Branch),
       is_subbranch_of B T1 -> is_subbranch_of (Left :: B) (Node T1 Gamma T2)
   | is_subbranch_of_right :
-    forall (T1 T2 : TableauTree) (Gamma : list Form) (B : Branch),
+    forall (T1 T2 : TableauTree) (Gamma : Ctx) (B : Branch),
       is_subbranch_of B T2 -> is_subbranch_of (Right :: B) (Node T1 Gamma T2).
 
   (** Of course, a branch [B] [is_subbranch_of] a [TableauTree] whenever it [is_branch_of] this
@@ -108,22 +235,22 @@ Section Tableaux.
   (** A [Form]ula [F] [is_on_branch] [B] if it appears in any one of the nodes along [B]. *)
   Inductive is_on_branch (F : Form) : Branch -> TableauTree -> Prop :=
   | is_on_branch_node :
-    forall (T1 T2 : TableauTree) (Gamma : list Form) (B : Branch),
+    forall (T1 T2 : TableauTree) (Gamma : Ctx) (B : Branch),
       F \in Gamma -> is_on_branch F B (Node T1 Gamma T2)
   | is_on_branch_left :
-    forall (T1 T2 : TableauTree) (Gamma : list Form) (B : Branch),
+    forall (T1 T2 : TableauTree) (Gamma : Ctx) (B : Branch),
       is_on_branch F B T1 -> is_on_branch F (Left :: B) (Node T1 Gamma T2)
   | is_on_branch_right :
-    forall (T1 T2 : TableauTree) (Gamma : list Form) (B : Branch),
+    forall (T1 T2 : TableauTree) (Gamma : Ctx) (B : Branch),
       is_on_branch F B T2 -> is_on_branch F (Right :: B) (Node T1 Gamma T2).
 
-  Definition mkOptionalNode (Gamma : option (list Form)) :=
+  Definition mkOptionalNode (Gamma : option Ctx) :=
     match Gamma with
     | Some Gamma => Node Leaf Gamma Leaf
     | None => Leaf
     end.
 
-  Fixpoint expand_tableau_branch__aux (left_forms right_forms : option (list Form))
+  Fixpoint expand_tableau_branch__aux (left_forms right_forms : option Ctx)
     (B : Branch) (T : TableauTree) : option TableauTree :=
     match B, T with
     | [], Node Leaf Gamma Leaf =>
@@ -139,7 +266,7 @@ Section Tableaux.
 
   Lemma expand_tableau_branch_Some_is_branch_of :
     forall {B : Branch} {T T' : TableauTree}
-      {left_forms right_forms : option (list Form)},
+      {left_forms right_forms : option Ctx},
       expand_tableau_branch__aux left_forms right_forms B T = Some T' ->
       is_branch_of B T.
   Proof using Type.
@@ -157,25 +284,25 @@ Section Tableaux.
   Qed.
 
   Lemma expand_tableau_branch_left :
-    forall (Gamma : list Form) (T1 T1' T2 : TableauTree) (B : Branch)
-      (left_forms right_forms : option (list Form)),
+    forall (Gamma : Ctx) (T1 T1' T2 : TableauTree) (B : Branch)
+      (left_forms right_forms : option Ctx),
       expand_tableau_branch__aux left_forms right_forms B T1 = Some T1' ->
       expand_tableau_branch__aux left_forms right_forms (Left :: B) (Node T1 Gamma T2) =
         Some (Node T1' Gamma T2).
   Proof using Type. intros ??????? e; cbn; rewrite e //. Qed.
 
   Lemma expand_tableau_branch_right :
-    forall (Gamma : list Form) (T1 T2 T2' : TableauTree) (B : Branch)
-      (left_forms right_forms : option (list Form)),
+    forall (Gamma : Ctx) (T1 T2 T2' : TableauTree) (B : Branch)
+      (left_forms right_forms : option Ctx),
       expand_tableau_branch__aux left_forms right_forms B T2 = Some T2' ->
       expand_tableau_branch__aux left_forms right_forms (Right :: B) (Node T1 Gamma T2) =
         Some (Node T1 Gamma T2').
   Proof using Type. intros ??????? e; cbn; rewrite e //. Qed.
 
   Lemma is_branch_of_extend_left :
-    forall {T T' : TableauTree} {B : Branch} {l : list Form} {l' : option (list Form)},
+    forall {T T' : TableauTree} {B : Branch} {l : Ctx} {l' : option Ctx},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) l' B T = Some T' ->
-      is_branch_of (B ++ [Left]) T'.
+      is_branch_of (B \rhd Left) T'.
   Proof using Type.
     intros ????? hbranchof e. generalize dependent T'; induction hbranchof; intros T' e; cbn in *.
     - injection e => <-; cbn. apply is_branch_of_left; constructor.
@@ -188,7 +315,7 @@ Section Tableaux.
   Qed.
 
   Lemma is_branch_of_extend_left' :
-    forall {T T' : TableauTree} {B : Branch} {l : list Form} {l' : option (list Form)},
+    forall {T T' : TableauTree} {B : Branch} {l : Ctx} {l' : option Ctx},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) l' B T = Some T' ->
       ~is_branch_of B T'.
   Proof using Type.
@@ -204,9 +331,9 @@ Section Tableaux.
   Qed.
 
   Lemma is_branch_of_extend_right :
-    forall {T T' : TableauTree} {B : Branch} {l : option (list Form)} {l' : list Form},
+    forall {T T' : TableauTree} {B : Branch} {l : option Ctx} {l' : Ctx},
       is_branch_of B T -> expand_tableau_branch__aux l (Some l') B T = Some T' ->
-      is_branch_of (B ++ [Right]) T'.
+      is_branch_of (B \rhd Right) T'.
   Proof using Type.
     intros ????? hbranchof e. generalize dependent T'; induction hbranchof; intros T' e; cbn in *.
     - injection e => <-; cbn. apply is_branch_of_right; constructor.
@@ -234,7 +361,7 @@ Section Tableaux.
   Qed.
 
   Lemma is_branch_of_extend_oth :
-    forall (T T' : TableauTree) (B B' : Branch) (l l' : option (list Form)),
+    forall (T T' : TableauTree) (B B' : Branch) (l l' : option Ctx),
       is_branch_of B' T -> is_branch_of B T -> B <> B' ->
       expand_tableau_branch__aux l l' B T = Some T' -> is_branch_of B' T'.
   Proof using Type.
@@ -279,7 +406,7 @@ Section Tableaux.
     end.
 
   (** The [label] of a branch is the label of the last node of the branch. *)
-  Fixpoint get_label (B : Branch) (T : TableauTree) : option (list Form) :=
+  Fixpoint get_label (B : Branch) (T : TableauTree) : option Ctx :=
     match B, T with
     | [], Node _ Gamma _ => Some Gamma
     | Left :: B, Node T1 Gamma _ => get_label B T1
@@ -326,9 +453,9 @@ Section Tableaux.
   Qed.
 
   Lemma replace_expand_Left :
-    forall {B : Branch} {T T0 : TableauTree} (T' : TableauTree) {l : list Form},
+    forall {B : Branch} {T T0 : TableauTree} (T' : TableauTree) {l : Ctx},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) None B T = Some T0 ->
-      exists T'', T'' <> Leaf /\ replace_child B T T'' = replace_child (B ++ [Left]) T0 T'.
+      exists T'', T'' <> Leaf /\ replace_child B T T'' = replace_child (B \rhd Left) T0 T'.
   Proof using Type.
     intros ????? hbranchof; revert  T0 T' l.
     induction hbranchof; intros ??? hexpand.
@@ -347,12 +474,12 @@ Section Tableaux.
   Qed.
 
   Lemma replace_child_sequence_expand :
-    forall {B : Branch} {T T0 : TableauTree} (T1 T2 : TableauTree) {l l' : option (list Form)},
+    forall {B : Branch} {T T0 : TableauTree} (T1 T2 : TableauTree) {l l' : option Ctx},
       expand_tableau_branch__aux l l' B T = Some T0 ->
-      (T' <- replace_child (B ++ [Left]) T T1;
-       replace_child (B ++ [Right]) T' T2) =
-      (T' <- replace_child (B ++ [Left]) T0 T1;
-       replace_child (B ++ [Right]) T' T2).
+      (T' <- replace_child (B \rhd Left) T T1;
+       replace_child (B \rhd Right) T' T2) =
+      (T' <- replace_child (B \rhd Left) T0 T1;
+       replace_child (B \rhd Right) T' T2).
   Proof using Type.
     intros B; induction B as [|b B IHB]; intros ?????? e.
     - destruct T; try easy; cbn in *.
@@ -362,25 +489,25 @@ Section Tableaux.
       + destruct (expand_tableau_branch__aux l l' B T3) eqn:eexpand; try easy.
         injection e => <-; cbn in *.
         specialize (IHB T3 t T1 T2 l l' eexpand).
-        destruct (replace_child (B ++ [Left]) T3 T1),
-          (replace_child (B ++ [Left]) t T1); try easy;
+        destruct (replace_child (B \rhd Left) T3 T1),
+          (replace_child (B \rhd Left) t T1); try easy;
           rewrite IHB //.
         rewrite -IHB //.
       + destruct (expand_tableau_branch__aux l l' B T4) eqn:eexpand; try easy.
         injection e => <-; cbn in *.
         specialize (IHB T4 t T1 T2 _ _ eexpand).
-        destruct (replace_child (B ++ [Left]) T4 T1),
-          (replace_child (B ++ [Left]) t T1); try easy;
+        destruct (replace_child (B \rhd Left) T4 T1),
+          (replace_child (B \rhd Left) t T1); try easy;
           rewrite IHB //.
         rewrite -IHB //.
   Qed.
 
   Lemma replace_child_Node :
-    forall {B : Branch} {T : TableauTree} (T1 T2 : TableauTree) (Gamma : list Form),
+    forall {B : Branch} {T : TableauTree} (T1 T2 : TableauTree) (Gamma : Ctx),
       is_branch_of B T -> get_label B T = Some Gamma ->
       replace_child B T (Node T1 Gamma T2) =
-        (T' <- replace_child (B ++ [Left]) T T1;
-         replace_child (B ++ [Right]) T' T2).
+        (T' <- replace_child (B \rhd Left) T T1;
+         replace_child (B \rhd Right) T' T2).
   Proof using Type.
     intros ????? hbranchof; revert T1 T2 Gamma; induction hbranchof; intros ??? elabel.
     - cbn in *; injection elabel => -> //.
@@ -417,7 +544,7 @@ Section Tableaux.
 
   Lemma is_branch_of_replace_child_oth_inv :
     forall {B B' : Branch} {b b' : BranchingStep} {T T' T0 : TableauTree},
-      is_branch_of (B ++ b :: B') T0 -> b <> b' -> replace_child (B ++ [b']) T T' = Some T0 ->
+      is_branch_of (B ++ b :: B') T0 -> b <> b' -> replace_child (B \rhd b') T T' = Some T0 ->
       is_branch_of (B ++ b :: B') T.
   Proof using Type.
     intro B; induction B as [|b0 B0 IHB0]; intros ?????? hbranchof ne erepl.
@@ -444,12 +571,12 @@ Section Tableaux.
   Qed.
 
   (** The [context] of a branch is the list of all the formulas of a branch. *)
-  Fixpoint get_context (B : Branch) (T : TableauTree) : list Form :=
+  Fixpoint get_context (B : Branch) (T : TableauTree) : Ctx :=
     match B, T with
     | [], Node Leaf Gamma Leaf => Gamma
-    | Left :: B, Node T1 Gamma _ => (get_context B T1 ++ Gamma)
-    | Right :: B, Node _ Gamma T2 => (get_context B T2 ++ Gamma)
-    | _, _ => []
+    | Left :: B, Node T1 Gamma _ => (Ctx.union (get_context B T1) Gamma)
+    | Right :: B, Node _ Gamma T2 => (Ctx.union (get_context B T2) Gamma)
+    | _, _ => Ctx.empty
     end.
 
   Lemma get_context_replace_child_oth :
@@ -486,20 +613,20 @@ Section Tableaux.
       + inversion hin.
       + destruct T1, T2; try easy.
         destruct B'; try easy.
-        destruct b; cbn; apply in_or_app; now right.
-    - destruct b, T; cbn in *; try easy.
-      + apply in_app_or in hin; destruct hin as [hin | hin].
-        * apply in_or_app; left. now apply IHB.
-        * apply in_or_app; now right.
-      + apply in_app_or in hin; destruct hin as [hin | hin].
-        * apply in_or_app; left. now apply IHB.
-        * apply in_or_app; now right.
+        destruct b; cbn; rewrite Ctx.in_or_union; now right.
+    - destruct b, T; cbn in *; try easy;
+        rewrite Ctx.in_or_union in hin; destruct hin as [hin | hin];
+        rewrite Ctx.in_or_union.
+        + left; by apply IHB.
+        + by right.
+        + left; by apply IHB.
+        + by right.
   Qed.
 
-  Fixpoint get_all_formulas (T : TableauTree) : list Form :=
+  Fixpoint get_all_formulas (T : TableauTree) : Ctx :=
     match T with
-    | Leaf => []
-    | Node T1 Gamma T2 => Gamma ++ get_all_formulas T1 ++ get_all_formulas T2
+    | Leaf => Ctx.empty
+    | Node T1 Gamma T2 => Ctx.union (Ctx.union Gamma (get_all_formulas T1)) (get_all_formulas T2)
     end.
 
   Lemma in_get_ctx_in_all_formulas :
@@ -507,26 +634,28 @@ Section Tableaux.
       is_branch_of B T -> F \in get_context B T -> F \in get_all_formulas T.
   Proof using Type.
     intros ??? hbranchof; induction hbranchof.
-    - intro; cbn in *. rewrite app_nil_r //.
-    - intros [hin | hin]%in_app_or; cbn in *.
-      + apply in_or_app; right; apply in_or_app; left.
+    - intro; cbn in *. rewrite !Ctx.union_emptyr //.
+    - cbn; intros [hin | hin]%Ctx.in_or_union.
+      + rewrite Ctx.in_or_union; left.
+        rewrite Ctx.in_or_union; right.
+        by apply IHhbranchof.
+      + rewrite Ctx.in_or_union; left.
+        by rewrite Ctx.in_or_union; left.
+    - cbn; intros [hin | hin]%Ctx.in_or_union.
+      + rewrite Ctx.in_or_union; right.
         now apply IHhbranchof.
-      + apply in_or_app; now left.
-    - intros [hin | hin]%in_app_or; cbn in *.
-      + apply in_or_app; right; apply in_or_app; right.
-        now apply IHhbranchof.
-      + apply in_or_app; now left.
+      + rewrite Ctx.in_or_union; left.
+        by rewrite Ctx.in_or_union; left.
   Qed.
 
   (** Actually, a [Tableau] also keeps in memory the Skolem symbols introduced. *)
   Record Tableau :=
-    { tree :> TableauTree
-    ; symbols : sko_record sko }.
+    mkTab { tree :> TableauTree ; symbols : sko_record sko }.
 
-  Definition expand_tableau_branch (left_forms right_forms : option (list Form))
+  Definition expand_tableau_branch (left_forms right_forms : option Ctx)
     (B : Branch) (T : Tableau) : option Tableau :=
     expand_tableau_branch__aux left_forms right_forms B T >>=
-      (fun tree => Some {| tree := tree; symbols := symbols T |}).
+      (fun tree => Some (mkTab tree (symbols T))).
 
   (** A [Sequence] is a list of tableaux. *)
   Definition Sequence := list Tableau.
@@ -545,7 +674,7 @@ Section Tableaux.
   (** A [Branch] of a [Tableau] is satisfied if its context is satisfied. *)
   Definition exists_satisfied_branch (M : Model pred func) (mu : env M var) (T : Tableau) : Prop :=
     exists (B : Branch),
-      is_branch_of B T /\ [[ M # [] # mu '|= ls_to_form (get_context B T) ]].
+      is_branch_of B T /\ [[ M # [] # mu '|= Ctx.to_form (get_context B T) ]].
 
   (** A [Tableau] is said satisfiable if there exists a model such that for every free-variable
       environment, there is a branch that is satisfied. *)
@@ -557,60 +686,60 @@ Section Tableaux.
   Definition preserves_function_symbols (T : Tableau) (s : set_atom func) :=
     function_symbols (get_all_formulas T) \subseteq s \union to_set (symbols T).
 
-  Definition mkTableau (Gamma : list Form) : Tableau :=
-    {| tree := Node Leaf Gamma Leaf
-    ;  symbols := empty_record |}.
+  Definition mkTableau (Gamma : Ctx) : Tableau :=
+    mkTab (Node Leaf Gamma Leaf) empty_record.
 
-  Definition mkLeaf : Tableau := {| tree := Leaf; symbols := empty_record |}.
+  Definition mkLeaf : Tableau :=
+    mkTab Leaf empty_record.
 
   Lemma get_context_extend_left :
-    forall {T T' : TableauTree} {B : Branch} {Gamma l : list Form} {l' : option (list Form)},
+    forall {T T' : TableauTree} {B : Branch} {Gamma l : Ctx} {l' : option Ctx},
       is_branch_of B T -> expand_tableau_branch__aux (Some l) l' B T = Some T' ->
-      get_context B T = Gamma -> get_context (B ++ [Left]) T' = (l ++ Gamma).
+      get_context B T = Gamma -> get_context (B \rhd Left) T' = Ctx.union l Gamma.
   Proof using Type.
-    intro T. induction T; intros ????? hbranchof e eT; destruct B.
+    intro T; induction T; intros ????? hbranchof e eT; destruct B.
     - inversion e.
     - inversion e; destruct b; easy.
-    - inversion hbranchof; subst. cbn in e.
+    - inversion hbranchof; subst; cbn in e.
       injection e => <- //.
     - destruct b; cbn.
       + inversion hbranchof; subst.
         cbn in e. destruct (expand_tableau_branch__aux (Some l) l' B T1) eqn:eT1.
         * injection e => <-; cbn in *. erewrite IHT1; eauto.
-          rewrite app_assoc //.
+          rewrite Ctx.union_assoc //.
         * inversion e.
-      + inversion hbranchof; subst.
-        cbn in e. destruct (expand_tableau_branch__aux (Some l) l' B T2) eqn:eT2.
+      + inversion hbranchof; subst; cbn in e.
+        destruct (expand_tableau_branch__aux (Some l) l' B T2) eqn:eT2.
         * injection e => <-; cbn in *. erewrite IHT2; eauto.
-          rewrite app_assoc //.
+          rewrite Ctx.union_assoc //.
         * inversion e.
   Qed.
 
   Lemma get_context_extend_right :
-    forall {T T' : TableauTree} {B : Branch} {Gamma l' : list Form} {l : option (list Form)},
+    forall {T T' : TableauTree} {B : Branch} {Gamma l' : Ctx} {l : option Ctx},
       is_branch_of B T -> expand_tableau_branch__aux l (Some l') B T = Some T' ->
-      get_context B T = Gamma -> get_context (B ++ [Right]) T' = (l' ++ Gamma).
+      get_context B T = Gamma -> get_context (B \rhd Right) T' = Ctx.union l' Gamma.
   Proof using Type.
-    intro T. induction T; intros ????? hbranchof e eT; destruct B.
+    intro T; induction T; intros ????? hbranchof e eT; destruct B.
     - inversion e.
     - inversion e. destruct b; easy.
-    - inversion hbranchof; subst. cbn in e.
+    - inversion hbranchof; subst; cbn in e.
       injection e => <-; now cbn.
     - destruct b; cbn.
-      + inversion hbranchof; subst.
-        cbn in e. destruct (expand_tableau_branch__aux l (Some l') B T1) eqn:eT1.
+      + inversion hbranchof; subst; cbn in e.
+        destruct (expand_tableau_branch__aux l (Some l') B T1) eqn:eT1.
         * injection e => <-; cbn in *. erewrite IHT1; eauto.
-          rewrite app_assoc //.
+          rewrite Ctx.union_assoc //.
         * inversion e.
       + inversion hbranchof; subst.
         cbn in e. destruct (expand_tableau_branch__aux l (Some l') B T2) eqn:eT2.
         * injection e => <-; cbn in *. erewrite IHT2; eauto.
-          rewrite app_assoc //.
+          rewrite Ctx.union_assoc //.
         * inversion e.
   Qed.
 
   Lemma get_context_extend_oth :
-    forall (T T' : TableauTree) (B B' : Branch) (l l' : option (list Form)),
+    forall (T T' : TableauTree) (B B' : Branch) (l l' : option Ctx),
       is_branch_of B T -> is_branch_of B' T -> B <> B' ->
       expand_tableau_branch__aux l l' B T = Some T' -> get_context B' T = get_context B' T'.
   Proof using Type.
@@ -645,24 +774,24 @@ Section Tableaux.
   Qed.
 
   Lemma is_branch_of_expand_tableau_branch :
-    forall {B : Branch} {T : Tableau} (l l' : option (list Form)),
+    forall {B : Branch} {T : Tableau} (l l' : option Ctx),
       is_branch_of B T ->
       exists (T' : Tableau), expand_tableau_branch l l' B T = Some T'.
   Proof using Type.
     intros ? [T symbs ] ?? hbranchof; cbn in *. induction hbranchof; cbn.
-    - exists {| tree := Node (mkOptionalNode l) Gamma (mkOptionalNode l'); symbols := symbs |}; auto.
+    - exists (mkTab (Node (mkOptionalNode l) Gamma (mkOptionalNode l')) symbs); auto.
     - destruct IHhbranchof as (T1' & eT1').
       destruct (expand_tableau_branch__aux l l' B T1); cbn in *.
-      + exists {| tree := Node t Gamma T2; symbols := symbs |}; auto.
+      + exists (mkTab (Node t Gamma T2) symbs); auto.
       + inversion eT1'.
     - destruct IHhbranchof as (T2' & eT2').
       destruct (expand_tableau_branch__aux l l' B T2); cbn in *.
-      + exists {| tree := Node T1 Gamma t; symbols := symbs |}; auto.
+      + exists (mkTab (Node T1 Gamma t) symbs); auto.
       + inversion eT2'.
   Qed.
 
   Lemma expand_tableau_branch_Some__aux :
-    forall {B : Branch} {T T' : Tableau} {l l' : option (list Form)},
+    forall {B : Branch} {T T' : Tableau} {l l' : option Ctx},
       expand_tableau_branch l l' B T = Some T' ->
       expand_tableau_branch__aux l l' B T = Some (tree T').
   Proof using Type.
@@ -672,7 +801,7 @@ Section Tableaux.
   Qed.
 
   Lemma expand_tableau_branch_Some_symbs :
-    forall {B : Branch} {T T' : Tableau} {l l' : option (list Form)},
+    forall {B : Branch} {T T' : Tableau} {l l' : option Ctx},
       expand_tableau_branch l l' B T = Some T' ->
       symbols T = symbols T'.
   Proof using Type.
@@ -682,10 +811,10 @@ Section Tableaux.
   Qed.
 
   Lemma replace_expanded_child_not_branch_Left :
-    forall {B : Branch} {T T0 T0' T' : TableauTree} {Gamma : list Form},
+    forall {B : Branch} {T T0 T0' T' : TableauTree} {Gamma : Ctx},
       is_branch_of B T -> T0' <> Leaf ->
       expand_tableau_branch__aux (Some Gamma) None B T = Some T0 ->
-      replace_child (B ++ [Left]) T0 T0' = Some T' -> ~is_branch_of B T'.
+      replace_child (B \rhd Left) T0 T0' = Some T' -> ~is_branch_of B T'.
   Proof using Type.
     intro B; induction B as [|b B IHB]; intros ????? hbranchof hnleaf hexpand hrepl hbranchof'.
 
@@ -713,11 +842,11 @@ Section Tableaux.
   Qed.
 
   Lemma replace_expanded_child_not_branch_Right :
-    forall {B : Branch} {T T0 T0' T1 T1' T2 : TableauTree} {Gamma1 Gamma2 : list Form},
+    forall {B : Branch} {T T0 T0' T1 T1' T2 : TableauTree} {Gamma1 Gamma2 : Ctx},
       is_branch_of B T -> T0' <> Leaf -> T1' <> Leaf ->
       expand_tableau_branch__aux (Some Gamma1) (Some Gamma2) B T = Some T0 ->
-      replace_child (B ++ [Left]) T0 T0' = Some T1 ->
-      replace_child (B ++ [Right]) T1 T1' = Some T2 -> ~is_branch_of B T2.
+      replace_child (B \rhd Left) T0 T0' = Some T1 ->
+      replace_child (B \rhd Right) T1 T1' = Some T2 -> ~is_branch_of B T2.
   Proof using Type.
     intro B; induction B as [|b B IHB];
       intros ???????? hbranchof hnleaf0 hnleaf1 hexpand hrepl1 hrepl2 hbranchof'.
@@ -755,10 +884,10 @@ Section Tableaux.
   Qed.
 
   Lemma replace_expanded_child_not_subbranch :
-    forall {B : Branch} {T T0 T0' T' : TableauTree} {Gamma : list Form},
+    forall {B : Branch} {T T0 T0' T' : TableauTree} {Gamma : Ctx},
       is_branch_of B T -> T0' <> Leaf ->
       expand_tableau_branch__aux (Some Gamma) None B T = Some T0 ->
-      replace_child (B ++ [Left]) T0 T0' = Some T' -> ~is_subbranch_of (B ++ [Right]) T'.
+      replace_child (B \rhd Left) T0 T0' = Some T' -> ~is_subbranch_of (B \rhd Right) T'.
   Proof using Type.
     intros ?????? hbranchof. revert T0 T0' T' Gamma; induction hbranchof;
       intros ???? ne hexpand erepl hbranchof'; cbn in *.
@@ -796,7 +925,7 @@ Section Tableaux.
   Qed.
 
   Lemma extend_function_symbols_value :
-    forall {B : Branch} {T T' : Tableau} {l l' : option (list Form)},
+    forall {B : Branch} {T T' : Tableau} {l l' : option Ctx},
       is_branch_of B T ->
       expand_tableau_branch__aux l l' B T = Some (tree T') ->
       function_symbols (get_all_formulas T') =
@@ -804,7 +933,7 @@ Section Tableaux.
   Proof using Type.
     intros ????? hbranchof; revert T' l l'; induction hbranchof; intros ??? e.
     - cbn in e; injection e => <-; cbn.
-      rewrite app_nil_r !fold_left_app.
+      rewrite !Ctx.union_emptyr. !fold_left_app.
       do 2 rewrite set_fold_left.
       destruct l, l'; try easy;
         cbn; rewrite !app_nil_r //.
@@ -861,7 +990,7 @@ Section Tableaux.
   Qed.
 
   Lemma extend_subset_preserves_function_symbols :
-    forall {B : Branch} {T T' : Tableau} (s : set_atom func) {l l' : option (list Form)},
+    forall {B : Branch} {T T' : Tableau} (s : set_atom func) {l l' : option Ctx},
       is_branch_of B T -> preserves_function_symbols T s ->
       to_set (symbols T) \subseteq to_set (symbols T') ->
       function_symbols l \subseteq s \union to_set (symbols T') ->
@@ -884,7 +1013,7 @@ Section Tableaux.
   (** An optional list of formulas is satisfied either if it is none or if the list is
       satisfied. *)
   Definition is_optional_satisfied
-    (M : Model pred func) (mu : env M var) (l : option (list Form)) :=
+    (M : Model pred func) (mu : env M var) (l : option Ctx) :=
     match l with
     | None => False
     | Some l => [[ M # [] # mu '|= ls_to_form l ]]
@@ -893,7 +1022,7 @@ Section Tableaux.
   (** If a satisfiable tableau is extended with lists of formulas of which one of them is also
       satisfied by the same model, then the extended tableau is also satisfiable. *)
   Lemma is_satisfiable_extend_gen :
-    forall (M M' : Model pred func) (T T' : Tableau) (B : Branch) (l l' : option (list Form))
+    forall (M M' : Model pred func) (T T' : Tableau) (B : Branch) (l l' : option Ctx)
       (mu' : env M' var) (f : env M' var -> env M var),
       is_branch_of B T -> expand_tableau_branch__aux l l' B T = Some (tree T') ->
       (forall (F : Form),
@@ -962,7 +1091,7 @@ Section Tableaux.
 
   Lemma is_satisfiable_extend :
     forall (M : Model pred func) (mu : env M var) (T T' : Tableau) (B : Branch)
-      (l l' : option (list Form)),
+      (l l' : option Ctx),
       is_branch_of B T -> expand_tableau_branch l l' B T = Some T' ->
       ([[ M # [] # mu '|= ls_to_form (get_context B T) ]] ->
        is_optional_satisfied M mu l \/ is_optional_satisfied M mu l') ->
@@ -1084,13 +1213,13 @@ Section ExpansionRules.
   (** A sequence is a tableau proof if there it is an expansion sequence s.t. the first
       tableau of the sequence has a simple node labelled by this list of formulas and the
       last is closed under a substitution [sigma]. *)
-  Definition is_tableau_proof (Gamma : list Form) (sigma : Substitution var Term) (s : Sequence sko) : Prop :=
+  Definition is_tableau_proof (Gamma : Ctx) (sigma : Substitution var Term) (s : Sequence sko) : Prop :=
     is_expansion_sequence s /\
       hd_error s = Some (mkTableau sko Gamma) /\
       is_tableau_closed (last s (mkLeaf sko)) sigma.
 
   (** A list of formulas have a tableau if there exists a sequence that is a tableau proof *)
-  Definition hasTableau (Gamma : list Form) (sigma : Substitution var Term) : Prop :=
+  Definition hasTableau (Gamma : Ctx) (sigma : Substitution var Term) : Prop :=
     exists (s : Sequence sko), is_tableau_proof Gamma sigma s.
 End ExpansionRules.
 
@@ -1111,7 +1240,7 @@ Section Soundness.
 
   (** First, we show that the last tableau of a proof cannot be satisfiable. *)
   Lemma hasTableau_not_satisfiable :
-    forall (M : Model pred func) (Gamma : list Form) (sigma : Substitution var Term) (s : Sequence sko),
+    forall (M : Model pred func) (Gamma : Ctx) (sigma : Substitution var Term) (s : Sequence sko),
       is_tableau_proof sko Gamma sigma s ->
       (forall (B : Branch),
           is_branch_of B (last s (mkLeaf sko)) ->
@@ -1217,7 +1346,7 @@ Section Soundness.
 
   (** This allows us to deduce the the soundness theorem. *)
   Theorem hasTableau_sound :
-    forall (sigma : Substitution var Term) (Gamma : list Form) (F : Form),
+    forall (sigma : Substitution var Term) (Gamma : Ctx) (F : Form),
       isClosed (Neg F :: Gamma) ->
       hasTableau sko (Neg F :: Gamma) sigma -> Gamma |= F.
   Proof using Type.
