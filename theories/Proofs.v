@@ -31,7 +31,7 @@ Module Type ICtx.
 
     Parameter empty : t.
     Parameter eq  : t -> t -> Prop.
-    Parameter from_list : list Form -> t.
+    Parameter mk : list Form -> t.
     Parameter fv : t -> set_atom var.
     Parameter existsb : (Form -> bool) -> t -> bool.
     Parameter mem : Form -> t -> bool.
@@ -42,6 +42,8 @@ Module Type ICtx.
     Parameter union : t -> t -> t.
     Parameter pr : t -> string.
     Parameter to_form : t -> Form.
+    Parameter GetFunctSymbols : @GetFunctSymbols func t.
+    Existing Instance GetFunctSymbols.
 
     Parameter mem_spec : forall (F : Form) (Gamma : t), mem F Gamma = true <-> In F Gamma.
     Parameter existsb_exists :
@@ -58,6 +60,20 @@ Module Type ICtx.
       forall (Gamma1 Gamma2 Gamma3 : t),
         union (union Gamma1 Gamma2) Gamma3 =
           union Gamma1 (union Gamma2 Gamma3).
+    Parameter funct_symbols_union :
+      forall (Gamma1 Gamma2 : t),
+        function_symbols (union Gamma1 Gamma2) =
+          function_symbols Gamma1 \union function_symbols Gamma2.
+    Parameter to_form_union :
+      forall (Gamma1 Gamma2 : t),
+        to_form (union Gamma1 Gamma2) \equiv Neg (Or (Neg (to_form Gamma1)) (Neg (to_form Gamma2))).
+    Parameter interp_form :
+      forall (Gamma : t) (M : Model pred func) (rho : list M) (sigma : env M var),
+        (forall F : Form, In F Gamma -> [[M # rho # sigma '|= F]]) ->
+        [[M # rho # sigma '|= to_form Gamma]].
+    Parameter in_interp :
+      forall {Gamma : t} {M : Model pred func} {rho : list M} {sigma : env M var} {F : Form},
+        [[M # rho # sigma '|= to_form Gamma]] -> In F Gamma -> [[M # rho # sigma '|= F]].
   End Def.
 End ICtx.
 
@@ -72,7 +88,8 @@ Module ListCtx <: ICtx.
     Definition t := t_.
     Definition empty := Mk [].
     Definition eq : t -> t -> Prop := eq.
-    Definition from_list (l : list Form) : t := Mk l.
+    Definition mk (l : list Form) : t := Mk l.
+
     Definition elements (Gamma : t) : list Form :=
       let 'Mk obj := Gamma in obj.
 
@@ -80,13 +97,15 @@ Module ListCtx <: ICtx.
     Definition existsb (pred : Form -> bool) (Gamma : t) : bool := List.existsb pred (elements Gamma).
     Definition mem (F : Form) (Gamma : t) : bool := list_mem F (elements Gamma).
     Definition In (F : Form) (Gamma : t) : Prop := List.In F (elements Gamma).
-    Definition singleton (F : Form) : t := from_list [F].
-    Definition add (F : Form) (Gamma : t) : t := from_list (F :: elements Gamma).
+    Definition singleton (F : Form) : t := mk [F].
+    Definition add (F : Form) (Gamma : t) : t := mk (F :: elements Gamma).
     Definition union (Gamma1 Gamma2 : t) : t :=
-      from_list (elements Gamma1 ++ elements Gamma2).
+      mk (elements Gamma1 ++ elements Gamma2).
     #[local] Open Scope string_scope.
     Definition pr : t -> string := fun _ => "Not yet implemented".
     Definition to_form (Gamma : t) := ls_to_form (elements Gamma).
+    Definition GetFunctSymbols : @GetFunctSymbols func t :=
+      fun Gamma => function_symbols (elements Gamma).
 
     Lemma mem_spec :
       forall (F : Form) (Gamma : t),
@@ -110,14 +129,14 @@ Module ListCtx <: ICtx.
     Lemma union_emptyr :
       forall (Gamma : t), union Gamma empty = Gamma.
     Proof using Type.
-      intros []; unfold empty; destruct empty; unfold union, from_list; cbn; f_equal;
+      intros []; unfold empty; destruct empty; unfold union, mk; cbn; f_equal;
         apply app_nil_r.
     Qed.
 
     Lemma union_emptyl :
       forall (Gamma : t), union empty Gamma = Gamma.
     Proof using Type.
-      intros []; unfold empty; destruct empty; unfold union, from_list; cbn; f_equal;
+      intros []; unfold empty; destruct empty; unfold union, mk; cbn; f_equal;
         apply app_nil_l.
     Qed.
 
@@ -128,13 +147,40 @@ Module ListCtx <: ICtx.
     Proof using Type.
       intros [Gamma1] [Gamma2] [Gamma3]; unfold union; cbn; f_equal; by rewrite app_assoc.
     Qed.
+
+    Existing Instance GetFunctSymbols.
+    Lemma funct_symbols_union :
+      forall (Gamma1 Gamma2 : t),
+        function_symbols (union Gamma1 Gamma2) =
+          function_symbols Gamma1 \union function_symbols Gamma2.
+    Proof using Type.
+      intros; cbn.
+      by rewrite fold_left_app set_fold_left.
+    Qed.
+
+    Lemma to_form_union :
+      forall (Gamma1 Gamma2 : t),
+        to_form (union Gamma1 Gamma2) \equiv Neg (Or (Neg (to_form Gamma1)) (Neg (to_form Gamma2))).
+    Proof using Type. intros; apply ls_to_form_app. Qed.
+
+    Lemma interp_form :
+      forall (Gamma : t) (M : Model pred func) (rho : list M) (sigma : env M var),
+        (forall F : Form, In F Gamma -> [[M # rho # sigma '|= F]]) ->
+        [[M # rho # sigma '|= to_form Gamma]].
+    Proof using Type. intros; by apply interp_form_list. Qed.
+
+    Lemma in_interp :
+      forall {Gamma : t} {M : Model pred func} {rho : list M} {sigma : env M var} {F : Form},
+        [[M # rho # sigma '|= to_form Gamma]] -> In F Gamma -> [[M # rho # sigma '|= F]].
+    Proof using Type. intros; eapply in_form_list_interp; eauto. Qed.
   End Def.
   #[global] Arguments t : clear implicits.
 End ListCtx.
 
 Module Ctx := ListCtx.
-Opaque Ctx.t Ctx.empty Ctx.eq Ctx.from_list Ctx.fv Ctx.existsb Ctx.mem Ctx.In Ctx.singleton
-  Ctx.add Ctx.elements Ctx.union Ctx.to_form.
+Opaque Ctx.t Ctx.empty Ctx.eq Ctx.mk Ctx.fv Ctx.existsb Ctx.mem Ctx.In Ctx.singleton
+  Ctx.add Ctx.elements Ctx.union Ctx.to_form Ctx.GetFunctSymbols.
+Existing Instance Ctx.GetFunctSymbols.
 Notation "F \in Gamma" := (Ctx.In F Gamma) (at level 30).
 
 #[global] Instance GetFunctSymbs_Ctx {pred func var : Atom} :
@@ -933,18 +979,13 @@ Section Tableaux.
   Proof using Type.
     intros ????? hbranchof; revert T' l l'; induction hbranchof; intros ??? e.
     - cbn in e; injection e => <-; cbn.
-      rewrite !Ctx.union_emptyr. !fold_left_app.
-      do 2 rewrite set_fold_left.
-      destruct l, l'; try easy;
-        cbn; rewrite !app_nil_r //.
-    - cbn in e. destruct (expand_tableau_branch__aux l l' B T1) eqn:hexpand; try easy.
+      rewrite !Ctx.union_emptyr !Ctx.funct_symbols_union.
+      destruct l, l'; cbn; by rewrite ?Ctx.union_emptyr ?empty_unitr.
+    - cbn in e; destruct (expand_tableau_branch__aux l l' B T1) eqn:hexpand; try easy.
       injection e => <-; cbn.
-      specialize (IHhbranchof {| tree := t; symbols := symbols T |} _ _ hexpand).
-      cbn in IHhbranchof.
-      rewrite !fold_left_app. apply set_ext; intro f; split; intro hin.
-      + do 2 rewrite set_fold_left.
-        do 2 rewrite set_fold_left in hin.
-        rewrite !union_spec in hin |- *.
+      specialize (IHhbranchof (mkTab t (symbols T)) _ _ hexpand); cbn in IHhbranchof.
+      rewrite !Ctx.funct_symbols_union. apply set_ext; intro f; split; intro hin.
+      + rewrite !union_spec in hin |- *.
         destruct hin as [ [ hG | ht ] | hT2 ].
         * now do 4 left.
         * rewrite IHhbranchof !union_spec in ht. destruct ht as [ [ hT1 | hl ] | hl' ].
@@ -952,9 +993,7 @@ Section Tableaux.
           -- now left; right.
           -- now right.
         * do 2 left; now right.
-      + do 2 rewrite set_fold_left.
-        do 2 rewrite set_fold_left in hin.
-        rewrite !union_spec in hin |- *.
+      + rewrite !union_spec in hin |- *.
         rewrite IHhbranchof !union_spec.
         destruct hin as [ [ [ [ hG | hT1 ] | hT2 ] | hl ] | hl' ].
         * now repeat left.
@@ -962,14 +1001,11 @@ Section Tableaux.
         * now right.
         * now left; right; left; right.
         * now left; repeat right.
-    - cbn in e. destruct (expand_tableau_branch__aux l l' B T2) eqn:hexpand; try easy.
+    - cbn in e; destruct (expand_tableau_branch__aux l l' B T2) eqn:hexpand; try easy.
       injection e => <-; cbn.
-      specialize (IHhbranchof {| tree := t; symbols := symbols T |} _ _ hexpand).
-      cbn in IHhbranchof.
-      rewrite !fold_left_app. apply set_ext; intro f; split; intro hin.
-      + do 2 rewrite set_fold_left.
-        do 2 rewrite set_fold_left in hin.
-        rewrite !union_spec in hin |- *.
+      specialize (IHhbranchof (mkTab t (symbols T)) _ _ hexpand); cbn in IHhbranchof.
+      rewrite !Ctx.funct_symbols_union. apply set_ext; intro f; split; intro hin.
+      + rewrite !union_spec in hin |- *.
         destruct hin as [ [ hG | ht ] | hT2 ].
         * now do 4 left.
         * do 3 left; now right.
@@ -977,9 +1013,7 @@ Section Tableaux.
           -- do 2 left; now right.
           -- left; now right.
           -- now right.
-      + do 2 rewrite set_fold_left.
-        do 2 rewrite set_fold_left in hin.
-        rewrite !union_spec in hin |- *.
+      + rewrite !union_spec in hin |- *.
         rewrite IHhbranchof !union_spec.
         destruct hin as [ [ [ [ hG | hT1 ] | hT2 ] | hl ] | hl' ].
         * now repeat left.
@@ -1016,7 +1050,7 @@ Section Tableaux.
     (M : Model pred func) (mu : env M var) (l : option Ctx) :=
     match l with
     | None => False
-    | Some l => [[ M # [] # mu '|= ls_to_form l ]]
+    | Some l => [[ M # [] # mu '|= Ctx.to_form l ]]
     end.
 
   (** If a satisfiable tableau is extended with lists of formulas of which one of them is also
@@ -1029,7 +1063,7 @@ Section Tableaux.
           F \in get_all_formulas T ->
           [[ M # [] # f mu' '|= F ]] ->
           [[ M' # [] # mu' '|= F ]]) ->
-      ([[ M # [] # (f mu') '|= ls_to_form (get_context B T) ]] ->
+      ([[ M # [] # (f mu') '|= Ctx.to_form (get_context B T) ]] ->
        is_optional_satisfied M' mu' l \/ is_optional_satisfied M' mu' l') ->
       (exists_satisfied_branch M (f mu') T) ->
       exists_satisfied_branch M' mu' T'.
@@ -1043,16 +1077,16 @@ Section Tableaux.
     - destruct (hsatlr hsatB) as [hsatl | hsatr].
 
       (* Case: the extension with the formulas on the left is satisfied. *)
-      + destruct l.
-        * exists (B0 ++ [Left]); split; cbn.
+      + destruct l as [l|].
+        * exists (B0 \rhd Left); split; cbn.
           -- destruct (expand_tableau_branch__aux (Some l) l' B0 T) eqn:eT.
              ++ eapply is_branch_of_extend_left; eauto.
                 injection e => <-; eauto.
              ++ inversion e.
           -- destruct (expand_tableau_branch__aux (Some l) l' B0 T) eqn:eT.
              ++ injection e => eT'. rewrite eT' in eT. erewrite get_context_extend_left; eauto.
-                cbn. unfold interpret; rewrite (ls_to_form_app l (get_context B0 T) M' [] mu').
-                cbn. intros [hl | hnB0]; auto. apply hnB0, interp_form_list.
+                cbn; unfold interpret; rewrite (Ctx.to_form_union l (get_context B0 T) M' [] mu').
+                cbn; intros [hl | hnB0]; auto. apply hnB0, Ctx.interp_form.
                 intros F hin; apply hcsv; auto.
                 ** eapply in_get_ctx_in_all_formulas; eauto.
                 ** apply (in_form_list_interp hin hsatB).
@@ -1060,8 +1094,8 @@ Section Tableaux.
         * now cbn in hsatl.
 
       (* Case: the extension with the formulas on the right is satisfied. *)
-      + destruct l'.
-        * exists (B0 ++ [Right]); split; cbn.
+      + destruct l' as [l0|].
+        * exists (B0 \rhd Right); split; cbn.
           -- destruct (expand_tableau_branch__aux l (Some l0) B0 T) eqn:eT.
              ++ eapply is_branch_of_extend_right; eauto.
                 injection e => <-; eauto.
@@ -1069,8 +1103,9 @@ Section Tableaux.
           -- destruct (expand_tableau_branch__aux l (Some l0) B0 T) eqn:eT.
              ++ injection e => eT'; rewrite eT' in eT.
                 erewrite get_context_extend_right; eauto.
-                cbn; unfold interpret. rewrite (ls_to_form_app l0 (get_context B0 T) M' [] mu').
-                cbn. intros [hl0 | hnB0]; auto. apply hnB0, interp_form_list.
+                cbn; unfold interpret.
+                rewrite (Ctx.to_form_union l0 (get_context B0 T) M' [] mu').
+                cbn; intros [hl0 | hnB0]; auto. apply hnB0, Ctx.interp_form.
                 intros F hin; apply hcsv; auto.
                 ** eapply in_get_ctx_in_all_formulas; eauto.
                 ** apply (in_form_list_interp hin hsatB).
@@ -1083,7 +1118,7 @@ Section Tableaux.
       + injection e => <-. exists B; split.
         * apply is_branch_of_extend_oth with (T := T) (B := B0) (l := l) (l' := l'); auto.
         * cbn in *. rewrite -(get_context_extend_oth T t B0 B l l' hbranchof hbranchB); try easy.
-          apply interp_form_list; intros F hin; apply hcsv.
+          apply Ctx.interp_form; intros F hin; apply hcsv.
           -- eapply in_get_ctx_in_all_formulas; eauto.
           -- apply (in_form_list_interp hin hsatB).
       + inversion e.
@@ -1093,7 +1128,7 @@ Section Tableaux.
     forall (M : Model pred func) (mu : env M var) (T T' : Tableau) (B : Branch)
       (l l' : option Ctx),
       is_branch_of B T -> expand_tableau_branch l l' B T = Some T' ->
-      ([[ M # [] # mu '|= ls_to_form (get_context B T) ]] ->
+      ([[ M # [] # mu '|= Ctx.to_form (get_context B T) ]] ->
        is_optional_satisfied M mu l \/ is_optional_satisfied M mu l') ->
       exists_satisfied_branch M mu T -> exists_satisfied_branch M mu T'.
   Proof using Type.
@@ -1110,9 +1145,9 @@ Section Tableaux.
     intros ??? hbranchof honbranch. induction honbranch.
     - destruct B; cbn in *.
       + inversion hbranchof; now subst.
-      + destruct b; apply in_or_app; now right.
-    - cbn. apply in_or_app; left. apply IHhonbranch. now inversion hbranchof.
-    - cbn. apply in_or_app; left. apply IHhonbranch. now inversion hbranchof.
+      + destruct b; apply Ctx.in_or_union; now right.
+    - cbn. apply Ctx.in_or_union; left. apply IHhonbranch. now inversion hbranchof.
+    - cbn. apply Ctx.in_or_union; left. apply IHhonbranch. now inversion hbranchof.
   Qed.
 
   Lemma in_context_is_on_branch :
@@ -1121,21 +1156,21 @@ Section Tableaux.
   Proof using Type.
     intros ??? hbranchof hin. induction hbranchof.
     - now apply is_on_branch_node.
-    - cbn in hin; apply in_app_or in hin; destruct hin as [ hT1 | hG ].
+    - cbn in hin; apply Ctx.in_or_union in hin; destruct hin as [ hT1 | hG ].
       + now apply is_on_branch_left, IHhbranchof.
       + now apply is_on_branch_node.
-    - cbn in hin; apply in_app_or in hin; destruct hin as [ hT2 | hG ].
+    - cbn in hin; apply Ctx.in_or_union in hin; destruct hin as [ hT2 | hG ].
       + now apply is_on_branch_right, IHhbranchof.
       + now apply is_on_branch_node.
   Qed.
 
   Lemma is_on_satisfiable_branch :
     forall {T : Tableau} {B : Branch} {F : Form} {M : Model pred func} {mu : env M var},
-      is_branch_of B T -> is_on_branch F B T -> [[ M # [] # mu '|= ls_to_form (get_context B T) ]] ->
+      is_branch_of B T -> is_on_branch F B T -> [[ M # [] # mu '|= Ctx.to_form (get_context B T) ]] ->
       [[ M # [] # mu '|= F ]].
   Proof using Type.
     intros ????? hbranchof honbranch hsat.
-    have h := in_form_list_interp _ hsat.
+    have h := Ctx.in_interp hsat.
     apply h, is_on_branch_in_context; auto.
   Qed.
 End Tableaux.
@@ -1163,29 +1198,31 @@ Section ExpansionRules.
   | expansion_NegNeg :
     forall (T T' : Tableau) (B : Branch) (F : Form),
       is_branch_of B T -> is_on_branch (Neg (Neg F)) B T ->
-      expand_tableau_branch sko (Some [F]) None B T = Some T' -> T |> T'
+      expand_tableau_branch sko (Some (Ctx.singleton F)) None B T = Some T' -> T |> T'
 
   | expansion_NegOr :
     forall (T T' : Tableau) (B : Branch) (F1 F2 : Form),
       is_branch_of B T -> is_on_branch (Neg (Or F1 F2)) B T ->
-      expand_tableau_branch sko (Some [Neg F1 ; Neg F2]) None B T = Some T' -> T |> T'
+      expand_tableau_branch sko (Some (Ctx.mk [Neg F1 ; Neg F2])) None B T = Some T' -> T |> T'
 
   | expansion_Or :
     forall (T T' : Tableau) (B : Branch) (F1 F2 : Form),
       is_branch_of B T -> is_on_branch (Or F1 F2) B T ->
-      expand_tableau_branch sko (Some [F1]) (Some [F2]) B T = Some T' -> T |> T'
+      expand_tableau_branch sko (Some (Ctx.singleton F1)) (Some (Ctx.singleton F2)) B T =
+        Some T' -> T |> T'
 
   | expansion_All :
     forall (T T' : Tableau) (B : Branch) (F : Form) (x : var),
       is_branch_of B T -> is_on_branch (All F) B T ->
-      expand_tableau_branch sko (Some [F{0 \to Free x}]) None B T = Some T' -> T |> T'
+      expand_tableau_branch sko (Some (Ctx.singleton F{0 \to Free x})) None B T = Some T' ->
+      T |> T'
 
   | expansion_NegAll :
     forall (T T' : Tableau) (B : Branch) (F : Form) (t : Term)
       (hsko : sko t (Neg (All F)) (symbols T) (fv (get_context B T))
                 (function_symbols (get_all_formulas T)) = true),
       is_branch_of B T -> is_on_branch (Neg (All F)) B T ->
-      expand_tableau_branch__aux (Some [Neg F{0 \to t}]) None B T = Some (tree T') ->
+      expand_tableau_branch__aux (Some (Ctx.singleton (Neg F{0 \to t}))) None B T = Some (tree T') ->
       symbols T' = add_symbol (symbol sko hsko) (Neg (All F)) (symbols T) ->
       T |> T'
   where "T |> T'" := (ExpansionStep T T').
