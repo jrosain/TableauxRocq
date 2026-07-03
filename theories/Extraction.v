@@ -2,7 +2,8 @@ From Tableaux Require Import Core.
 From Tableaux Require Import Checker.
 
 Extraction Language OCaml.
-Set Extraction Output Directory "../checker/lib/".
+(* Set Extraction Output Directory "../checker/lib/". *)
+Set Extraction Output Directory "checker/lib/".
 
 (** ** Extraction for constants and basic inductives *)
 From Stdlib Require Import ExtrOcamlBasic.

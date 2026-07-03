@@ -17,6 +17,7 @@
         pkgs.callPackage ./devtools/rocq-tableaux.nix {
           mkRocqDerivation = pkgs.rocqPackages.mkRocqDerivation;
         };
+      tableaux-checker = pkgs.callPackage ./devtools/tableaux-checker.nix {};
     });
 
     devShells = forAllSystems (system: pkgs:

@@ -24,5 +24,7 @@ theories/SkolemizationInstances.v
 theories/Syntax.v
 theories/SyntaxInstance.v
 
+theories/Extraction.v
+
 examples/drinker.v
 examples/branching.v

@@ -20,6 +20,7 @@ pkgs.mkShell {
     # Packages for building the extraction
     ocaml
     dune_3
+    pkgs.ocamlPackages.menhir
   ]) ++ (lib.optionals withOCamlDev [
     # Packages for developing the non-critical OCaml code
     pkgs.ocamlPackages.ocaml-lsp
@@ -27,6 +28,5 @@ pkgs.mkShell {
     pkgs.ocamlPackages.ocp-indent
     pkgs.ocamlPackages.ocp-index
     pkgs.ocamlPackages.merlin
-    pkgs.ocamlPackages.menhir
   ]);
 }
