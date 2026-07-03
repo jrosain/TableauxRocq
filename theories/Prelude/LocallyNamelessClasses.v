@@ -28,11 +28,11 @@ Section Substitution.
   Definition isLocallyClosed {A : Type} `{BV A} (x : A) :=
     is_empty (bv x).
 
-  Class Substitution (X : Atom) (A : Type) `{BV A} :=
+  Class Substitution (X : Type) `{isAtom X} (A : Type) `{BV A} :=
     { subst :> X -> A
     ; isSubst : forall (x : X), isLocallyClosed (subst x) }.
 
-  Class Subst {X : Atom} (A B : Type) `{BV B} :=
+  Class Subst {X : Type} `{isAtom X} (A B : Type) `{BV B} :=
     substitute : A -> Substitution X B -> A.
   Arguments substitute {_ _ _ _ _} _ _.
 End Substitution.
@@ -55,7 +55,7 @@ End BVInstances.
 Section SubstInstances.
   Context `{set_nat : set nat}.
 
-  #[global] Instance subst_list {X : Atom} {A B : Type} `{H : BV B} `{Subst X A B} :
+  #[global] Instance subst_list {X : Type} `{isAtom X} {A B : Type} `{H : BV B} `{Subst X A B} :
     Subst (list A) B :=
     fun xs sigma =>
       (fix F (xs : list A) : list A :=
@@ -67,7 +67,7 @@ End SubstInstances.
 
 (** ** Free variable and free-variable closedness *)
 Section FreeVariables.
-  Context {var : Atom}.
+  Context {var : Type} `{isAtom var}.
 
   Let set_var := set_atom var.
 
@@ -80,11 +80,11 @@ End FreeVariables.
 
 (** ** Further free instances of [FV]. *)
 Section FVInstances.
-  Context {var : Atom}.
+  Context {var : Type} `{isAtom var}.
 
   Let set_var := set_atom var.
 
-  #[global] Instance fv_list {A : Type} `{@FV var A} : @FV var (list A) :=
+  #[global] Instance fv_list {A : Type} `{!FV A} : FV (list A) :=
     fix F (xs : list A) : set_var :=
       match xs with
       | [] => empty_set
@@ -92,7 +92,7 @@ Section FVInstances.
       end.
 
   Lemma fv_list_in :
-    forall {A : Type} `{@FV var A} (x : A) (l : list A),
+    forall {A : Type} `{!FV A} (x : A) (l : list A),
       List.In x l -> fv l = fv (x :: l).
   Proof using Type.
     intros ???? hin; induction l as [|y ys IHys]; inversion hin.

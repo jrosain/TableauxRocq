@@ -20,6 +20,9 @@ Axiom prodext :
     (forall x : A, P x = Q x) ->
     (forall x : A, P x) = (forall x : A, Q x).
 
+(** ** Tactics *)
+Ltac tca := typeclasses eauto 10.
+
 (** ** Rocq's default behaviour *)
 
 (** Make the usage of bullets mandatory. *)

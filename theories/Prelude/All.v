@@ -1,9 +1,4 @@
-(** * Prelude.All: get everything defined in the prelude. *)
+(** * Prelude.Core: everything defined in the prelude, including instances. *)
 
-From Tableaux Require Export Prelude.Init.
-From Tableaux Require Export Prelude.Classes.
-From Tableaux Require Export Prelude.Ind.
-From Tableaux Require Export Prelude.Sets.
-From Tableaux Require Export Prelude.Utils.
-From Tableaux Require Export Prelude.Atoms.
-From Tableaux Require Export Prelude.LocallyNamelessClasses.
+From Tableaux Require Export Prelude.Core.
+From Tableaux Require Export Prelude.AtomInstances.

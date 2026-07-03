@@ -17,7 +17,8 @@ Notation "x \in l" := (List.In x l) (at level 30).
 
 (** ** Tableaux *)
 Section Tableaux.
-  Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
+  Context `{set_nat : set nat} {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var}
+    (sko : Skolemization_ pred func var).
 
   Let Form := Form pred func var.
 
@@ -197,10 +198,10 @@ Section Tableaux.
     - injection e => eT; rewrite -eT in hbranchof'; inversion hbranchof'.
     - destruct (expand_tableau_branch__aux (Some l) l' B T1) eqn:eT'; try easy.
       injection e => eT; rewrite -eT in hbranchof'; inversion hbranchof'; subst.
-      now specialize (IHhbranchof t eq_refl H1).
+      now specialize (IHhbranchof t eq_refl H4).
     -  destruct (expand_tableau_branch__aux (Some l) l' B T2) eqn:eT'; try easy.
       injection e => eT; rewrite -eT in hbranchof'; inversion hbranchof'; subst.
-      now specialize (IHhbranchof t eq_refl H1).
+      now specialize (IHhbranchof t eq_refl H4).
   Qed.
 
   Lemma is_branch_of_extend_right :
@@ -241,28 +242,28 @@ Section Tableaux.
     intros ????. revert T T' B'. induction B as [|b B IHB];
       intros ????? hbranchof' hbranchof n e;  destruct B' as [|b' B'].
     - easy.
-    - inversion hbranchof; subst; inversion hbranchof'; inversion H0.
-    - inversion hbranchof'; subst; inversion hbranchof; inversion H0.
+    - inversion hbranchof; subst; inversion hbranchof'; inversion H3.
+    - inversion hbranchof'; subst; inversion hbranchof; inversion H3.
     - destruct b.
       + inversion hbranchof. destruct (expand_tableau_branch__aux l l' B T1) eqn:e1.
-        * erewrite <-H1, expand_tableau_branch_left in e; eauto. destruct b'.
+        * erewrite <-H4, expand_tableau_branch_left in e; eauto. destruct b'.
           -- injection e => <-. apply is_branch_of_left. eapply IHB; eauto.
              ++ inversion hbranchof'; subst; auto.
-                injection H4 => _ _ <- //.
+                injection H7 => _ _ <- //.
              ++ congruence.
-          -- rewrite -H1 in hbranchof'. inversion hbranchof'; subst.
+          -- rewrite -H4 in hbranchof'. inversion hbranchof'; subst.
              injection e => <-. now apply is_branch_of_right.
-        * cbn in e. destruct T; try easy. injection H1 => _ _ eT1. rewrite eT1 in e1.
+        * cbn in e. destruct T; try easy. injection H4 => _ _ eT1. rewrite eT1 in e1.
           rewrite e1 in e. inversion e.
       + inversion hbranchof. destruct (expand_tableau_branch__aux l l' B T2) eqn:e2.
-        * erewrite <- H1, expand_tableau_branch_right in e; eauto. destruct b'.
-          -- rewrite -H1 in hbranchof'. inversion hbranchof'; subst.
+        * erewrite <- H4, expand_tableau_branch_right in e; eauto. destruct b'.
+          -- rewrite -H4 in hbranchof'. inversion hbranchof'; subst.
              injection e => <-. now apply is_branch_of_left.
           -- injection e => <-. apply is_branch_of_right. eapply IHB; eauto.
              ++ inversion hbranchof'; subst; auto.
-                injection H4 => <- _ _ //.
+                injection H7 => <- _ _ //.
              ++ congruence.
-        * cbn in e. destruct T; try easy. injection H1 => eT2 _ _. rewrite eT2 in e2.
+        * cbn in e. destruct T; try easy. injection H4 => eT2 _ _. rewrite eT2 in e2.
           rewrite e2 in e. inversion e.
   Qed.
 
@@ -433,13 +434,13 @@ Section Tableaux.
         destruct (replace_child _ _ _) eqn:erepl0; try easy.
         inversion hbranchof; subst.
         injection erepl => eT2 eG et; subst.
-        specialize (IHB0 B' b b' T1 T' T3 H0 ne erepl0).
+        specialize (IHB0 B' b b' T1 T' T3 H3 ne erepl0).
         now constructor.
       + destruct T; try easy.
         destruct (replace_child _ _ _) eqn:erepl0; try easy.
         inversion hbranchof; subst.
         injection erepl => eT2 eG et; subst.
-        specialize (IHB0 B' b b' T2 T' T4 H0 ne erepl0).
+        specialize (IHB0 B' b b' T2 T' T4 H3 ne erepl0).
         now constructor.
   Qed.
 
@@ -617,8 +618,8 @@ Section Tableaux.
     intros ?? B. revert T T'. induction B as [|b B IHB]; intros ????? hbranchof hbranchof' n e;
       destruct B' as [|b' B'].
     - easy.
-    - inversion hbranchof; subst. inversion hbranchof'; subst; inversion H0.
-    - inversion hbranchof'; subst. inversion hbranchof; subst; inversion H0.
+    - inversion hbranchof; subst. inversion hbranchof'; subst; inversion H3.
+    - inversion hbranchof'; subst. inversion hbranchof; subst; inversion H3.
     - destruct b, b'; cbn.
       + inversion hbranchof; subst.
         destruct (expand_tableau_branch__aux l l' B T1) eqn:e1.
@@ -736,7 +737,7 @@ Section Tableaux.
         destruct (replace_child (B ++ [Right]) _ _) eqn:erepl2; try easy.
         inversion hbranchof'; subst.
         inversion hbranchof; subst.
-        specialize (IHB T3 t T0' T1_1 T1' t1 Gamma1 Gamma2 H2 hnleaf0 hnleaf1 hexpand1).
+        specialize (IHB T3 t T0' T1_1 T1' t1 Gamma1 Gamma2 H5 hnleaf0 hnleaf1 hexpand1).
         apply IHB; auto.
         * injection hexpand => _ _ ->.
           injection hrepl1 => _ _ <- //.
@@ -747,7 +748,7 @@ Section Tableaux.
         destruct (replace_child (B ++ [Right]) _ _) eqn:erepl2; try easy.
         inversion hbranchof'; subst.
         inversion hbranchof; subst.
-        specialize (IHB T4 t T0' t0 T1' t1 Gamma1 Gamma2 H2 hnleaf0 hnleaf1 hexpand1).
+        specialize (IHB T4 t T0' t0 T1' t1 Gamma1 Gamma2 H5 hnleaf0 hnleaf1 hexpand1).
         apply IHB; auto.
         * injection hexpand => -> //.
         * injection hrepl1 => -> //.
@@ -765,7 +766,7 @@ Section Tableaux.
 
     - injection hexpand => eT0; subst.
       injection erepl => eT'; subst. inversion hbranchof'; subst.
-      inversion H1.
+      inversion H4.
 
     - destruct T0; try easy.
       destruct (expand_tableau_branch__aux _ _ _ _) eqn:hexpand1; try easy.
@@ -1011,19 +1012,20 @@ Section Tableaux.
   Qed.
 End Tableaux.
 
-Arguments tree {_ _ _ _}.
-Arguments symbols {_ _ _ _}.
-Arguments is_tableau_closed {_ _ _ _ _} _ _.
-Arguments is_tableau_satisfiable {_ _ _ _} _.
-Arguments exists_satisfied_branch {_ _ _ _} _ _ _.
-Arguments preserves_function_symbols {_ _ _ _} _ _.
+Arguments tree {_ _ _ _ _ _ _}.
+Arguments symbols {_ _ _ _ _ _ _}.
+Arguments is_tableau_closed {_ _ _ _ _ _ _ _} _ _.
+Arguments is_tableau_satisfiable {_ _ _ _ _ _ _} _.
+Arguments exists_satisfied_branch {_ _ _ _ _ _ _} _ _ _.
+Arguments preserves_function_symbols {_ _ _ _ _ _ _} _ _.
 
 (** ** Expansion rules *)
 
 (** We denote [T |> T'] when a [Tableau] [T] can be expanded to a tableau [T']. *)
 Reserved Notation "T |> T'" (at level 30, right associativity).
 Section ExpansionRules.
-  Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
+  Context `{set_nat : set nat} {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var}
+    (sko : Skolemization_ pred func var).
 
   Let Term := Term func var.
   Let Form := Form pred func var.
@@ -1094,8 +1096,8 @@ Section ExpansionRules.
     exists (s : Sequence sko), is_tableau_proof Gamma sigma s.
 End ExpansionRules.
 
-Arguments ExpansionStep {_ _ _ _} _ _.
-Arguments is_expansion_sequence {_ _ _ _} _.
+Arguments ExpansionStep {_ _ _ _ _ _ _} _ _.
+Arguments is_expansion_sequence {_ _ _ _ _ _ _} _.
 Notation "T |> T'" := (ExpansionStep T T').
 
 (** ** Soundness *)
@@ -1103,7 +1105,8 @@ Notation "T |> T'" := (ExpansionStep T T').
 (** In this section, we show that this definition of tableaux is sound, i.e., if list of formulas
     [Neg F :: Gamma] has a tableau, then [Gamma |= F]. *)
 Section Soundness.
-  Context `{set_nat : set nat} {pred func var : Atom} (sko : Skolemization_ pred func var).
+  Context `{set_nat : set nat} {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var}
+    (sko : Skolemization_ pred func var).
 
   Let Term := Term func var.
   Let Form := Form pred func var.
@@ -1148,7 +1151,7 @@ Section Soundness.
     - destruct hsat as (M & hsat). exists M; intro mu. specialize (hsat mu).
       eapply is_satisfiable_extend; eauto. left.
       intros [hnF | contra].
-      + now apply (is_on_satisfiable_branch sko hbranchof hcontains H).
+      + now apply (is_on_satisfiable_branch sko hbranchof hcontains H2).
       + cbn in contra; apply contra; now intro.
 
     (* Case: [Neg (Or F1 F2)] *)
@@ -1156,10 +1159,10 @@ Section Soundness.
       eapply is_satisfiable_extend; eauto. left.
       intros [hF1 | hnnF ].
       + apply hF1; intro.
-        apply (is_on_satisfiable_branch sko hbranchof hcontains H); now left.
+        apply (is_on_satisfiable_branch sko hbranchof hcontains H2); now left.
       + apply hnnF; intros [hF2 | contra].
         * apply hF2; intro.
-          apply (is_on_satisfiable_branch sko hbranchof hcontains H); now right.
+          apply (is_on_satisfiable_branch sko hbranchof hcontains H2); now right.
         * apply contra. now intro.
 
     (* Case: [Or F1 F2] *)
@@ -1173,7 +1176,7 @@ Section Soundness.
     - destruct hsat as (M & hsat). exists M; intro mu. specialize (hsat mu).
       eapply is_satisfiable_extend; eauto. left.
       intros [hnF | contra].
-      + have hall := is_on_satisfiable_branch sko hbranchof hcontains H.
+      + have hall := is_on_satisfiable_branch sko hbranchof hcontains H2.
         apply hnF, instantiate_imply_all; auto.
         now cbn.
       + cbn in contra; apply contra; now intro.
@@ -1268,12 +1271,6 @@ Section Soundness.
     apply hnsat. rewrite elast //.
   Qed.
 End Soundness.
-
-Module ConcreteProofInstances.
-  Export ConcreteSkolemizationInstances.
-
-  Definition Tableau := @Tableau string string string.
-End ConcreteProofInstances.
 
 (** Exposing tactics to simplify manipulation of trees. *)
 Module TreeTactics.
@@ -1375,3 +1372,5 @@ Module TreeTactics.
     | _ => fail 0 "Cannot infer replacement infos in this context: no is_branch_of in the context"
     end.
 End TreeTactics.
+
+(** Instance of the proof types with strings can be found in [ProofInstance.v] *)

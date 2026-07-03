@@ -1,6 +1,14 @@
 # Created by https://www.toptal.com/developers/gitignore/api/coq,emacs
 # Edit at https://www.toptal.com/developers/gitignore?templates=coq,emacs
 
+checker/_build
+checker/lib/*
+!checker/lib/prelude.ml*
+!checker/lib/grammar.ml*
+!checker/lib/parser.mly
+!checker/lib/lexer.mll
+!checker/lib/printer.ml*
+
 _opam
 .direnv
 

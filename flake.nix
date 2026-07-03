@@ -20,6 +20,6 @@
     });
 
     devShells = forAllSystems (system: pkgs:
-      { default = import ./shell.nix { pkgs = pkgs; }; });
+      { default = import ./shell.nix { lib = pkgs.lib; pkgs = pkgs; }; });
   };
 }

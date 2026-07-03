@@ -2,10 +2,13 @@
 
 theories/Prelude/All.v
 theories/Prelude/Atoms.v
+theories/Prelude/AtomInstances.v
 theories/Prelude/Classes.v
+theories/Prelude/Core.v
 theories/Prelude/Ind.v
 theories/Prelude/Init.v
 theories/Prelude/Sets.v
+theories/Prelude/SetInstances.v
 theories/Prelude/Utils.v
 theories/Prelude/LocallyNamelessClasses.v
 
@@ -14,9 +17,12 @@ theories/Checker.v
 theories/Core.v
 theories/ExtendedSyntax.v
 theories/Proofs.v
+theories/ProofInstance.v
 theories/Semantics.v
 theories/Skolemization.v
+theories/SkolemizationInstances.v
 theories/Syntax.v
+theories/SyntaxInstance.v
 
 examples/drinker.v
 examples/branching.v

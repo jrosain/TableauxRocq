@@ -1,6 +1,6 @@
 (** * Skolemization: a generic class for Skolemization *)
 
-From Tableaux Require Import Prelude.All.
+From Tableaux Require Import Prelude.Core.
 From Tableaux Require Import Syntax.
 From Tableaux Require Import Semantics.
 
@@ -9,7 +9,7 @@ From Tableaux Require Import Semantics.
     follow. The goal is to be able to be Skolemization-independent in the definition of
     tableaux and make it work seamlessly for different instances of this class. *)
 Section SkolemizationDef.
-  Context {pred func var : Atom}.
+  Context {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var}.
 
   Let set_var := set_atom var.
   Let set_func := set_atom func.
@@ -147,15 +147,16 @@ End SkolemizationDef.
 Coercion specs : SkoRecord >-> SkoRecordSpecs.
 Coercion is_skolemization : Skolemization_ >-> isSkolemization.
 
-Arguments SkoRecordData : clear implicits.
-Arguments SkoRecord : clear implicits.
+Arguments SkoRecordData _ _ _ {_ _ _}.
+Arguments SkoRecord _ _ _ {_ _ _}.
 
-Arguments SkolemizationData : clear implicits.
-Arguments Skolemization_ : clear implicits.
-Arguments sko_record {_ _ _} _.
+Arguments SkolemizationData _ _ _ {_ _ _}.
+Arguments Skolemization_ _ _ _ {_ _ _}.
+Arguments sko_record {_ _ _ _ _ _} _.
 
 Section SkoSymbolLemmas.
-  Context {pred func var : Atom} {record : SkoRecord pred func var}.
+  Context {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var}
+    {record : SkoRecord pred func var}.
 
   Let Term := Term func var.
   Let Form := Form pred func var.
@@ -185,7 +186,8 @@ Section SkoSymbolLemmas.
 End SkoSymbolLemmas.
 
 Section SkoDefs.
-  Context {pred func var : Atom} (sko : Skolemization_ pred func var).
+  Context {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var}
+    (sko : Skolemization_ pred func var).
 
   Let Term := Term func var.
   Let Form := Form pred func var.
@@ -213,7 +215,7 @@ Section SkoDefs.
     specialize (hfree sko). injection h => el _.
     have hfree' : forall t : Syntax.Term func var, List.In t l -> exists x : var, t = Free x.
     { intros; apply hfree. now destruct el. }
-    clear hfree el h hsko func_symbols fvs symbs F a.
+    clear hfree el h hsko func_symbols fvs symbs F f.
     induction l as [|v vs IHvs]; auto.
     cbn; rewrite set_fold_left empty_unitl -IHvs.
     - intros; apply hfree'. now right.
@@ -250,7 +252,7 @@ End SkoDefs.
 
 (** ** Some classic instances *)
 Section SkolemizationInstances.
-  Context {pred func var : Atom}.
+  Context {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var} `{set_nat : set nat}.
 
   Let set_var := set_atom var.
   Let set_func := set_atom func.
@@ -416,15 +418,15 @@ Section SkolemizationInstances.
     intros ??????. set largs := args OuterSkolemizationData hsko.
     destruct t; try inversion hsko; cbn in hsko.
     have eargs : largs = l by reflexivity. rewrite eargs.
-    have [ _ [ _ [ _ hargs ] ] ] := OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H0.
-    clear largs eargs H0 hsko.
+    have [ _ [ _ [ _ hargs ] ] ] := OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H3.
+    clear largs eargs H3 hsko.
     induction l as [|t ts IHts].
     - now exists [].
     - have ht := hargs t ltac:(now left).
       destruct ht as (x & e).
-      have H : forall t, List.In t ts -> exists x : var, t = Free x.
+      have h : forall t, List.In t ts -> exists x : var, t = Free x.
       { intros; apply hargs. now right. }
-      specialize (IHts H). destruct IHts as (l0 & el0).
+      specialize (IHts h). destruct IHts as (l0 & el0).
       exists (x :: l0); cbn. rewrite e el0 //.
   Qed.
 
@@ -469,7 +471,7 @@ Section SkolemizationInstances.
 
   Lemma isSkolemization_OuterSkolemizationData :
     isSkolemization OuterSkolemizationData.
-  Proof using Type.
+  Proof using set_nat.
     constructor.
     - apply OuterSkolemization_isFunc.
     - intros ??????? hin. destruct t; try easy.
@@ -494,18 +496,18 @@ Section SkolemizationInstances.
       cbn in el0. rewrite el0.
       exists (replace_interp_func M F (symbol OuterSkolemizationData hsko) l0); split.
       + intros mu hdelta; apply satisfies_opening_with_sko; auto.
-        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H0) as (_ & hfvs & e & _).
+        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H3) as (_ & hfvs & e & _).
           intros x hin; specialize (hfvs x hin). rewrite -e in hfvs. rewrite el0 in hfvs.
-          clear hsko e H0 el0; induction l0 as [|v vs IHvs].
+          clear hsko e H3 el0; induction l0 as [|v vs IHvs].
           -- now apply empty_spec in hfvs.
           -- cbn; rewrite union_spec. cbn in hfvs; rewrite union_spec in hfvs.
              destruct hfvs.
              ++ now left.
              ++ right; now apply IHvs.
-        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H0) as (hnin & _ & _).
+        * destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H3) as (hnin & _ & _).
           intro hin; now apply hnin, hdelta.
       + intros G mu hG. unfold interpret; rewrite no_skolem_same_interp_form; auto.
-        destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H0) as (hnin & _ & _); cbn.
+        destruct (OuterSkolemization_is_sko_pred_sound _ _ _ _ _ H3) as (hnin & _ & _); cbn.
         intro hin; now apply hnin, hG.
   Qed.
 
@@ -563,15 +565,15 @@ Section SkolemizationInstances.
     intros ??????. set largs := args InnerSkolemizationData hsko.
     destruct t; try inversion hsko; cbn in hsko.
     have eargs : largs = l by reflexivity. rewrite eargs.
-    have [ _ [ _ hargs ] ] := InnerSkolemization_is_sko_pred_sound _ _ _ _ H0.
-    clear largs eargs H0 hsko.
+    have [ _ [ _ hargs ] ] := InnerSkolemization_is_sko_pred_sound _ _ _ _ H3.
+    clear largs eargs H3 hsko.
     induction l as [|t ts IHts].
     - now exists [].
     - have ht := hargs t ltac:(now left).
       destruct ht as (x & e).
-      have H : forall t, List.In t ts -> exists x : var, t = Free x.
+      have h : forall t, List.In t ts -> exists x : var, t = Free x.
       { intros; apply hargs. now right. }
-      specialize (IHts H). destruct IHts as (l0 & el0).
+      specialize (IHts h). destruct IHts as (l0 & el0).
       exists (x :: l0); cbn. rewrite e el0 //.
   Qed.
 
@@ -616,7 +618,7 @@ Section SkolemizationInstances.
 
   Lemma isSkolemization_InnerSkolemizationData :
     isSkolemization InnerSkolemizationData.
-  Proof using Type.
+  Proof using set_nat.
     constructor.
     - apply InnerSkolemization_isFunc.
     - intros ??????? hin. destruct t; try easy.
@@ -637,7 +639,7 @@ Section SkolemizationInstances.
       cbn in el0. rewrite el0.
       exists (replace_interp_func M F (symbol InnerSkolemizationData hsko) l0); split.
       + intros mu hdelta; apply satisfies_opening_with_sko; auto.
-        * destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (_ & e & _).
+        * destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H3) as (_ & e & _).
           rewrite el0 in e; cbn in e. rewrite -e.
           clear. induction l0 as [|v vs IHvs].
           -- now intros x hin%empty_spec.
@@ -645,10 +647,10 @@ Section SkolemizationInstances.
              destruct hin.
              ++ now left.
              ++ right; now apply IHvs.
-        * destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _).
+        * destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H3) as (hnin & _ & _).
           intro hin; now apply hnin, hdelta.
       + intros G mu hG. unfold interpret; rewrite no_skolem_same_interp_form; auto.
-        destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H0) as (hnin & _ & _); cbn.
+        destruct (InnerSkolemization_is_sko_pred_sound _ _ _ _ H3) as (hnin & _ & _); cbn.
         intro hin. now apply hnin, hG.
   Qed.
 
@@ -660,8 +662,4 @@ Section SkolemizationInstances.
   Defined.
 End SkolemizationInstances.
 
-Module ConcreteSkolemizationInstances.
-  Export ConcreteSyntaxInstances.
-
-  Definition Skolemization := Skolemization_ string string string.
-End ConcreteSkolemizationInstances.
+(** Instances of Skolemization with the concrete syntax can be found in [SkolemizationInstances.v]. *)

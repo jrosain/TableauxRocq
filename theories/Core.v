@@ -1,4 +1,4 @@
-From Tableaux Require Export Prelude.All.
+From Tableaux Require Export Prelude.Core.
 From Tableaux Require Export Proofs.
 From Tableaux Require Export Semantics.
 From Tableaux Require Export Skolemization.
