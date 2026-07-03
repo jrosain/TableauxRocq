@@ -12,23 +12,39 @@ proofs in Rocq, and (ii) outputing *optimized* tableaux proofs for fast certific
 
 ### Requirements
 
-This project can be compiled with Rocq 9.0.1 together with Rocq's latest stdlib release.
-There are two ways of installing it.
+This project depends on Rocq. It is compiled using Rocq 9.1.1 in the CI, but is compatible
+with the following versions of Rocq:
+- `rocq-core 9.0.0` with `rocq-stdlib 9.0.0`
+- `rocq-core 9.0.1` with `rocq-stdlib 9.0.0`
+- `rocq-core 9.1.0` with `rocq-stdlib 9.1.0`
+- `rocq-core 9.1.1` with `rocq-stdlib 9.1.0`
+There are two ways of compiling the project.
 
 #### Nix Installation (recommended)
 
-A fully-reproducible setup is achieved using a `shell.nix` file and a pinned version of
-`nixpkgs`. We ensure that the project always compiles under this version of Rocq. Hence,
-one simply needs to input `nix-shell` to fetch and install the right version of Rocq.
+A fully-reproducible setup is achieved using `flake.nix` and `shell.nix` files and a
+pinned version of `nixpkgs`. We ensure that the project always compiles under this pinned
+version of Rocq. One simply needs to use `nix-shell` to fetch and install the correct
+version of Rocq.
+
+The library is available using Nix flakes. It can be added to the inputs using the following lines:
+```
+tr = {
+  url = "git+https://github.com/jrosain/TableauxRocq";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+```
+The corresponding output is in `tr.packages.${system}.rocqPackages.rocq-tableaux`. We currently support the systems `x86_64-linux` and `aarch64-linux`.
 
 #### opam Installation
 
-Another way of installing the dependencies of the project is via `opam`:
+Another way of installing the dependencies of the project is via `opam`, using one of the pairs listed above.
+For instance, if one wants the latest compatible version of Rocq, they have to enter the following commands:
 ```
-opam pin add rocq-prover 9.0.1
+opam pin add rocq-core 9.1.1
+opam pin add rocq-stdlib 9.1.0
 ```
-The `rocq-prover` package should provide both `rocq-core` and `rocq-stdlib`, so you should
-be ready to go.
+`ocamlfind` is also necessary but should be already installed.
 
 ### Compilation
 
