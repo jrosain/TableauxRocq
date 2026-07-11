@@ -2,7 +2,8 @@
 , pkgs ? import ./devtools/nixpkgs.nix {}
 , withDoc ? true
 , withExtraction ? true
-, withOCamlDev ? true }:
+, withOCamlDev ? true
+, withTests ? true }:
 
 pkgs.mkShell {
   nativeBuildInputs = with pkgs.buildPackages; [
@@ -28,5 +29,7 @@ pkgs.mkShell {
     pkgs.ocamlPackages.ocp-indent
     pkgs.ocamlPackages.ocp-index
     pkgs.ocamlPackages.merlin
+  ]) ++ (lib.optionals withTests [
+    python314
   ]);
 }

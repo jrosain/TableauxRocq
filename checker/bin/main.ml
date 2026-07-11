@@ -79,7 +79,7 @@ let main () =
     | Lib.Grammar.MultipleSubEncountered ->
        Printf.printf "Error: multiple declarations with the substitution role encountered.\n"
     | Lib.Grammar.NoSuchName name ->
-       Printf.printf "Error: found reference to an unknown name \"%s\"." name
+       Printf.printf "Error: found reference to an unknown name \"%s\".\n" name
     | Lib.Grammar.DefCycleFound path ->
        Printf.printf "Error: cycle of dependencies between the definitions (%s).\n" (String.concat " -> " path)
     | Lib.Grammar.ProofCycleFound path ->

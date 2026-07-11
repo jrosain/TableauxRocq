@@ -1,0 +1,1 @@
+Error: cycle of dependencies between the definitions (d4 -> d3 -> d2 -> d1 -> d0).
