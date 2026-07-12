@@ -7,6 +7,7 @@ proofs in Rocq, and (ii) outputing *optimized* tableaux proofs for fast certific
 
 - [Documentation](#documentation)
 - [Installation and Local Compilation](#installation-and-local-compilation)
+- [Extraction of the Proof Checker](#extraction-of-the-proof-checker)
 - [Outputing Proofs using TableauxRocq](#outputing-proofs-using-tableauxrocq)
 
 ## Documentation
@@ -43,7 +44,8 @@ tr = {
   inputs.nixpkgs.follows = "nixpkgs";
 };
 ```
-The corresponding output is in `tr.packages.${system}.rocqPackages.rocq-tableaux`. We currently support the systems `x86_64-linux` and `aarch64-linux`.
+The corresponding output is in `tr.packages.${system}.rocqPackages.rocq-tableaux`.
+We currently support the systems `x86_64-linux` and `aarch64-linux`.
 
 #### opam Installation
 
@@ -81,6 +83,19 @@ make doc
 *Warning*: this commands needs `pandoc` to generate the index file out of the
 `README.md`. Note that it is included in the `nix` configuration file, so if you use nix,
 it should work out of the box.
+
+## Extraction of the Proof Checker
+
+By default, running `make` will extract ML code to the folder [checker](checker). In order
+to compile this code, one needs `dune` (version 3) and `OCaml` (version 5). For Nix users,
+these softwares are already furnished by the `shell.nix` file. This can be deactivated by
+setting the input `withExtraction` to `false`.
+
+If `TableauxRocq` has been added to one's flakes (as described in the [Nix installation
+section](#nix-installation-recommended)), the binary of the proof checker can be obtained
+by adding the package `tr.packages.${system}.poulet` in one's configuration.
+
+Otherwise, it can be compiled by using `dune build` in the `checker` folder.
 
 ## Outputing Proofs using TableauxRocq
 

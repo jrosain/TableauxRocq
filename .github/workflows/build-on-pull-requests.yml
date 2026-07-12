@@ -21,7 +21,7 @@ jobs:
         with:
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-      - run: nix-shell --run "make"
+      - run: nix develop --build
 
   Bench:
     runs-on: ubuntu-latest
@@ -34,6 +34,20 @@ jobs:
         with:
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-      - run: nix-shell --run "make; cd devtools; sh run-tests.sh $REPO_TOKEN"
+      - run: nix develop --command bash -c "make; cd devtools; sh run-rocq-tests.sh $REPO_TOKEN"
         env:
           REPO_TOKEN: ${{ secrets.CLONE_REPO_TOKEN }}
+
+  Poulet:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: Build
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Nix
+        uses: cachix/install-nix-action@v18
+        with:
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - run: nix develop --command bash -c "make poulet; cd devtools; python3 run-poulet-tests.py"
+

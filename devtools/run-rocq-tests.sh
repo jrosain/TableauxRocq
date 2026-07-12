@@ -182,7 +182,7 @@ compile_and_bench() {
 }
 
 # Compile previous bugs
-compile tests
+compile tests/rocq
 
 # Run benches
-compile_and_bench tests/benchs
+compile_and_bench tests/rocq/benchs

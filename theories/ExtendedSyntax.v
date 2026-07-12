@@ -10,7 +10,8 @@ From Tableaux Require Import Semantics.
 From Tableaux Require Import Proofs.
 From Tableaux Require Import Skolemization.
 
-Export ConcreteProofInstances.
+From Tableaux Require Export Prelude.All.
+From Tableaux Require Export ProofInstance.
 
 (** In this file, we define:
       1. a syntax using [string]s for bound variable, in order to make it easy to
@@ -117,13 +118,13 @@ End ESemantics.
 
 (** ** 3. Syntax translation *)
 Section ESyntaxTranslation.
-  Fixpoint fv_eterm (t : ETerm) : SetOfString :=
+  Fixpoint fv_eterm (t : ETerm) : string_set :=
     match t with
     | EVar x   => singleton x
     | EFun f l => fold_left (fun s t => s \union (fv_eterm t)) l empty_set
     end.
 
-  Fixpoint bv_eform (F : EForm) : SetOfString :=
+  Fixpoint bv_eform (F : EForm) : string_set :=
     match F with
     | EBot | ETop | EPred _ _ => empty_set
     | ENeg F => bv_eform F
@@ -435,11 +436,11 @@ Section ESyntaxTranslation.
   Qed.
 
   Lemma closed_in_union_closed_in_left :
-    forall (t : ETerm) (s s' : SetOfString_.SetOfX_.t),
+    forall (t : ETerm) (s s' : string_set),
       closed_in (fun x s => ~set_in x s) (s \union s') t -> closed_in (fun x s => ~set_in x s) s t.
   Proof.
     intros. destruct t using eterm_ind; cbn in *.
-    - intro hin. apply H. rewrite union_spec. now left.
+    - intro hin. apply H. change (set_in x (s \union s')); rewrite union_spec. now left.
     - induction l as [|t ts IHts]; cbn; auto. split.
       + apply Forall_inv in H0. apply H0. apply H.
       + apply IHts.
@@ -448,11 +449,11 @@ Section ESyntaxTranslation.
   Qed.
 
   Lemma closed_in_union_closed_in_right :
-    forall (t : ETerm) (s s' : SetOfString_.SetOfX_.t),
+    forall (t : ETerm) (s s' : string_set),
       closed_in (fun x s => ~set_in x s) (s \union s') t -> closed_in (fun x s => ~set_in x s) s' t.
   Proof.
     intros. destruct t using eterm_ind; cbn in *.
-    - intro hin. apply H. rewrite union_spec. now right.
+    - intro hin. apply H. change (set_in x (s \union s')); rewrite union_spec. now right.
     - induction l as [|t ts IHts]; cbn; auto. split.
       + apply Forall_inv in H0. apply H0. apply H.
       + apply IHts.
@@ -460,22 +461,22 @@ Section ESyntaxTranslation.
         * apply H.
   Qed.
 
-  Fixpoint translate_EForm__aux (m : list string) (F : EForm) : Form :=
+  Fixpoint translate_EForm_aux (m : list string) (F : EForm) : Form :=
     match F with
     | EBot => Bot
     | ETop => Neg Bot
     | EPred f l => Pred f (map (translate_ETerm m) l)
-    | ENeg F => Neg (translate_EForm__aux m F)
-    | EOr F G => Or (translate_EForm__aux m F) (translate_EForm__aux m G)
-    | EAnd F G => Neg (Or (Neg (translate_EForm__aux m F)) (Neg (translate_EForm__aux m G)))
-    | EImp F G => Or (Neg (translate_EForm__aux m F)) (translate_EForm__aux m G)
-    | EEqu F G => Neg (Or (Neg (Or (Neg (translate_EForm__aux m F)) (translate_EForm__aux m G)))
-                      (Neg (Or (Neg (translate_EForm__aux m G)) (translate_EForm__aux m F))))
-    | EEx x F  => Neg (All (Neg (translate_EForm__aux (x :: m) F)))
-    | EAll x F => All (translate_EForm__aux (x :: m) F)
+    | ENeg F => Neg (translate_EForm_aux m F)
+    | EOr F G => Or (translate_EForm_aux m F) (translate_EForm_aux m G)
+    | EAnd F G => Neg (Or (Neg (translate_EForm_aux m F)) (Neg (translate_EForm_aux m G)))
+    | EImp F G => Or (Neg (translate_EForm_aux m F)) (translate_EForm_aux m G)
+    | EEqu F G => Neg (Or (Neg (Or (Neg (translate_EForm_aux m F)) (translate_EForm_aux m G)))
+                      (Neg (Or (Neg (translate_EForm_aux m G)) (translate_EForm_aux m F))))
+    | EEx x F  => Neg (All (Neg (translate_EForm_aux (x :: m) F)))
+    | EAll x F => All (translate_EForm_aux (x :: m) F)
     end.
 
-  Definition translate_EForm := translate_EForm__aux [].
+  Definition translate_EForm := translate_EForm_aux [].
 
   Fixpoint instantiate_eterm (x : string) (u t : ETerm) : ETerm :=
     match t with
@@ -553,9 +554,9 @@ Section ESyntaxTranslation.
 
   Lemma instantiate_shadowed_form :
     forall (F : EForm) (t : ETerm) (x : string) (rho rho' : list string),
-      (translate_EForm__aux (rho ++ x :: rho' ++ [x]) F)
+      (translate_EForm_aux (rho ++ x :: rho' ++ [x]) F)
         {#| rho | + #| rho' | + 1 \to translate_ETerm rho' t} =
-        translate_EForm__aux (rho ++ x :: rho') F.
+        translate_EForm_aux (rho ++ x :: rho') F.
   Proof.
     intros F t. induction F; try reflexivity.
     - intros. cbn. apply f_equal. induction l; auto.
@@ -617,8 +618,8 @@ Section ESyntaxTranslation.
     forall (x : string) (t : ETerm) (F : EForm) (rho : list string),
       ~(List.In x rho) -> closed_in mem_list rho t ->
       closed_in (fun x s => ~ set_in x s) (bv_eform F) t ->
-      (translate_EForm__aux (rho ++ [x]) F) {#|rho| \to translate_ETerm rho t} =
-        translate_EForm__aux rho (instantiate_eform x t F).
+      (translate_EForm_aux (rho ++ [x]) F) {#|rho| \to translate_ETerm rho t} =
+        translate_EForm_aux rho (instantiate_eform x t F).
   Proof.
     intros ???. induction F; intros rho hin hclosed hclosed'; cbn in *; try reflexivity.
     - intros. rewrite !map_map.
@@ -642,7 +643,7 @@ Section ESyntaxTranslation.
         clear hin IHF. induction t using eterm_ind'; cbn in *.
         - unfold mem_list in *; cbn.
           rewrite -match_eq_dec_eq_bool. destruct (x0 == s).
-          + exfalso. apply hclosed'. rewrite union_spec. left.
+          + exfalso. apply hclosed'. change (set_in x0 (singleton s \union bv_eform F)); rewrite union_spec. left.
             subst. rewrite singleton_spec //.
           + rewrite hclosed. now cbn.
         - induction l as [|t ts IHts]; cbn in *; auto. split.
@@ -669,7 +670,7 @@ Section ESyntaxTranslation.
         clear hin IHF. induction t using eterm_ind'; cbn in *.
         - unfold mem_list in *; cbn.
           rewrite -match_eq_dec_eq_bool. destruct (x0 == s).
-          + exfalso. apply hclosed'. rewrite union_spec. left.
+          + exfalso. apply hclosed'. change (set_in x0 (singleton s \union bv_eform F)); rewrite union_spec. left.
             subst. rewrite singleton_spec //.
           + rewrite hclosed. now cbn.
         - induction l as [|t ts IHts]; cbn in *; auto. split.
@@ -779,7 +780,7 @@ Section ValidityEquivalence.
 
     Lemma gen_translation_equivalidity :
       forall (M : Model string string) (F : EForm) (bvs : list string) (rho : list M) (sigma : env M string),
-        [[ M # rho # sigma '|= translate_EForm__aux bvs F ]] <->
+        [[ M # rho # sigma '|= translate_EForm_aux bvs F ]] <->
           interpret_eform M (extended_environment bvs rho sigma) F.
     Proof.
       intros M F; induction F.
@@ -884,7 +885,7 @@ Section ValidityEquivalence.
 
   Theorem hasTableau_is_evalid :
     forall (F : EForm) (sko : Skolemization) (Gamma : list EForm) (sigma : Substitution string Term),
-      @isClosed string (list Form) _ (Neg (translate_EForm F) :: to_form_list Gamma) ->
+      @isClosed string _ (list Form) _ (Neg (translate_EForm F) :: to_form_list Gamma) ->
       hasTableau sko (Neg (translate_EForm F) :: to_form_list Gamma) sigma ->
       is_evalid (EImp (ls_to_eform Gamma) F).
   Proof.
@@ -896,7 +897,7 @@ Section ValidityEquivalence.
     rewrite e -gen_translation_equivalidity. cbn.
     cbn in htab. destruct htab as [hGamma | hF].
     - left. intro h. apply hGamma.
-      have e' : (translate_EForm__aux [] (ls_to_eform Gamma)) =
+      have e' : (translate_EForm_aux [] (ls_to_eform Gamma)) =
                   (ls_to_form (to_form_list Gamma)).
       { clear. induction Gamma as [|G Gs IHGs]; cbn in *; try reflexivity.
         now rewrite -IHGs. }
@@ -919,7 +920,7 @@ Section TranslateSubst.
     forall (t : ETerm), @isLocallyClosed _ Term _ [[ t ]].
   Proof.
     intro t. induction t using eterm_ind.
-    - unfold isLocallyClosed; cbn. apply empty_is_empty.
+    - unfold isLocallyClosed; cbn. by unfold is_empty.
     - induction l as [|x xs IHxs]; unfold isLocallyClosed.
       + apply empty_is_empty.
       + cbn. apply is_empty_spec'; intros y. rewrite union_spec; intros [].
@@ -934,7 +935,7 @@ Section TranslateSubst.
       isLocallyClosed (subst_translation l x).
   Proof.
     intros l x H. induction l as [|y ys IHys]; unfold isLocallyClosed; cbn.
-    - apply empty_is_empty.
+    - by unfold is_empty.
     - change (fst y =? x) with (eqb (fst y) x).
       rewrite -match_eq_dec_eq_bool. destruct (fst y == x).
       + eapply (H (fst y)). right. now destruct y.

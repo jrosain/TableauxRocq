@@ -13,22 +13,6 @@ From Stdlib Require Import Lia.
 
 (** ** 1. The algorithm *)
 
-(** *** Data-structures *)
-
-(** We start by giving a data structure that reflects the rules of [ExpansionStep]. *)
-Inductive Rule : Type :=
-| AlphaNegNeg : Form -> Rule
-| AlphaNegOr : Form -> Rule
-| BetaOr : Form -> Rule
-| GammaAll : Form -> string -> Rule
-| DeltaNegAll : Form -> Term -> Rule.
-
-(** As we want a proof tree, we will take a tree of extended rules as an input of the algorithm.
-    Unary rules can be implemented by ignoring the _2nd_ child of the tree. *)
-Inductive RuleTree : Type :=
-| Leaf : option (Form * Form) -> RuleTree
-| Node : RuleTree -> Rule -> RuleTree -> RuleTree.
-
 (** A small [Result] monad that stores the errors encountered. *)
 Definition Result (A : Type) : Type := A * list string.
 
@@ -55,19 +39,19 @@ Class Pr (A : Type) :=
 #[global] Instance pr_term : Pr Term :=
   fix F (t : Term) : string :=
     match t with
-    | Bound n => "x@" ++ nat_to_string n
+    | Bound n => ("x@" ++ nat_to_string n)%string
     | Free x => x
-    | Fun f l => f ++ "(" ++ pr_list F l ++ ")"
+    | Fun f l => (f ++ "(" ++ pr_list F l ++ ")")%string
     end.
 
 #[global] Instance pr_form : Pr Form :=
   fix rec (F : Form) : string :=
     match F with
     | Bot => "$false"
-    | Pred p l => p ++ "(" ++ pr_list pr l ++ ")"
-    | Neg F => "~(" ++ rec F ++ ")"
-    | Or F1 F2 => "(" ++ rec F1 ++ " | " ++ rec F2 ++ ")"
-    | All F => "! (" ++ rec F ++ ")"
+    | Pred p l => (p ++ "(" ++ pr_list pr l ++ ")")%string
+    | Neg F => ("~(" ++ rec F ++ ")")%string
+    | Or F1 F2 => ("(" ++ rec F1 ++ " | " ++ rec F2 ++ ")")%string
+    | All F => ("! (" ++ rec F ++ ")")%string
     end.
 
 (* TODO: declare a [Ctx] in the [Proofs] file and share the definitions *)
@@ -77,7 +61,7 @@ Module Ctx.
   Definition t := list Form.
   Definition eq : t -> t -> Prop := eq.
   Definition from_list (l : list Form) : t := l.
-  Definition fv (Gamma : t) : SetOfString := fv Gamma.
+  Definition fv (Gamma : t) : string_set := fv Gamma.
   Definition existsb (pred : Form -> bool) (Gamma : t) : bool := List.existsb pred Gamma.
   Definition mem (F : Form) (Gamma : t) : bool := list_mem F Gamma.
   Definition In (F : Form) (Gamma : t) : Prop := F \in Gamma.
@@ -85,7 +69,7 @@ Module Ctx.
   Definition add (F : Form) (Gamma : t) : t := F :: Gamma.
   Definition elements (Gamma : t) : list Form := Gamma.
   Definition union (Gamma1 Gamma2 : t) : t := (Gamma1 ++ Gamma2)%list.
-  #[global] Instance pr_ctx : Pr t := fun Gamma => "[" ++ pr_list pr Gamma ++ "]".
+  #[global] Instance pr_ctx : Pr t := fun Gamma => ("[" ++ pr_list pr Gamma ++ "]")%string.
 
   Lemma mem_spec :
     forall (F : Form) (Gamma : t),
@@ -190,7 +174,7 @@ Section ProofCheckerAlgorithm.
 
   Definition delta_rule (Gamma : Ctx.t) (sigma : Substitution string Term) (T : RuleTree)
     (record : sko_record sko) (F : Form) (t : Term) (getter : Form -> option Form)
-    (err : string) (func_symbs : SetOfString) (search : CheckerAlgorithm) :=
+    (err : string) (func_symbs : string_set) (search : CheckerAlgorithm) :=
     rule_wrapper Gamma F err getter
       (fun F0 => if sko t F record (fv Gamma) (func_symbs \union to_set record)
              then
@@ -207,8 +191,8 @@ Section ProofCheckerAlgorithm.
         the supplied substitution ; returns [false] if no closure rule can be found ;
       - on a node: it tries to apply the given rule on the given formula, and calls the
         algorithm recursively. *)
-  Fixpoint CheckProof__aux
-    (func_symbols : SetOfString) (Gamma : Ctx.t) (sigma : Substitution string Term)
+  Fixpoint CheckProof_aux
+    (func_symbols : string_set) (Gamma : Ctx.t) (sigma : Substitution string Term)
     (record : sko_record sko) (tree : RuleTree) : result :=
     match tree with
     | Leaf None => closure_rule (fun Gamma _ => trivial_contradiction Gamma) "trivial" Gamma sigma record
@@ -219,16 +203,16 @@ Section ProofCheckerAlgorithm.
     | Node T1 rule T2 =>
 
         let alpha_rule (F : Form) (getter : Form -> option Ctx.t) (err : string) :=
-          alpha_rule Gamma sigma T1 record F getter err (CheckProof__aux func_symbols) in
+          alpha_rule Gamma sigma T1 record F getter err (CheckProof_aux func_symbols) in
 
         let beta_rule (F : Form) (getter : Form -> option (Ctx.t * Ctx.t)) (err : string) :=
-          beta_rule Gamma sigma T1 T2 record F getter err (CheckProof__aux func_symbols) in
+          beta_rule Gamma sigma T1 T2 record F getter err (CheckProof_aux func_symbols) in
 
         let gamma_rule (F : Form) (x : string) (getter : Form -> option Form) (err : string) :=
-          gamma_rule Gamma sigma T1 record F x getter err (CheckProof__aux func_symbols) in
+          gamma_rule Gamma sigma T1 record F x getter err (CheckProof_aux func_symbols) in
 
         let delta_rule (F : Form) (t : Term) (getter : Form -> option Form) (err : string) :=
-          delta_rule Gamma sigma T1 record F t getter err func_symbols (CheckProof__aux func_symbols) in
+          delta_rule Gamma sigma T1 record F t getter err func_symbols (CheckProof_aux func_symbols) in
 
         match rule with
         | AlphaNegNeg F => alpha_rule F get_neg_neg "double negation"
@@ -248,7 +232,7 @@ Section ProofCheckerAlgorithm.
       w.r.t. the union of these function symbols and the introduced Skolem symbols. *)
   Definition CheckProof (Gamma : list Form) (sigma : Substitution string Term)
     (tree : RuleTree) : Result bool :=
-    result <- CheckProof__aux (function_symbols Gamma) (Ctx.from_list Gamma) sigma empty_record tree;
+    result <- CheckProof_aux (function_symbols Gamma) (Ctx.from_list Gamma) sigma empty_record tree;
     ret (status result).
 End ProofCheckerAlgorithm.
 Arguments status {_} _.
@@ -312,12 +296,12 @@ Section RulesSoundness.
   Lemma alpha_rule_sound :
     forall {Gamma : Ctx.t} {sigma : Substitution string Term}
       {record record' : sko_record sko} {T : RuleTree} {F : Form} {err : string}
-      {getter : Form -> option Ctx.t} {func_symbs : SetOfString},
-      alpha_rule sko Gamma sigma T record F getter err (CheckProof__aux sko func_symbs) =
+      {getter : Form -> option Ctx.t} {func_symbs : string_set},
+      alpha_rule sko Gamma sigma T record F getter err (CheckProof_aux sko func_symbs) =
         ret {| status := true; symbs := record' |} ->
       exists (l : Ctx.t),
         getter F = Some l /\ Ctx.In F Gamma /\
-          CheckProof__aux sko func_symbs (Ctx.union l Gamma) sigma record T =
+          CheckProof_aux sko func_symbs (Ctx.union l Gamma) sigma record T =
             ret {| status := true; symbs := record' |}.
   Proof using Type.
     intros ????????? e. unfold alpha_rule in e.
@@ -327,26 +311,26 @@ Section RulesSoundness.
   Lemma beta_rule_sound :
     forall {Gamma : Ctx.t} {sigma : Substitution string Term}
       {record record' : sko_record sko} {T1 T2 : RuleTree} {F : Form} {err : string}
-      {getter : Form -> option (Ctx.t * Ctx.t)} {func_symbs : SetOfString},
-      beta_rule sko Gamma sigma T1 T2 record F getter err (CheckProof__aux sko func_symbs) =
+      {getter : Form -> option (Ctx.t * Ctx.t)} {func_symbs : string_set},
+      beta_rule sko Gamma sigma T1 T2 record F getter err (CheckProof_aux sko func_symbs) =
         ret {| status := true; symbs := record' |} ->
       exists (l1 l2 : Ctx.t) (symbols : sko_record sko),
         getter F = Some (l1, l2) /\ Ctx.In F Gamma /\
-          CheckProof__aux sko func_symbs (Ctx.union l1 Gamma) sigma record T1 =
+          CheckProof_aux sko func_symbs (Ctx.union l1 Gamma) sigma record T1 =
             ret {| status := true; symbs := symbols |} /\
-          CheckProof__aux sko func_symbs (Ctx.union l2 Gamma) sigma symbols T2 =
+          CheckProof_aux sko func_symbs (Ctx.union l2 Gamma) sigma symbols T2 =
             ret {| status := true; symbs := record' |}.
   Proof using Type.
     intros ?????????? e. unfold beta_rule in e.
     apply rule_wrapper_sound in e. destruct e as ((l1 & l2) & eg & hin & hact).
     exists l1, l2; cbn[fst snd] in hact.
-    destruct (CheckProof__aux sko func_symbs (Ctx.union l1 Gamma) sigma record T1); cbn in *.
+    destruct (CheckProof_aux sko func_symbs (Ctx.union l1 Gamma) sigma record T1); cbn in *.
     destruct a as (b & s). exists s; repeat split; cbn in *; destruct b; unfold ret in hact; cbn in *;
       auto.
 
     2,4: injection hact => _ _ contra; inversion contra.
 
-    all: destruct (CheckProof__aux sko func_symbs (Ctx.union l2 Gamma) sigma s T2); cbn in *;
+    all: destruct (CheckProof_aux sko func_symbs (Ctx.union l2 Gamma) sigma s T2); cbn in *;
       destruct (status a); cbn in *; auto.
 
     all: injection hact => e _; apply app_eq_nil in e; destruct e as [el el']; subst; auto.
@@ -355,12 +339,12 @@ Section RulesSoundness.
   Lemma gamma_rule_sound :
     forall {Gamma : Ctx.t} {sigma : Substitution string Term}
       {record record' : sko_record sko} {T : RuleTree} {F : Form} {x : string} {err : string}
-      {getter : Form -> option Form} {func_symbs : SetOfString},
-      gamma_rule sko Gamma sigma T record F x getter err (CheckProof__aux sko func_symbs) =
+      {getter : Form -> option Form} {func_symbs : string_set},
+      gamma_rule sko Gamma sigma T record F x getter err (CheckProof_aux sko func_symbs) =
         ret {| status := true; symbs := record' |} ->
       exists (G : Form),
         getter F = Some G /\ Ctx.In F Gamma /\
-          CheckProof__aux sko func_symbs (Ctx.add (G{0 \to Free x}) Gamma) sigma record T =
+          CheckProof_aux sko func_symbs (Ctx.add (G{0 \to Free x}) Gamma) sigma record T =
             ret {| status := true; symbs := record' |}.
   Proof using Type.
     intros ?????????? e. unfold gamma_rule in e.
@@ -370,14 +354,14 @@ Section RulesSoundness.
   Lemma delta_rule_sound :
     forall {Gamma : Ctx.t} {sigma : Substitution string Term}
       {record record' : sko_record sko} {T : RuleTree} {F : Form} {t : Term} {err : string}
-      {getter : Form -> option Form} {func_symbs : SetOfString},
-      delta_rule sko Gamma sigma T record F t getter err func_symbs (CheckProof__aux sko func_symbs) =
+      {getter : Form -> option Form} {func_symbs : string_set},
+      delta_rule sko Gamma sigma T record F t getter err func_symbs (CheckProof_aux sko func_symbs) =
         ret {| status := true; symbs := record' |} ->
       exists (f : string) (G : Form),
         getter F = Some G /\ F \in Gamma /\
           sko t F record (fv Gamma) (func_symbs \union to_set record) = true /\
           get_symbol t = Some f /\
-          CheckProof__aux sko func_symbs (G{0 \to t} :: Gamma) sigma (add_symbol f F record) T =
+          CheckProof_aux sko func_symbs (G{0 \to t} :: Gamma) sigma (add_symbol f F record) T =
             ret {| status := true; symbs := record' |}.
   Proof using Type.
     intros ?????????? e. unfold delta_rule in e.
@@ -385,7 +369,7 @@ Section RulesSoundness.
     destruct e as (G & eG & hin & e).
     destruct (sko t F _ _ _) eqn:hsko; try inversion e.
     destruct (get_symbol t) eqn:esym; try inversion e.
-    exists a, G; repeat split; auto.
+    exists s, G; repeat split; auto.
   Qed.
 End RulesSoundness.
 
@@ -537,15 +521,15 @@ Ltac simplify_chk_rec_call :=
   let echk := fresh "echk" in
   let G := fresh "G" in
   match goal with
-  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (AlphaNegNeg ?f) ?R2) =
+  | [ e : CheckProof_aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (AlphaNegNeg ?f) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
       let e' := fresh e in
       (have e' := alpha_rule_sound e); destruct e' as (rf & eg & hin & echk)
-  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (AlphaNegOr ?f) ?R2) =
+  | [ e : CheckProof_aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (AlphaNegOr ?f) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
       let e' := fresh e in
       (have e' := alpha_rule_sound e); destruct e' as (rf & eg & hin & echk)
-  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (BetaOr ?f) ?R2) =
+  | [ e : CheckProof_aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (BetaOr ?f) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
       let rf' := fresh "rf" in
       let echk' := fresh "echk" in
@@ -554,11 +538,11 @@ Ltac simplify_chk_rec_call :=
       let e' := fresh e in
       (have e' := beta_rule_sound e);
       destruct e' as (rf & rf' & symbs & eget & hin & echk & echk')
-  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (GammaAll ?F ?x) ?R2) =
+  | [ e : CheckProof_aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (GammaAll ?F ?x) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
       let e' := fresh e in
       (have e' := gamma_rule_sound e); destruct e' as (G & eget & hin & echk)
-  | [ e : CheckProof__aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (DeltaNegAll ?F ?t) ?R2) =
+  | [ e : CheckProof_aux ?sko ?s ?Gamma ?sigma ?r (Node ?R1 (DeltaNegAll ?F ?t) ?R2) =
             ret {| status := true; symbs := ?s' |} |- _ ] =>
       let f := fresh "f" in
       let hsko := fresh "hsko" in
@@ -628,8 +612,8 @@ Section RuleTreeToSequence_Lemmas.
                             s1 hbranchof0 eseq) as (T'' & hnleaf'' & hreplace));
         on_delta_case
           ltac:(destruct (IHR1 (B ++ [Left])%list
-                               {| tree := t0; symbols := add_symbol a f (symbols T) |}
-                               s0 hbranchof0 eseq) as (T'' & hnleaf'' & hreplace)).
+                               {| tree := t0; symbols := add_symbol s0 f (symbols T) |}
+                               s1 hbranchof0 eseq) as (T'' & hnleaf'' & hreplace)).
 
       (** Still in the unary cases, as the sequence of the left child cannot be empty,
           it suffices to say that we replace the left child. *)
@@ -704,13 +688,13 @@ Section RuleTreeToSequence_Lemmas2.
 
   Let Tableau := Tableau sko.
 
-  (** Then, we can show that whenever the [CheckProof__aux] algorithm finds a result,
+  (** Then, we can show that whenever the [CheckProof_aux] algorithm finds a result,
       then the algorithm [RuleTree_to_Sequence__aux] converts the [RuleTree] to a [Sequence]
       successfully. *)
   Lemma CheckProof_Some_RuleTree_to_Sequence_Some__aux :
     forall {Gamma : list Form} {sigma : Substitution string Term} {R : RuleTree}
-      {B : Branch} {T : Tableau} {record record' : sko_record sko} {func_symbs : SetOfString},
-      CheckProof__aux sko func_symbs Gamma sigma record R = ret {| status := true; symbs := record' |} ->
+      {B : Branch} {T : Tableau} {record record' : sko_record sko} {func_symbs : string_set},
+      CheckProof_aux sko func_symbs Gamma sigma record R = ret {| status := true; symbs := record' |} ->
       is_branch_of B T -> get_context B T = Gamma ->
       exists (s : Sequence sko), RuleTree_to_Sequence__aux B T R = Some s.
   Proof using Type.
@@ -790,8 +774,8 @@ Section RuleTreeToSequence_Lemmas2.
 
   Lemma CheckProof_Some_RuleTree_to_Sequence_Some :
     forall {Gamma : list Form} {sigma : Substitution string Term} {R : RuleTree}
-      {record record' : sko_record sko} {func_symbs : SetOfString},
-      CheckProof__aux sko func_symbs Gamma sigma record R = ret {| status := true; symbs := record' |} ->
+      {record record' : sko_record sko} {func_symbs : string_set},
+      CheckProof_aux sko func_symbs Gamma sigma record R = ret {| status := true; symbs := record' |} ->
       exists (s : Sequence sko), RuleTree_to_Sequence Gamma R = Some s.
   Proof using Type.
     intros ?????? e. cbn.
@@ -799,14 +783,14 @@ Section RuleTreeToSequence_Lemmas2.
     apply is_branch_of_nil.
   Qed.
 
-  (** The set of symbols returned by the [CheckProof__aux] algorithm is exactly the
+  (** The set of symbols returned by the [CheckProof_aux] algorithm is exactly the
       set of symbols of the last tableau of the sequence returned by
       [RuleTree_to_Sequence__aux]. *)
   Lemma RuleTree_to_Sequence_symbols :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
-      {T : Tableau} {record : sko_record sko} {func_symbs : SetOfString} {s : Sequence sko},
+      {T : Tableau} {record : sko_record sko} {func_symbs : string_set} {s : Sequence sko},
       is_branch_of B T ->
-      CheckProof__aux sko func_symbs (get_context B T) sigma (symbols T) R =
+      CheckProof_aux sko func_symbs (get_context B T) sigma (symbols T) R =
         ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s ->
       record = symbols (last s (mkLeaf sko)).
@@ -898,9 +882,9 @@ Section Soundness.
       sequence (if it exists) give an expansion step. *)
   Lemma RuleTree_to_Sequence_snd_expansion :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
-      {T T' : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : SetOfString},
+      {T T' : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : string_set},
       is_branch_of B T -> preserves_function_symbols T func_symbs ->
-      CheckProof__aux sko func_symbs (get_context B T) sigma (symbols T) R =
+      CheckProof_aux sko func_symbs (get_context B T) sigma (symbols T) R =
         ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s -> s.(1) = Some T' ->
       T |> T'.
@@ -1005,12 +989,12 @@ Section Soundness.
 
   (** Some bureaucratic lemmas. *)
   Lemma preserves_function_symbols_None :
-    forall (T : Tableau) (func_symbs : SetOfString),
+    forall (T : Tableau) (func_symbs : string_set),
       function_symbols (@None (list Form)) \subseteq func_symbs \union to_set (symbols T).
   Proof using Type. intros ?? f contra. now apply empty_spec in contra. Qed.
 
   Lemma preserves_function_symbols_get_neg_neg :
-    forall {F : Form} {l : Ctx.t} {B : Branch} {T : Tableau} {func_symbs : SetOfString},
+    forall {F : Form} {l : Ctx.t} {B : Branch} {T : Tableau} {func_symbs : string_set},
       preserves_function_symbols T func_symbs -> is_branch_of B T -> get_neg_neg F = Some l ->
       F \in get_context B T ->
       function_symbols (Some (Ctx.elements l)) \subseteq func_symbs \union to_set (symbols T).
@@ -1026,7 +1010,7 @@ Section Soundness.
   Qed.
 
   Lemma preserves_function_symbols_get_neg_or :
-    forall {F : Form} {l : Ctx.t} {B : Branch} {T : Tableau} {func_symbs : SetOfString},
+    forall {F : Form} {l : Ctx.t} {B : Branch} {T : Tableau} {func_symbs : string_set},
       preserves_function_symbols T func_symbs -> is_branch_of B T -> get_neg_or F = Some l ->
       F \in get_context B T ->
       function_symbols (Some (Ctx.elements l)) \subseteq func_symbs \union to_set (symbols T).
@@ -1041,7 +1025,7 @@ Section Soundness.
   Qed.
 
   Lemma preserves_function_symbols_get_or1 :
-    forall {F : Form} {l1 l2 : Ctx.t} {B : Branch} {T : Tableau} {func_symbs : SetOfString},
+    forall {F : Form} {l1 l2 : Ctx.t} {B : Branch} {T : Tableau} {func_symbs : string_set},
       preserves_function_symbols T func_symbs -> is_branch_of B T -> get_or F = Some (l1, l2) ->
       F \in get_context B T ->
       function_symbols (Some (Ctx.elements l1)) \subseteq func_symbs \union to_set (symbols T).
@@ -1057,7 +1041,7 @@ Section Soundness.
   Qed.
 
   Lemma preserves_function_symbols_get_or2 :
-    forall {F : Form} {l1 l2 : Ctx.t} {B : Branch} {T : Tableau} {func_symbs : SetOfString},
+    forall {F : Form} {l1 l2 : Ctx.t} {B : Branch} {T : Tableau} {func_symbs : string_set},
       preserves_function_symbols T func_symbs -> is_branch_of B T -> get_or F = Some (l1, l2) ->
       F \in get_context B T ->
       function_symbols (Some (Ctx.elements l2)) \subseteq func_symbs \union to_set (symbols T).
@@ -1073,7 +1057,7 @@ Section Soundness.
   Qed.
 
   Lemma preserves_function_symbols_get_all :
-    forall {F G : Form} {B : Branch} {T : Tableau} {func_symbs : SetOfString} (x : string),
+    forall {F G : Form} {B : Branch} {T : Tableau} {func_symbs : string_set} (x : string),
       preserves_function_symbols T func_symbs -> is_branch_of B T -> get_all F = Some G ->
       F \in get_context B T ->
       function_symbols (Some [G{0 \to Free x}]) \subseteq func_symbs \union to_set (symbols T).
@@ -1090,7 +1074,7 @@ Section Soundness.
   Qed.
 
   Lemma preserves_function_symbols_get_neg_all :
-    forall {F G : Form} {B : Branch} {T : Tableau} {func_symbs : SetOfString} (t : Term)
+    forall {F G : Form} {B : Branch} {T : Tableau} {func_symbs : string_set} (t : Term)
       (f : string),
       preserves_function_symbols T func_symbs -> is_branch_of B T -> get_neg_all F = Some G ->
       F \in get_context B T -> function_symbols t = singleton f ->
@@ -1102,7 +1086,8 @@ Section Soundness.
     rewrite -el in hin'.
     have h : function_symbols (Neg F{0 \to t}) \subseteq
                function_symbols (Neg (All F)) \union function_symbols t.
-    { cbn; apply function_symbols_opening. }
+    { change (function_symbols F {0 \to t} \subseteq function_symbols F \union function_symbols t).
+      apply function_symbols_opening. }
     change (set_in f (function_symbols (Neg F {0 \to t}))) in hin'.
     specialize (h f hin'). rewrite union_spec in h. destruct h as [hF | ht].
     - rewrite join_to_set union_comm union_assoc !union_spec.
@@ -1122,10 +1107,10 @@ Section Soundness.
       no other function symbol gets introduced. *)
   Lemma RuleTree_to_Sequence_preserves_function_symbols_last :
   forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
-    {T : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : SetOfString},
+    {T : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : string_set},
     is_branch_of B T -> preserves_function_symbols T func_symbs ->
     RuleTree_to_Sequence__aux B T R = Some s ->
-    CheckProof__aux sko func_symbs (get_context B T) sigma (symbols T) R =
+    CheckProof_aux sko func_symbs (get_context B T) sigma (symbols T) R =
       ret {| status := true; symbs := record |} ->
     preserves_function_symbols (last s (mkLeaf sko)) func_symbs.
   Proof using Type.
@@ -1206,7 +1191,6 @@ Section Soundness.
         * erewrite <-echk1; f_equal.
           -- rewrite -ectx;
                erewrite get_context_extend_right; eauto.
-             by cbn; unfold Ctx.union.
           -- symmetry; eapply RuleTree_to_Sequence_symbols; [| |apply eseq1]; eauto.
              cbn in *; rewrite -echk0; unfold Ctx.union.
              erewrite <-get_context_extend_left; eauto.
@@ -1220,7 +1204,7 @@ Section Soundness.
           As a formula is instantiated with the Skolem function, its function symbol appears
           in the subsequent tableau and allows us to show the property. *)
       + eapply IHR1 with (B := (B ++ [Left])%list)
-                         (T := {| tree := t0; symbols := add_symbol a f (symbols T) |}); eauto.
+                         (T := {| tree := t0; symbols := add_symbol s0 f (symbols T) |}); eauto.
         * eapply extend_subset_preserves_function_symbols with
             (l := Some [f1{0 \to t}]) (l' := None); eauto.
           -- cbn; rewrite join_to_set.
@@ -1242,9 +1226,9 @@ Section Soundness.
       on the given index. *)
   Lemma CheckProof_Some_RuleTree_to_Sequence_is_expansion_sequence :
     forall {R : RuleTree} {sigma : Substitution string Term} {B : Branch}
-      {T : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : SetOfString},
+      {T : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : string_set},
       is_branch_of B T -> preserves_function_symbols T func_symbs ->
-      CheckProof__aux sko func_symbs (get_context B T) sigma (symbols T) R =
+      CheckProof_aux sko func_symbs (get_context B T) sigma (symbols T) R =
         ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s ->
       is_expansion_sequence s.
@@ -1462,7 +1446,7 @@ Section Soundness.
         injection eget => eget'; injection esymb => esymb'; subst; rewrite -ectx1 in echk.
         specialize (IHR1 sigma (B ++ [Left])%list
                          {| tree := t0; symbols := add_symbol f0 f (symbols T) |}
-                         record s0 func_symbs hbranchof0 hpres1 echk eseq1).
+                         record s1 func_symbs hbranchof0 hpres1 echk eseq1).
         solve_expansion eseq0 IHR1.
   Qed.
 
@@ -1471,9 +1455,9 @@ Section Soundness.
       [RuleTree_to_Sequence], this extension is closed if [CheckProof] returns [true]. *)
   Lemma CheckProof_Some_RuleTree_to_Sequence_closed :
     forall {R : RuleTree} {sigma : Substitution string Term} {B B' : Branch}
-      {T : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : SetOfString},
+      {T : Tableau} {record : sko_record sko} {s : Sequence sko} {func_symbs : string_set},
       is_branch_of B T -> is_branch_of (B ++ B')%list (last s (mkLeaf sko)) ->
-      CheckProof__aux sko func_symbs (get_context B T) sigma (symbols T) R =
+      CheckProof_aux sko func_symbs (get_context B T) sigma (symbols T) R =
         ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence__aux B T R = Some s ->
       is_branch_closed sko (last s (mkLeaf sko)) sigma (B ++ B')%list.
@@ -1537,12 +1521,12 @@ Section Soundness.
                                                 {| tree := t; symbols := symbols T |}
                  := is_branch_of_extend_left hbranchof eexp));
         on_delta_case
-          ltac:((have es : last s (mkLeaf sko) = last s0 (mkLeaf sko) by
+          ltac:((have es : last s (mkLeaf sko) = last s1 (mkLeaf sko) by
                  injection eseq0 => <-; rewrite last_cons //;
                                      eapply RuleTree_to_Sequence_not_nil; eauto);
                 (have hbranchof1 : is_branch_of
                                      (B ++ [Left])%list
-                                     {| tree := t0; symbols := add_symbol a f (symbols T) |}
+                                     {| tree := t0; symbols := add_symbol s0 f (symbols T) |}
                  := is_branch_of_extend_left hbranchof eexp); injection esymb => esymb'; subst);
         rewrite !es in hbranchof' |- *.
 
@@ -1649,7 +1633,7 @@ Section Soundness.
   Lemma CheckProof_Some_Sequence_closed :
     forall {R : RuleTree} {Gamma : list Form} {sigma : Substitution string Term}
       {record : sko_record sko} {s : Sequence sko},
-      CheckProof__aux sko (function_symbols Gamma) Gamma sigma empty_record R =
+      CheckProof_aux sko (function_symbols Gamma) Gamma sigma empty_record R =
         ret {| status := true; symbs := record |} ->
       RuleTree_to_Sequence Gamma R = Some s ->
       is_tableau_closed (last s (mkLeaf sko)) sigma.
@@ -1668,7 +1652,7 @@ Section Soundness.
   Proof using Type.
     intros ??? e.
 
-    cbn in e. destruct (CheckProof__aux sko (function_symbols Gamma)
+    cbn in e. destruct (CheckProof_aux sko (function_symbols (isAtom1 := string_atom) Gamma)
                           (Ctx.from_list Gamma) sigma empty_record R) eqn:esrch; try easy; cbn in *.
     destruct a; cbn in *. injection e => estatus el; subst.
     rewrite app_nil_r in estatus; subst.
@@ -1679,10 +1663,12 @@ Section Soundness.
     - eapply CheckProof_Some_RuleTree_to_Sequence_is_expansion_sequence; eauto.
       1: apply is_branch_of_nil.
       2: apply esrch.
-      red; cbn. rewrite app_nil_r empty_to_set empty_unitr //.
+      red; cbn. rewrite app_nil_r empty_to_set.
+      set f := (f in fold_left f _ _ \subseteq _).
+      change (fold_left f (Ctx.from_list Gamma) \{ \} \subseteq (function_symbols Gamma) \union \{ \});
+        by rewrite empty_unitr.
     - split.
       + erewrite RuleTree_to_Sequence_hd; eauto.
-        by rewrite /Ctx.from_list.
       + eapply CheckProof_Some_Sequence_closed; eauto.
   Qed.
 End Soundness.
@@ -1690,82 +1676,84 @@ End Soundness.
 (** ** 3. Extended Syntax *)
 
 Module Export ExtendedSyntax.
-  Inductive ExtendedRule : Type :=
-  | AlphaNegNeg : Form -> ExtendedRule
-  | AlphaAnd : Form -> ExtendedRule
-  | AlphaNegOr : Form -> ExtendedRule
-  | AlphaNegImp : Form -> ExtendedRule
-  | BetaOr : Form -> ExtendedRule
-  | BetaImp : Form -> ExtendedRule
-  | BetaNegAnd : Form -> ExtendedRule
-  | BetaEqu : Form -> ExtendedRule
-  | BetaNegEqu : Form -> ExtendedRule
-  | GammaAll : Form -> string -> ExtendedRule
-  | GammaNegEx : Form -> string -> ExtendedRule
-  | DeltaEx : Form -> Term -> ExtendedRule
-  | DeltaNegAll : Form -> Term -> ExtendedRule.
+  Module E.
+    Inductive ExtendedRule : Type :=
+    | AlphaNegNeg : Form -> ExtendedRule
+    | AlphaAnd : Form -> ExtendedRule
+    | AlphaNegOr : Form -> ExtendedRule
+    | AlphaNegImp : Form -> ExtendedRule
+    | BetaOr : Form -> ExtendedRule
+    | BetaImp : Form -> ExtendedRule
+    | BetaNegAnd : Form -> ExtendedRule
+    | BetaEqu : Form -> ExtendedRule
+    | BetaNegEqu : Form -> ExtendedRule
+    | GammaAll : Form -> string -> ExtendedRule
+    | GammaNegEx : Form -> string -> ExtendedRule
+    | DeltaEx : Form -> Term -> ExtendedRule
+    | DeltaNegAll : Form -> Term -> ExtendedRule.
 
-  Inductive ExtendedRuleTree : Type :=
-  | Leaf : option (Form * Form) -> ExtendedRuleTree
-  | Node : ExtendedRuleTree -> ExtendedRule -> ExtendedRuleTree -> ExtendedRuleTree.
+    Inductive ExtendedRuleTree : Type :=
+    | Leaf : option (Form * Form) -> ExtendedRuleTree
+    | Node : ExtendedRuleTree -> ExtendedRule -> ExtendedRuleTree -> ExtendedRuleTree.
 
-  Definition mkTrivialClosure : ExtendedRuleTree := Leaf None.
+    Definition mkTrivialClosure : ExtendedRuleTree := Leaf None.
 
-  Definition mkClosure (F G : Form) : ExtendedRuleTree :=
-    Leaf (Some (F, G)).
+    Definition mkClosure (F G : Form) : ExtendedRuleTree :=
+      Leaf (Some (F, G)).
 
-  Definition mkUnaryNode (rule : ExtendedRule) (T1 : ExtendedRuleTree) : ExtendedRuleTree :=
-    Node T1 rule (Leaf None).
+    Definition mkUnaryNode (rule : ExtendedRule) (T1 : ExtendedRuleTree) : ExtendedRuleTree :=
+      Node T1 rule (Leaf None).
 
-  Definition mkBinaryNode (rule : ExtendedRule) (T1 T2 : ExtendedRuleTree) : ExtendedRuleTree :=
-    Node T1 rule T2.
+    Definition mkBinaryNode (rule : ExtendedRule) (T1 T2 : ExtendedRuleTree) : ExtendedRuleTree :=
+      Node T1 rule T2.
+  End E.
 
   Definition get_neg_neg (F : Form) : Result Form :=
     match F with
     | Neg (Neg G) => ret G
-    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++ " is not a double negation."])
+    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++ " is not a double negation.")%string])
     end.
 
   Definition get_neg_or (F : Form) : Result (list Form) :=
     match F with
     | Neg (Or F1 F2) => ret [Neg F1 ; Neg F2]
-    | _ => ([], ["Error: the formula " ++ pr_form F ++ " is not a negated disjunction."])
+    | _ => ([], [("Error: the formula " ++ pr_form F ++ " is not a negated disjunction.")%string])
     end.
 
   Definition get_and (F : Form) : Result (list Form) :=
     match F with
     | Neg (Or (Neg F1) (Neg F2)) => ret [F1 ; F2 ; Neg (Neg F1) ; Neg (Neg F2)]
-    | _ => ([], ["Error: the formula " ++ pr_form F ++ " is not a conjunction."])
+    | _ => ([], [("Error: the formula " ++ pr_form F ++ " is not a conjunction.")%string])
     end.
 
   Definition get_neg_imp (F : Form) : Result (list Form) :=
     match F with
     | Neg (Or (Neg F1) F2) => ret [F1 ; Neg F2 ; Neg (Neg F1)]
-    | _ => ([], ["Error: the formula " ++ pr_form F ++ " is not a negated implication."])
+    | _ => ([], [("Error: the formula " ++ pr_form F ++ " is not a negated implication.")%string])
     end.
 
   Definition get_or (F : Form) : Result (Form * Form) :=
     match F with
     | Or F1 F2 => ret (F1, F2)
-    | _ => ((Neg Bot, Neg Bot), ["Error: the formula " ++ pr_form F ++ " is not a disjunction."])
+    | _ => ((Neg Bot, Neg Bot), [("Error: the formula " ++ pr_form F ++ " is not a disjunction.")%string])
     end.
 
   Definition get_imp (F : Form) : Result (Form * Form) :=
     match F with
     | Or (Neg F1) F2 => ret (Neg F1, F2)
-    | _ => ((Neg Bot, Neg Bot), ["Error: the formula " ++ pr_form F ++ " is not an implication."])
+    | _ => ((Neg Bot, Neg Bot), [("Error: the formula " ++ pr_form F ++ " is not an implication.")%string])
     end.
 
   Definition get_neg_and (F : Form) : Result (list Form * list Form) :=
     match F with
     | Neg (Neg (Or (Neg F1) (Neg F2))) => ret ([Neg F1 ; Or (Neg F1) (Neg F2)], [Neg F2 ; Or (Neg F1) (Neg F2)])
-    | _ => (([], []), ["Error: the formula " ++ pr_form F ++ " is not a negated conjunction."])
+    | _ => (([], []), [("Error: the formula " ++ pr_form F ++ " is not a negated conjunction.")%string])
     end.
 
   Definition get_equ (F : Form) :
     Result (list Form * list Form * list Form * list Form * list Form) :=
     let err := (([], [], [], [], []),
-                 ["Error: the formula " ++ pr_form F ++ " is not an equivalence."]) in
+                 [("Error: the formula " ++ pr_form F ++ " is not an equivalence.")%string]) in
     match F with
     | Neg (Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F3) F4))) =>
         if negb (eqb F1 F4 && eqb F2 F3) then err
@@ -1777,7 +1765,7 @@ Module Export ExtendedSyntax.
 
   Definition get_neg_equ (F : Form) : Result (list Form * list Form * Form) :=
     let err := (([], [], Neg Bot),
-                 ["Error: the formula " ++ pr_form F ++ " is not an equivalence."]) in
+                 [("Error: the formula " ++ pr_form F ++ " is not an equivalence.")%string]) in
     match F with
     | Neg (Neg (Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F3) F4)))) =>
         if negb (eqb F1 F4 && eqb F2 F3) then err
@@ -1790,149 +1778,149 @@ Module Export ExtendedSyntax.
   Definition get_all (F : Form) : Result Form :=
     match F with
     | All G => ret G
-    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++ " is not a universal quantifier."])
+    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++ " is not a universal quantifier.")%string])
     end.
 
   Definition get_neg_ex (F : Form) : Result Form :=
     match F with
     | Neg (Neg (All (Neg G))) => ret G
-    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++
-                   " is not a negated existential quantifier."])
+    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++
+                   " is not a negated existential quantifier.")%string])
     end.
 
   Definition get_ex (F : Form) : Result Form :=
     match F with
     | Neg (All (Neg G)) => ret G
-    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++ " is not an existential quantifier."])
+    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++ " is not an existential quantifier.")%string])
     end.
 
   Definition get_neg_all (F : Form) : Result Form :=
     match F with
     | Neg (All G) => ret G
-    | _ => (Neg Bot, ["Error: the formula " ++ pr_form F ++ " is not a negated universal quantifier."])
+    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++ " is not a negated universal quantifier.")%string])
     end.
 
   (* We provide a compilation of the [ExtendedRuleTree] to a [RuleTree]. *)
-  Fixpoint compile__aux (Gamma : list Form) (T : ExtendedRuleTree) : Result RuleTree :=
+  Fixpoint compile__aux (Gamma : list Form) (T : E.ExtendedRuleTree) : Result RuleTree :=
     match T with
-    | Leaf None => if Ctx.mem [[ ENeg ETop ]] Gamma
-                  then ret (Checker.Node (Checker.Leaf None)
-                              (Checker.AlphaNegNeg [[ ENeg ETop ]]) (Checker.Leaf None))
-                  else ret (Checker.Leaf None)
-    | Leaf (Some (F, G)) => ret (Checker.Leaf (Some (F, G)))
-    | Node T1 r T2 =>
+    | E.Leaf None => if Ctx.mem [[ ENeg ETop ]] Gamma
+                  then ret (Node (Leaf None)
+                              (AlphaNegNeg [[ ENeg ETop ]]) (Leaf None))
+                  else ret (Leaf None)
+    | E.Leaf (Some (F, G)) => ret (Leaf (Some (F, G)))
+    | E.Node T1 r T2 =>
         match r with
-        | AlphaNegNeg F =>
+        | E.AlphaNegNeg F =>
             G <- get_neg_neg F;
             T1' <- compile__aux (G :: Gamma) T1;
-            ret (Checker.Node T1' (Checker.AlphaNegNeg F) (Checker.Leaf None))
-        | AlphaNegOr F =>
+            ret (Node T1' (AlphaNegNeg F) (Leaf None))
+        | E.AlphaNegOr F =>
             l <- get_neg_or F;
             T1' <- compile__aux (l ++ Gamma)%list T1;
-            ret (Checker.Node T1' (Checker.AlphaNegOr F) (Checker.Leaf None))
-        | AlphaAnd F =>
+            ret (Node T1' (AlphaNegOr F) (Leaf None))
+        | E.AlphaAnd F =>
             l <- get_and F;
             T1' <- compile__aux (l ++ Gamma)%list T1;
-            ret (Checker.Node
-                   (Checker.Node (Checker.Node T1' (Checker.AlphaNegNeg (last l (Neg Bot)))
-                                    (Checker.Leaf None))
-                      (Checker.AlphaNegNeg (hd (Neg Bot) (tl (tl l)))) (Checker.Leaf None))
-                   (Checker.AlphaNegOr F) (Checker.Leaf None))
-        | AlphaNegImp F =>
+            ret (Node
+                   (Node (Node T1' (AlphaNegNeg (last l (Neg Bot)))
+                                    (Leaf None))
+                      (AlphaNegNeg (hd (Neg Bot) (tl (tl l)))) (Leaf None))
+                   (AlphaNegOr F) (Leaf None))
+        | E.AlphaNegImp F =>
             l <- get_neg_imp F;
             T1' <- compile__aux (l ++ Gamma)%list T1;
-            ret (Checker.Node
-                   (Checker.Node T1' (Checker.AlphaNegNeg (last l (Neg Bot))) (Checker.Leaf None))
-                   (Checker.AlphaNegOr F)
-                   (Checker.Leaf None))
-        | BetaOr F =>
+            ret (Node
+                   (Node T1' (AlphaNegNeg (last l (Neg Bot))) (Leaf None))
+                   (AlphaNegOr F)
+                   (Leaf None))
+        | E.BetaOr F =>
             fs <- get_or F;
             T1' <- compile__aux (fst fs :: Gamma)%list T1;
             T2' <- compile__aux (snd fs :: Gamma)%list T2;
-            ret (Checker.Node T1' (Checker.BetaOr F) T2')
-        | BetaImp F =>
+            ret (Node T1' (BetaOr F) T2')
+        | E.BetaImp F =>
             fs <- get_imp F;
             T1' <- compile__aux (fst fs :: Gamma)%list T1;
             T2' <- compile__aux (snd fs :: Gamma)%list T2;
-            ret (Checker.Node T1' (Checker.BetaOr F) T2')
-        | BetaNegAnd F =>
+            ret (Node T1' (BetaOr F) T2')
+        | E.BetaNegAnd F =>
             fs <- get_neg_and F;
             T1' <- compile__aux (fst fs ++ Gamma)%list T1;
             T2' <- compile__aux (snd fs ++ Gamma)%list T2;
-            ret (Checker.Node (Checker.Node T1' (Checker.BetaOr (last (fst fs) (Neg Bot))) T2')
-                              (Checker.AlphaNegNeg F) (Checker.Leaf None))
-        | BetaEqu F =>
+            ret (Node (Node T1' (BetaOr (last (fst fs) (Neg Bot))) T2')
+                              (AlphaNegNeg F) (Leaf None))
+        | E.BetaEqu F =>
             fs <- get_equ F;
             match fs, snd fs, snd (fst fs) with
             | (fnegs, contr1, contr2, fpos, prefix), [nF2 ; nF1 ; nnF1 ; nnF2], [F1 ; F2] =>
                 T1' <- compile__aux (fnegs ++ prefix ++ Gamma)%list T1;
                 T2' <- compile__aux (fpos ++ prefix ++ Gamma)%list T2;
-                ret (Checker.Node
-                       (Checker.Node
-                          (Checker.Node
-                             (Checker.Node
-                                (Checker.Node
+                ret (Node
+                       (Node
+                          (Node
+                             (Node
+                                (Node
                                    T1'
-                                   (Checker.BetaOr nF2)
-                                   (Checker.Leaf (Some (F1, Neg F1))))
-                                (Checker.BetaOr nF1)
-                                (Checker.Node
-                                   (Checker.Leaf (Some (F2, Neg F2)))
-                                   (Checker.BetaOr nF2)
+                                   (BetaOr nF2)
+                                   (Leaf (Some (F1, Neg F1))))
+                                (BetaOr nF1)
+                                (Node
+                                   (Leaf (Some (F2, Neg F2)))
+                                   (BetaOr nF2)
                                    T2'))
-                             (Checker.AlphaNegNeg nnF2) (Checker.Leaf None))
-                          (Checker.AlphaNegNeg nnF1) (Checker.Leaf None))
-                       (Checker.AlphaNegOr F) (Checker.Leaf None))
-             | _, _, _ => (Checker.Leaf None, ["Anomaly: please report to the developers."])
+                             (AlphaNegNeg nnF2) (Leaf None))
+                          (AlphaNegNeg nnF1) (Leaf None))
+                       (AlphaNegOr F) (Leaf None))
+             | _, _, _ => (Leaf None, ["Anomaly: please report to the developers."])
              end
-        | BetaNegEqu F =>
+        | E.BetaNegEqu F =>
             fs <- get_neg_equ F;
             T1' <- compile__aux (fst (fst fs) ++ Gamma)%list T1;
             T2' <- compile__aux (snd (fst fs) ++ Gamma)%list T2;
-            ret (Checker.Node
-                   (Checker.Node
-                      (Checker.Node
-                         (Checker.Node T1'
-                            (Checker.AlphaNegNeg (hd (Neg Bot) (tl (fst (fst fs)))))
-                            (Checker.Leaf None))
-                         (Checker.AlphaNegOr (last (fst (fst fs)) (Neg Bot)))
-                         (Checker.Leaf None))
-                      (Checker.BetaOr (snd fs))
-                      (Checker.Node
-                         (Checker.Node T2'
-                            (Checker.AlphaNegNeg (hd (Neg Bot) (tl (snd (fst fs)))))
-                            (Checker.Leaf None))
-                         (Checker.AlphaNegOr (last (snd (fst fs)) (Neg Bot)))
-                         (Checker.Leaf None)))
-                   (Checker.AlphaNegNeg F)
-                   (Checker.Leaf None))
-        | GammaAll F x =>
+            ret (Node
+                   (Node
+                      (Node
+                         (Node T1'
+                            (AlphaNegNeg (hd (Neg Bot) (tl (fst (fst fs)))))
+                            (Leaf None))
+                         (AlphaNegOr (last (fst (fst fs)) (Neg Bot)))
+                         (Leaf None))
+                      (BetaOr (snd fs))
+                      (Node
+                         (Node T2'
+                            (AlphaNegNeg (hd (Neg Bot) (tl (snd (fst fs)))))
+                            (Leaf None))
+                         (AlphaNegOr (last (snd (fst fs)) (Neg Bot)))
+                         (Leaf None)))
+                   (AlphaNegNeg F)
+                   (Leaf None))
+        | E.GammaAll F x =>
             G <- get_all F;
             T1' <- compile__aux (G{0 \to Free x} :: Gamma) T1;
-            ret (Checker.Node T1' (Checker.GammaAll F x) (Checker.Leaf None))
-        | GammaNegEx F x =>
+            ret (Node T1' (GammaAll F x) (Leaf None))
+        | E.GammaNegEx F x =>
             G <- get_neg_ex F;
             T1' <- compile__aux (Neg G{0 \to Free x} :: All (Neg G) :: Gamma) T1;
-            ret (Checker.Node
-                   (Checker.Node T1' (Checker.GammaAll (All (Neg G)) x) (Checker.Leaf None))
-                   (Checker.AlphaNegNeg F) (Checker.Leaf None))
-        | DeltaEx F t =>
+            ret (Node
+                   (Node T1' (GammaAll (All (Neg G)) x) (Leaf None))
+                   (AlphaNegNeg F) (Leaf None))
+        | E.DeltaEx F t =>
             G <- get_ex F;
             T1' <- compile__aux (G{0 \to t} :: Neg (Neg G{0 \to t}) :: Gamma) T1;
-            ret (Checker.Node
-                   (Checker.Node T1' (Checker.AlphaNegNeg (Neg (Neg G{0 \to t}))) (Checker.Leaf None))
-                   (Checker.DeltaNegAll F t) (Checker.Leaf None))
-        | DeltaNegAll F t =>
+            ret (Node
+                   (Node T1' (AlphaNegNeg (Neg (Neg G{0 \to t}))) (Leaf None))
+                   (DeltaNegAll F t) (Leaf None))
+        | E.DeltaNegAll F t =>
             G <- get_neg_all F;
             T1' <- compile__aux (G{0 \to t} :: Gamma) T1;
-            ret (Checker.Node T1' (Checker.DeltaNegAll F t) (Checker.Leaf None))
+            ret (Node T1' (DeltaNegAll F t) (Leaf None))
         end
     end.
 
-  Definition compile (Gamma : list Form) (T : ExtendedRuleTree) : Result RuleTree := compile__aux Gamma T.
+  Definition compile (Gamma : list Form) (T : E.ExtendedRuleTree) : Result RuleTree := compile__aux Gamma T.
 
   Lemma Extended_CheckProof_sound :
-    forall {sko : Skolemization} {Gamma : list Form} {sigma : Substitution string Term} (R : ExtendedRuleTree),
+    forall {sko : Skolemization} {Gamma : list Form} {sigma : Substitution string Term} (R : E.ExtendedRuleTree),
       (T <- compile Gamma R;
        CheckProof sko Gamma sigma T) = ret true ->
       hasTableau sko Gamma sigma.
@@ -1945,6 +1933,8 @@ Module Export ExtendedSyntax.
     { injection echk => els _. apply app_eq_nil in els; easy. }
     rewrite el in echk; now cbn in echk.
   Qed.
+
+  Export E.
 End ExtendedSyntax.
 
 (** ** 4. The [tableaux] tactic *)

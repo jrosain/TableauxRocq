@@ -9,9 +9,14 @@ config:
 
 clean:
 	make clean -f RocqMakefile
+	cd checker && dune clean
+	git clean -Xf
 
 install:
 	make install -f RocqMakefile
+
+poulet: all
+	cd checker && dune build
 
 doc: RocqMakefile
 	COQMAKEFILE=RocqMakefile COQDOCJS_DIR=devtools make coqdoc -f RocqMakefile

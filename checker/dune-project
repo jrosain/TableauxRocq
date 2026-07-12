@@ -1,0 +1,13 @@
+(lang dune 3.21)
+
+(name poulet)
+
+(generate_opam_files false)
+
+(package
+ (name poulet)
+ (synopsis "A fully certified PrOof checker for tableaUx in first-order Logic Extracted from Tableauxrocq.")
+ (description "This package contains the extraction of the proof checker of TableauxRocq, together with a TPTP-like language parser to express proofs. Description of the parsing can be found on the homepage of the project.")
+ (depends ocaml))
+
+(using menhir 2.1)

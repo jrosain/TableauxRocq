@@ -1,0 +1,9 @@
+(library
+ (name lib))
+
+(menhir
+  (modules parser)
+  (flags --explain))
+
+(ocamllex
+  (modules lexer))

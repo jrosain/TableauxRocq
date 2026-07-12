@@ -6,14 +6,15 @@ From Stdlib Require Import Classical.
 From Stdlib Require Import Lia.
 From Stdlib Require Import Logic.IndefiniteDescription.
 
-From Tableaux Require Import Prelude.All.
+From Tableaux Require Import Prelude.Core.
 From Tableaux Require Import Syntax.
 
 Section SemanticsDef.
-  Context {pred func var : Atom}.
+  Context {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var}.
 
   Class Model :=
-    { car :> Atom
+    { car :> Type
+    ; atom_car :: isAtom car
     ; interp_func : func -> list car -> car
     ; interp_pred : pred -> list car -> Prop
     ; non_empty : car }.
@@ -80,7 +81,7 @@ Section SemanticsDef.
 
   #[global] Instance equiv_trans : Transitive equiv.
   Proof using Type.
-    intros F G H hequ1 hequ2 M rho sigma. specialize (hequ1 M rho sigma); specialize (hequ2 M rho sigma).
+    intros ??? hequ1 hequ2 M rho sigma. specialize (hequ1 M rho sigma); specialize (hequ2 M rho sigma).
     rewrite hequ1 hequ2 //.
   Qed.
 
@@ -117,7 +118,7 @@ Notation "F \equiv G" := (equiv F G) (at level 30).
 Notation "Gamma |= F" := (is_valid (Or (Neg (ls_to_form Gamma)) F)) (at level 40).
 
 Section SemanticsFacts.
-  Context {pred func var : Atom} `{set_nat : set nat}.
+  Context {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var} `{set_nat : set nat}.
 
   Let Form := Form pred func var.
   Let Term := Term func var.
@@ -161,11 +162,11 @@ Section SemanticsFacts.
       List.In F Gamma -> Gamma |= F.
   Proof using Type.
     intros ?? Hin. induction Gamma as [|G Gs IHGs]; inversion Hin.
-    - rewrite !H in IHGs |- *.
+    - rewrite !H2 in IHGs |- *.
       intros M; cbn. apply NNPP=>rem. apply rem. right.
-      apply NNPP=>rem'. apply rem. left. intros H0. apply H0. now left.
-    - intros M; cbn. specialize (IHGs H M). destruct IHGs as [HGs | HF].
-      + left. intro H0. apply H0. now right.
+      apply NNPP=>rem'. apply rem. left. intros h. apply h. now left.
+    - intros M; cbn. specialize (IHGs H2 M). destruct IHGs as [HGs | HF].
+      + left. intro h. apply h. now right.
       + now right.
   Qed.
 
@@ -174,7 +175,7 @@ Section SemanticsFacts.
       Gamma |= Bot -> Gamma |= F.
   Proof using Type.
     intros F Gamma Hmodels M. cbn.
-    specialize (Hmodels M). cbn in Hmodels. destruct Hmodels as [H | contra].
+    specialize (Hmodels M). cbn in Hmodels. destruct Hmodels as [h | contra].
     + now left.
     + inversion contra.
   Qed.
@@ -186,10 +187,10 @@ Section SemanticsFacts.
     intros F Gamma. split.
     - intros Hmodels M; cbn. specialize (Hmodels M). cbn in Hmodels.
       destruct Hmodels.
-      + left. intros H0; apply H0. now right.
-      + left. intros H0; apply H0. left; intro H1; now apply H1.
+      + left. intros h; apply h. now right.
+      + left. intros h; apply h. left; intro h'; now apply h'.
     - intros Hmodels M; specialize (Hmodels M); cbn in Hmodels |- *.
-      destruct Hmodels; auto. apply NNPP=>rem. apply H. intros [HF | HGamma].
+      destruct Hmodels; auto. apply NNPP=>rem. apply H2. intros [HF | HGamma].
       + apply rem. right. now apply NNPP.
       + apply rem. now left.
   Qed.
@@ -266,22 +267,22 @@ Section SemanticsFacts.
     forall (F : Form), F \equiv Neg (Neg F).
   Proof using Type.
     intros F M; cbn. split.
-    - intros H H'; now apply H'.
+    - intros h h'; now apply h'.
     - apply NNPP.
   Qed.
 
   Lemma neg_equiv :
     forall (F G : Form), F \equiv G -> Neg F \equiv Neg G.
   Proof using Type.
-    intros F G H M rho sigma. specialize (H M). cbn; rewrite H //.
+    intros F G h M rho sigma. specialize (h M). cbn; rewrite h //.
   Qed.
 
   Lemma or_equiv :
     forall (F1 F2 G1 G2 : Form), F1 \equiv G1 -> F2 \equiv G2 -> Or F1 F2 \equiv Or G1 G2.
   Proof using Type.
-    intros ???? H1 H2 M rho sigma.
-    specialize (H1 M rho sigma); specialize (H2 M rho sigma); cbn.
-    rewrite H1 H2 //.
+    intros ???? h1 h2 M rho sigma.
+    specialize (h1 M rho sigma); specialize (h2 M rho sigma); cbn.
+    rewrite h1 h2 //.
   Qed.
 
   Lemma or_comm :
@@ -304,10 +305,10 @@ Section SemanticsFacts.
         * apply neg_equiv, IHFs.
       + split; intro hinterp; cbn in *.
         * destruct hinterp; auto.
-          apply NNPP => save. apply H. intros []; auto.
+          apply NNPP => save. apply H2. intros []; auto.
           apply save. left. intro hinterp'; apply hinterp'. now right.
         * destruct hinterp; auto.
-          apply NNPP => hinterp. apply H. intros [].
+          apply NNPP => hinterp. apply H2. intros [].
           -- apply hinterp; now left.
           -- apply hinterp; right. intro h0. apply h0. now left.
   Qed.
@@ -317,23 +318,23 @@ Section SemanticsFacts.
       isLocallyClosed t ->
       interpret_term M rho0 sigma t = interpret_term M rho1 sigma t.
   Proof using Type.
-    intros ??????. induction t using term_ind.
-    - red in H. cbn in H. apply is_empty_spec with (x := n) in H.
-      + inversion H.
+    intros ????? hclosed. induction t using term_ind.
+    - red in hclosed. cbn in hclosed. apply is_empty_spec with (x := n) in hclosed.
+      + inversion hclosed.
       + now apply singleton_spec.
     - now cbn.
     - cbn. have hmap : map (interpret_term M rho0 sigma) l =
                          map (interpret_term M rho1 sigma) l.
       { induction l as [|u us IHus]; cbn; auto.
         rewrite IHus.
-        - red in H |- *. cbn in H.
-          now apply is_empty_union2 in H.
+        - red in hclosed |- *. cbn in hclosed.
+          now apply is_empty_union2 in hclosed.
         - now apply Forall_tail in X.
         - apply Forall_In with (x := u) in X.
           2: now right.
           rewrite X; auto.
-          red in H; cbn in H. unfold isLocallyClosed.
-          now apply is_empty_union1 in H. }
+          red in hclosed; cbn in hclosed. unfold isLocallyClosed.
+          now apply is_empty_union1 in hclosed. }
       rewrite hmap //.
   Qed.
 
@@ -343,7 +344,7 @@ Section SemanticsFacts.
       interpret_term M rho sigma (t {#|rho| \to u}) =
         interpret_term M (rho ++ [ [[ M # rho # sigma '|= u ]] ])%list sigma t.
   Proof using Type.
-    intros ??????. induction t using term_ind.
+    intros ????? hclosed. induction t using term_ind.
     - cbn. rewrite -match_eq_dec_eq_bool; destruct (#|rho| == n).
       + rewrite nth_error_app2.
         * rewrite e; apply le_n.
@@ -353,8 +354,8 @@ Section SemanticsFacts.
           { apply Compare_dec.not_ge. intro hgt. inversion hgt; auto.
             subst. apply nth_error_split in e.
             destruct e as [l1 [l2 [e0 e1] ] ].
-            subst. rewrite length_app e1 in H0.
-            cbn in H0. lia. }
+            subst. rewrite length_app e1 in H2.
+            cbn in H2. lia. }
           rewrite nth_error_app1; auto.
           now rewrite e.
         * have hgt : #|rho ++ [ [[ M # rho # sigma '|= u ]] ]|  <= n.
@@ -548,7 +549,8 @@ End SemanticsFacts.
     This choice function is unavoidable, as in and of itself, Skolemization uses the axiom of
     choice. *)
 Section ReplaceInterpFunc.
-  Context {pred func var : Atom} (M : Model pred func) (F : Form pred func var).
+  Context {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var}
+    (M : Model pred func) (F : Form pred func var).
 
   Lemma satisfy_delta :
     forall (mu : env M var),
@@ -581,7 +583,8 @@ Section ReplaceInterpFunc.
 End ReplaceInterpFunc.
 
 Section RealReplacementModel.
-  Context `{set_nat : set nat} {pred func var : Atom} (M : Model pred func).
+  Context `{set_nat : set nat} {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var}
+    (M : Model pred func).
 
   Definition ReplacementModel (f : func -> list M -> M) :=
     {| car := M
@@ -623,17 +626,17 @@ Section RealReplacementModel.
             [[M # [] # mk_env M
                 (combine vs (map (interpret_term M' [] mu) (map (fun v : var => Free v) vs)))
                 '|= Free x]].
-      { have H : forall l, map (interpret_term M' [] mu)
+      { have h : forall l, map (interpret_term M' [] mu)
                         (map (fun v : var => Free v) l) = map (fun x => option_get non_empty (mu x)) l.
         { clear. intros l; induction l as [|x xs IHxs]; auto.
           cbn. rewrite IHxs //. }
-        rewrite H. clear hinterp symbol. cbn. clear H M' t hinterp'.
+        rewrite h. clear hinterp symbol. cbn. clear h M' t hinterp'.
         intros x hin. specialize (hsubset x hin). induction vs as [|y ys IHys]; auto.
         - now apply empty_spec in hsubset.
         - cbn. rewrite -match_eq_dec_eq_bool; destruct (y == x); subst; auto.
           rewrite IHys //.
           cbn in hsubset; rewrite union_spec in hsubset; destruct hsubset; auto.
-          apply singleton_spec in H; congruence. }
+          apply singleton_spec in H2; congruence. }
       rewrite only_fv_valuation_matters_in_forms.
       + apply e.
       + apply hinterp; rewrite -only_fv_valuation_matters_in_forms; auto.
