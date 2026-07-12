@@ -95,16 +95,34 @@ If `TableauxRocq` has been added to one's flakes (as described in the [Nix insta
 section](#nix-installation-recommended)), the binary of the proof checker can be obtained
 by adding the package `tr.packages.${system}.poulet` in one's configuration.
 
-Otherwise, it can be compiled by using `dune build` in the `checker` folder.
+Otherwise, it can be compiled by using `dune build` in the `checker` folder. The whole
+process is streamlined by the `poulet` target of the `Makefile`, i.e., `make poulet` will
+extract the proof checker and compile `poulet` with dune.
 
 ## Outputing Proofs using TableauxRocq
 
 If you develop a tableau-based automated theorem prover, you can certify your proofs using
-TableauxRocq. TableauxRocq's core is based on a minimal syntax and proof system, but we
-provide an extended syntax, semantics and tableau proofs in the
-[ExtendedSyntax](theories/ExtendedSyntax.v) file, that supports the full first-order syntax. Then,
-to get started on developing an output, a showcase of the different types of rules are
-done in the following files:
+TableauxRocq. There are two ways of doing that.
+
+### Outputing TPTP-like Proofs (Recommended)
+
+We define a TPTP-like grammar (fully documented in [GRAMMAR](GRAMMAR.md)) as our proof
+format. It can be used by the certified OCaml checker `poulet`, that we get by extracting
+TableauxRocq algorithm to check proofs.
+
+The binary can be compiled from source using `make poulet` (see [Extraction of the Proof
+Checker](#extraction-of-the-proof-checker)).
+
+Examples of proofs can be found in the [GRAMMAR](GRAMMAR.md), and in the different files
+of the test-suite (see e.g., the folder [devtools/tests/basic](devtools/tests/basic)).
+
+### Outputing Rocq Code
+
+One can directly export proofs in Rocq. TableauxRocq's core is based on a minimal syntax
+and proof system, but we provide an extended syntax, semantics and tableau proofs in the
+[ExtendedSyntax](theories/ExtendedSyntax.v) file, that supports the full first-order
+syntax. Then, to get started on developing an output, a showcase of the different types of
+rules are done in the following files:
 
 - [drinker](examples/drinker.v): a proof of the drinker paradox $\exists x.\ P(x) \to
   \forall y.\ P(y)$ using two different Skolemization methods: inner and outer
@@ -115,5 +133,5 @@ done in the following files:
   though they have the same number of rules applied. Nevertheless, this gives a nice
   example of a branching rule.
 
-The folder [devtools/tests](devtools/tests) has examples for the application of other
+The folder [devtools/tests/rocq](devtools/tests/rocq) has examples for the application of other
 rules, but these files are not documented.

@@ -21,7 +21,7 @@ jobs:
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Documentation
-        run: nix-shell --run "make doc"
+        run: nix develop --command bash -c "make doc"
 
       - name: Deploy Documentation
         env:
@@ -37,7 +37,7 @@ jobs:
           git pull origin documentation --rebase
 
           version=$(echo ${BRANCH} | sed -e 's/refs\/heads\///g' | sed -e 's/release\///g')
-          cp -r html $version
+          rm -rf $version && cp -r html $version
 
           if [[ -n $(git status --porcelain) ]]; then
             git add $version
