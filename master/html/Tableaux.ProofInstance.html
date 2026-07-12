@@ -1,0 +1,81 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<link href="resources/coqdoc.css" rel="stylesheet" type="text/css" />
+<link href="resources/coqdocjs.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="resources/config.js"></script>
+<script type="text/javascript" src="resources/coqdocjs.js"></script>
+</head>
+
+<body onload="document.getElementById('content').focus()">
+  <div id="header">
+    <span class="left">
+      <span class="modulename"> <script> document.write(document.title) </script> </span>
+    </span>
+
+    <span class="button" id="toggle-proofs"></span>
+
+    <span class="right">
+      <a href="../">Project Page</a>
+      <a href="./indexpage.html"> Index </a>
+      <a href="./toc.html"> Table of Contents </a>
+    </span>
+</div>
+    <div id="content" tabindex="-1" onblur="document.getElementById('content').focus()">
+    <div id="main">
+<h1 class="libtitle">Tableaux.ProofInstance</h1>
+
+<div class="code">
+<span class="id" title="keyword">From</span> <span class="id" title="var">Tableaux</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Import</span> <a class="idref" href="Tableaux.Prelude.All.html#"><span class="id" title="library">Prelude.All</span></a>.<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Tableaux</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Export</span> <a class="idref" href="Tableaux.Proofs.html#"><span class="id" title="library">Proofs</span></a>.<br/>
+
+<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Tableaux</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Export</span> <a class="idref" href="Tableaux.SyntaxInstance.html#"><span class="id" title="library">SyntaxInstance</span></a>.<br/>
+<span class="id" title="keyword">From</span> <span class="id" title="var">Tableaux</span> <span class="id" title="keyword">Require</span> <span class="id" title="keyword">Export</span> <a class="idref" href="Tableaux.SkolemizationInstances.html#"><span class="id" title="library">SkolemizationInstances</span></a>.<br/>
+
+<br/>
+<span class="id" title="keyword">Definition</span> <a id="Tableau" class="idref" href="#Tableau"><span class="id" title="definition">Tableau</span></a> := @<a class="idref" href="Tableaux.Proofs.html#Tableau"><span class="id" title="record">Tableau</span></a> <span class="id" title="inductive">string</span> <span class="id" title="inductive">string</span> <span class="id" title="inductive">string</span> <span class="id" title="var">_</span> <span class="id" title="var">_</span> <span class="id" title="var">_</span>.<br/>
+
+<br/>
+<span class="comment">(*&nbsp;XXX:&nbsp;This&nbsp;data&nbsp;structure&nbsp;should&nbsp;be&nbsp;shared&nbsp;with&nbsp;Tableaux.<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We&nbsp;want&nbsp;a&nbsp;RuleTree&nbsp;and&nbsp;a&nbsp;TableauTree&nbsp;to&nbsp;coincide&nbsp;(actually,&nbsp;they&nbsp;almost&nbsp;already&nbsp;do&nbsp;so&nbsp;it&nbsp;should<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;be&nbsp;easy&nbsp;to&nbsp;unify&nbsp;them).&nbsp;*)</span><br/>
+
+<br/>
+</div>
+
+<div class="doc">
+We start by giving a data structure that reflects the rules of <span class="inlinecode"><a class="idref" href="Tableaux.Proofs.html#ExpansionStep"><span class="id" title="inductive">ExpansionStep</span></a></span>. 
+</div>
+<div class="code">
+<span class="id" title="keyword">Inductive</span> <a id="Rule" class="idref" href="#Rule"><span class="id" title="definition, inductive"><span id="Rule_rect" class="id"><span id="Rule_ind" class="id"><span id="Rule_rec" class="id"><span id="Rule_sind" class="id">Rule</span></span></span></span></span></a> : <span class="id" title="keyword">Type</span> :=<br/>
+| <a id="AlphaNegNeg" class="idref" href="#AlphaNegNeg"><span class="id" title="constructor">AlphaNegNeg</span></a> : <a class="idref" href="Tableaux.SyntaxInstance.html#Form"><span class="id" title="definition">Form</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.ProofInstance.html#Rule:1"><span class="id" title="inductive">Rule</span></a><br/>
+| <a id="AlphaNegOr" class="idref" href="#AlphaNegOr"><span class="id" title="constructor">AlphaNegOr</span></a> : <a class="idref" href="Tableaux.SyntaxInstance.html#Form"><span class="id" title="definition">Form</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.ProofInstance.html#Rule:1"><span class="id" title="inductive">Rule</span></a><br/>
+| <a id="BetaOr" class="idref" href="#BetaOr"><span class="id" title="constructor">BetaOr</span></a> : <a class="idref" href="Tableaux.SyntaxInstance.html#Form"><span class="id" title="definition">Form</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.ProofInstance.html#Rule:1"><span class="id" title="inductive">Rule</span></a><br/>
+| <a id="GammaAll" class="idref" href="#GammaAll"><span class="id" title="constructor">GammaAll</span></a> : <a class="idref" href="Tableaux.SyntaxInstance.html#Form"><span class="id" title="definition">Form</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <span class="id" title="inductive">string</span> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.ProofInstance.html#Rule:1"><span class="id" title="inductive">Rule</span></a><br/>
+| <a id="DeltaNegAll" class="idref" href="#DeltaNegAll"><span class="id" title="constructor">DeltaNegAll</span></a> : <a class="idref" href="Tableaux.SyntaxInstance.html#Form"><span class="id" title="definition">Form</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.SyntaxInstance.html#Term"><span class="id" title="definition">Term</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.ProofInstance.html#Rule:1"><span class="id" title="inductive">Rule</span></a>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+As we want a proof tree, we will take a tree of extended rules as an input of the algorithm.
+    Unary rules can be implemented by ignoring the <i>2nd</i> child of the tree. 
+</div>
+<div class="code">
+<span class="id" title="keyword">Inductive</span> <a id="RuleTree" class="idref" href="#RuleTree"><span class="id" title="definition, inductive"><span id="RuleTree_rect" class="id"><span id="RuleTree_ind" class="id"><span id="RuleTree_rec" class="id"><span id="RuleTree_sind" class="id">RuleTree</span></span></span></span></span></a> : <span class="id" title="keyword">Type</span> :=<br/>
+| <a id="Leaf" class="idref" href="#Leaf"><span class="id" title="constructor">Leaf</span></a> : <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Datatypes.html#option"><span class="id" title="inductive">option</span></a> (<a class="idref" href="Tableaux.SyntaxInstance.html#Form"><span class="id" title="definition">Form</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Datatypes.html#11c698c8685bb8ab1cf725545c085ac4"><span class="id" title="notation">*</span></a> <a class="idref" href="Tableaux.SyntaxInstance.html#Form"><span class="id" title="definition">Form</span></a>) <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.ProofInstance.html#RuleTree:3"><span class="id" title="inductive">RuleTree</span></a><br/>
+| <a id="Node" class="idref" href="#Node"><span class="id" title="constructor">Node</span></a> : <a class="idref" href="Tableaux.ProofInstance.html#RuleTree:3"><span class="id" title="inductive">RuleTree</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.ProofInstance.html#Rule"><span class="id" title="inductive">Rule</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.ProofInstance.html#RuleTree:3"><span class="id" title="inductive">RuleTree</span></a> <a class="idref" href="http://rocq-prover.org/doc/V9.1.1/stdlib//Corelib.Init.Logic.html#::type_scope:x_'-&gt;'_x"><span class="id" title="notation">-&gt;</span></a> <a class="idref" href="Tableaux.ProofInstance.html#RuleTree:3"><span class="id" title="inductive">RuleTree</span></a>.<br/>
+
+<br/>
+</div>
+</div>
+<div id="footer">
+  Generated by <a href="http://coq.inria.fr/">coqdoc</a> and improved with <a href="https://github.com/coq-community/coqdocjs">CoqdocJS</a>
+</div>
+</div>
+</body>
+
+</html>
