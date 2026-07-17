@@ -84,13 +84,18 @@ The only rules creating the optional term are `leftExists`, `leftNotAll`, `leftF
 "free" variable `X`.
 
 The final piece that is needed is the substitution, associating free variables to actual
-terms. It can be declared (only once in the file) using the `substitution` role as follows.
+terms and declaring the type of Skolemization used in the proof. It can be declared (only
+once in the file) using the `substitution` role as follows.
 ```
-fof(s, substitution, { X1 -> t1 ; ... ; Xn -> tn }).
+fof(s, substitution, { X1 -> t1 ; ... ; Xn -> tn }, sko).
 ```
 If a free-variable of the proof does not appear in the substitution, it will stay as
 itself. This field is not mandatory, i.e., if a tableau can be closed without
 substitution, one does not need to add an empty substitution declaration.
+
+`sko` can take the following values:
+- `outer`, or
+- `inner`.
 
 ### Children Order for Beta-Rules
 
@@ -115,7 +120,7 @@ Then, depending on Φ and `r`, the following formulas are added in the contexts 
 fof(drinker, definition, ? [X] : (d(X) => ! [Y] : d(Y))).
 fof(drinker, negated_conjecture, ~drinker).
 
-fof(s, substitution, { Y -> f(X) }).
+fof(s, substitution, { Y -> f(X) }, outer).
 
 fof(s0, plain, ~drinker, inference(leftNotEx, [s1], $fot(X))).
 fof(s1, plain, ~(d(X) => ! [Y] : d(Y)), inference(leftNotImplies, [s2])).
@@ -131,7 +136,7 @@ fof(s5, plain, [d(Y), ~d(f(X))], inference(leftHyp, [])).
 fof(drinker, definition, ? [X] : (d(X) => ! [Y] : d(Y))).
 fof(drinker, negated_conjecture, ~drinker).
 
-fof(s, substitution, { X -> c }).
+fof(s, substitution, { X -> c }, inner).
 
 fof(s0, plain, ~drinker, inference(leftNotEx, [s1], $fot(X))).
 fof(s1, plain, ~(d(X) => ! [Y] : d(Y)), inference(leftNotImplies, [s2])).

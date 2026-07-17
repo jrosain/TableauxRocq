@@ -2,7 +2,7 @@
 fof(drinker, definition, ? [X] : (d(X) => ! [Y] : d(Y))).
 fof(drinker_conj, negated_conjecture, ~drinker).
 
-fof(s, substitution, { Y -> f(X) }).
+fof(s, substitution, { Y -> f(X) }, outer).
 
 fof(s0, plain, ~drinker, inference(leftNotEx, [s1], $fot(X))).
 fof(s1, plain, ~(d(X) => ! [Y] : d(Y)), inference(leftNotImplies, [s2])).

@@ -1,2 +1,2 @@
-fof(sigma0, substitution, { Y -> d }).
-fof(sigma1, substitution, { X -> c }).
+fof(sigma0, substitution, { Y -> d }, inner).
+fof(sigma1, substitution, { X -> c }, outer).

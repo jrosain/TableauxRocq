@@ -12,6 +12,8 @@ checker/lib/*
 _opam
 .direnv
 
+poulet
+
 # doc
 html
 devtools/extra/index.html
