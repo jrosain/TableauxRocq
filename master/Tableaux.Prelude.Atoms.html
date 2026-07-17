@@ -51,37 +51,19 @@
 <div class="code">
 
 <br/>
-<span class="id" title="keyword">Record</span> <a id="Atom" class="idref" href="#Atom"><span class="id" title="record">Atom</span></a> :=<br/>
-&nbsp;&nbsp;{ <a id="atom" class="idref" href="#atom"><span class="id" title="projection">atom</span></a> :&gt; <span class="id" title="keyword">Type</span><br/>
-&nbsp;&nbsp;; <a id="eqb_atom" class="idref" href="#eqb_atom"><span class="id" title="projection">eqb_atom</span></a> :: <a class="idref" href="Tableaux.Prelude.Classes.html#EqBool"><span class="id" title="class">EqBool</span></a> <a class="idref" href="Tableaux.Prelude.Atoms.html#atom:2"><span class="id" title="method">atom</span></a><br/>
-&nbsp;&nbsp;; <a id="set_atom" class="idref" href="#set_atom"><span class="id" title="projection">set_atom</span></a> : <a class="idref" href="Tableaux.Prelude.Sets.html#set"><span class="id" title="class">set</span></a> <a class="idref" href="Tableaux.Prelude.Atoms.html#atom:2"><span class="id" title="method">atom</span></a> }.<br/>
-<span class="id" title="keyword">Arguments</span> <a class="idref" href="Tableaux.Prelude.Atoms.html#set_atom"><span class="id" title="projection">set_atom</span></a> : <span class="id" title="tactic">clear</span> <span class="id" title="var">implicits</span>.<br/>
+<span class="id" title="keyword">Class</span> <a id="isAtom" class="idref" href="#isAtom"><span class="id" title="record">isAtom</span></a> (<a id="A:1" class="idref" href="#A:1"><span class="id" title="binder">A</span></a> : <span class="id" title="keyword">Type</span>) :=<br/>
+&nbsp;&nbsp;{ <a id="eqb_atom" class="idref" href="#eqb_atom"><span class="id" title="projection">eqb_atom</span></a> :: <a class="idref" href="Tableaux.Prelude.Classes.html#EqBool"><span class="id" title="class">EqBool</span></a> <a class="idref" href="Tableaux.Prelude.Atoms.html#A:1"><span class="id" title="variable">A</span></a><br/>
+&nbsp;&nbsp;; <a id="set_atom" class="idref" href="#set_atom"><span class="id" title="projection">set_atom</span></a> :: <a class="idref" href="Tableaux.Prelude.Sets.html#set"><span class="id" title="class">set</span></a> <a class="idref" href="Tableaux.Prelude.Atoms.html#A:1"><span class="id" title="variable">A</span></a> }.<br/>
+<span class="id" title="keyword">Arguments</span> <a class="idref" href="Tableaux.Prelude.Atoms.html#eqb_atom"><span class="id" title="method">eqb_atom</span></a> {<span class="id" title="var">_</span> <span class="id" title="var">_</span>}.<br/>
+<span class="id" title="keyword">Arguments</span> <a class="idref" href="Tableaux.Prelude.Atoms.html#set_atom"><span class="id" title="method">set_atom</span></a> <span class="id" title="var">_</span> {<span class="id" title="var">_</span>}.<br/>
 
 <br/>
 </div>
 
 <div class="doc">
-<a id="lab4"></a><h2 class="section">Some usual instantiations, hidden under an importable module.</h2>
-
+Some instanciations can be found in <span class="inlinecode"><span class="id" title="var">AtomInstances.v</span></span>. 
 </div>
 <div class="code">
-
-<br/>
-<span class="id" title="keyword">Module</span> <a id="AtomComputationalInstances" class="idref" href="#AtomComputationalInstances"><span class="id" title="module">AtomComputationalInstances</span></a>.<br/>
-&nbsp;&nbsp;<span class="id" title="keyword">Export</span> <a class="idref" href="Tableaux.Prelude.Sets.html#SetComputationalInstances"><span class="id" title="module">SetComputationalInstances</span></a>.<br/>
-
-<br/>
-&nbsp;&nbsp;#[<span class="id" title="var">global</span>] <span class="id" title="var">Canonical</span> <span class="id" title="keyword">Structure</span> <a id="AtomComputationalInstances.nat_atom" class="idref" href="#AtomComputationalInstances.nat_atom"><span class="id" title="definition">nat_atom</span></a> : <a class="idref" href="Tableaux.Prelude.Atoms.html#Atom"><span class="id" title="record">Atom</span></a> :=<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;{| <a class="idref" href="Tableaux.Prelude.Atoms.html#atom"><span class="id" title="projection">atom</span></a> := <a class="idref" href="http://rocq-prover.org/doc/V9.0.1/stdlib//Corelib.Init.Datatypes.html#nat"><span class="id" title="inductive">nat</span></a><br/>
-&nbsp;&nbsp;&nbsp;&nbsp;;  <a class="idref" href="Tableaux.Prelude.Atoms.html#eqb_atom"><span class="id" title="projection">eqb_atom</span></a> := <a class="idref" href="Tableaux.Prelude.Classes.html#eq_bool_nat"><span class="id" title="instance">eq_bool_nat</span></a><br/>
-&nbsp;&nbsp;&nbsp;&nbsp;;  <a class="idref" href="Tableaux.Prelude.Atoms.html#set_atom"><span class="id" title="projection">set_atom</span></a> := <a class="idref" href="Tableaux.Prelude.Sets.html#SetComputationalInstances.SetOfNat"><span class="id" title="definition">SetOfNat</span></a> |}.<br/>
-
-<br/>
-&nbsp;&nbsp;#[<span class="id" title="var">global</span>] <span class="id" title="var">Canonical</span> <span class="id" title="keyword">Structure</span> <a id="AtomComputationalInstances.string_atom" class="idref" href="#AtomComputationalInstances.string_atom"><span class="id" title="definition">string_atom</span></a> : <a class="idref" href="Tableaux.Prelude.Atoms.html#Atom"><span class="id" title="record">Atom</span></a> :=<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;{| <a class="idref" href="Tableaux.Prelude.Atoms.html#atom"><span class="id" title="projection">atom</span></a> := <span class="id" title="inductive">string</span><br/>
-&nbsp;&nbsp;&nbsp;&nbsp;;  <a class="idref" href="Tableaux.Prelude.Atoms.html#eqb_atom"><span class="id" title="projection">eqb_atom</span></a> := <a class="idref" href="Tableaux.Prelude.Classes.html#eq_bool_string"><span class="id" title="instance">eq_bool_string</span></a><br/>
-&nbsp;&nbsp;&nbsp;&nbsp;;  <a class="idref" href="Tableaux.Prelude.Atoms.html#set_atom"><span class="id" title="projection">set_atom</span></a> := <a class="idref" href="Tableaux.Prelude.Sets.html#SetComputationalInstances.SetOfString"><span class="id" title="definition">SetOfString</span></a> |}.<br/>
-<span class="id" title="keyword">End</span> <a class="idref" href="Tableaux.Prelude.Atoms.html#AtomComputationalInstances"><span class="id" title="module">AtomComputationalInstances</span></a>.<br/>
 </div>
 </div>
 <div id="footer">
