@@ -110,7 +110,7 @@ Then, depending on Φ and `r`, the following formulas are added in the contexts 
 | ~(F & G)   | leftNotAnd  | ~F     | ~G    |
 | F => G     | leftImplies | ~F     | G     |
 | F <=> G    | leftIff     | ~F, ~G | F, G  |
-| ~(F <=> G) | leftNotIff  | F, ~G  | ~G, F |
+| ~(F <=> G) | leftNotIff  | F, ~G  | G, ~F |
 
 ## Full Example
 
