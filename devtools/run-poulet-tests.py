@@ -38,7 +38,7 @@ def run_failure_tests(dirname):
 if not os.path.exists(PATH):
     sh("cd .. && make poulet")
 
-succeed = ["basic"]
+succeed = ["basic" "bugs"]
 fail    = ["should_fail"]
 
 failed_tests = []
