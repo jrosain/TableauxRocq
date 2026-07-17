@@ -17,7 +17,7 @@ install:
 
 poulet: all
 	cd checker && dune build
-	ln -s checker/_build/default/bin/poulet.exe poulet
+	rm -f poulet && ln -s checker/_build/default/bin/poulet.exe poulet
 
 doc: RocqMakefile
 	COQMAKEFILE=RocqMakefile COQDOCJS_DIR=devtools make coqdoc -f RocqMakefile

@@ -37,9 +37,8 @@ jobs:
           git pull origin documentation --rebase
 
           version=$(echo ${BRANCH} | sed -e 's/refs\/heads\///g' | sed -e 's/release\///g')
-          rm -rf $version && cp -r html $version
 
-          if [[ -n $(git status --porcelain) ]]; then
+          if [[ -n $(git status --porcelain "$version") ]]; then
             git add $version
             git commit -m"chore: update documentation of $version (auto-pushed by GitHub Actions)"
             git push https://${PAT}@github.com/${REPO}.git documentation
