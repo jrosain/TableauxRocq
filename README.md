@@ -99,6 +99,10 @@ Otherwise, it can be compiled by using `dune build` in the `checker` folder. The
 process is streamlined by the `poulet` target of the `Makefile`, i.e., `make poulet` will
 extract the proof checker and compile `poulet` with dune.
 
+Afterwards, you can find the binary as:
+- `poulet` in the root of the repository if you used `make poulet`,
+- `checker/_build/default/bin/poulet.exe` if you built it using `dune`.
+
 ## Outputing Proofs using TableauxRocq
 
 If you develop a tableau-based automated theorem prover, you can certify your proofs using
