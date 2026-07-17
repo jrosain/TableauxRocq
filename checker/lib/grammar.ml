@@ -235,7 +235,7 @@ let rec compile etree =
 
      | ERImplies f ->
         (* [[ Imp f1 f2 ]] --> Or (Neg [[ f1 ]]) [[ f2 ]] *)
-        Node (compile left, BetaOr (translate_EForm f), Leaf None)
+        Node (compile left, BetaOr (translate_EForm f), compile right)
 
      | ERNotAnd f ->
         (* [[ Neg (And f1 f2) ]] --> Neg (Neg (Or (Neg [[ f1 ]]) (Neg [[ f2 ]]))) *)
