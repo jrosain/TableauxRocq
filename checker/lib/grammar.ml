@@ -4,6 +4,16 @@ open ProofInstance
 open LocallyNamelessClasses
 open ExtendedSyntax
 
+type sko = Outer | Inner
+
+let sko_str = function
+  | Outer -> "outer"
+  | Inner -> "inner"
+
+let interp_sko = function
+  | Outer -> SkolemizationInstances.coq_OuterSkolemization
+  | Inner -> SkolemizationInstances.coq_InnerSkolemization
+
 module Inference = struct
   type rule =
     False | NotTrue | Hyp | NotNot | And | NotOr | NotImplies | Or | Implies |
@@ -21,7 +31,7 @@ let mk_sub name tm = (name, tm)
 module Decl = struct
   type role = Axiom | Conj | NegConj | LocDef | ProofStep
   type plain = { name: string; role: role; targets: coq_EForm list; inf: Inference.t option }
-  type t = Plain of plain | Subst of ((string * coq_ETerm) list)
+  type t = Plain of plain | Subst of ((string * coq_ETerm) list * sko)
 
   let mk name role target inf =
     Plain { name; role; targets = [target]; inf = Some inf }
@@ -32,7 +42,7 @@ module Decl = struct
   let mk_hyp name role targets inf =
     Plain { name; role; targets; inf = Some inf }
 
-  let mk_sub sub = Subst sub
+  let mk_sub sub sk = Subst (sub, sk)
 end
 
 exception NoSuchName of string
@@ -349,22 +359,23 @@ let interp_rules gamma defs tree =
 let interp_decl_list ls =
   let open Decl in
   let rec interp_aux = function
-    | [] -> ([], [], None, [])
+    | [] -> ([], [], None, None, [])
     | x :: xs ->
-       let defs,fs,sub,tree = interp_aux xs in
+       let defs,fs,sub,sk,tree = interp_aux xs in
        match x with
-       | Decl.Subst sigma ->
+       | Decl.Subst (sigma,sk) ->
           if Option.is_some sub
           then raise MultipleSubEncountered
-          else (defs,fs,Some sigma,tree)
+          else (defs,fs,Some sigma,Some sk,tree)
        | Decl.Plain step ->
           match step.role with
-          | Axiom | Conj | NegConj -> defs,(step::fs),sub,tree
-          | LocDef -> step::defs,fs,sub,tree
-          | ProofStep -> defs,fs,sub,step::tree in
-  let defs,fs,sigma,tree = interp_aux ls in
+          | Axiom | Conj | NegConj -> defs,(step::fs),sub,sk,tree
+          | LocDef -> step::defs,fs,sub,sk,tree
+          | ProofStep -> defs,fs,sub,sk,step::tree in
+  let defs,fs,sigma,sk,tree = interp_aux ls in
+  let sk = Option.value sk ~default:Outer in
   let gamma = sort_normalization defs in
   let fs = interp_form_list gamma defs fs in
   let sigma = mk_substitution sigma in
   let tree = interp_rules gamma defs tree in
-  fs,sigma,tree
+  fs,sigma,sk,tree

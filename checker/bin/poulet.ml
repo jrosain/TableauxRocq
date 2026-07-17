@@ -39,26 +39,11 @@ let print_certificate file sko =
 │                                                                                                                        │
 ╚────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╝|} file sko
 
-type sko = Outer | Inner
-
-let sko_str = function
-  | Outer -> "outer"
-  | Inner -> "inner"
-
-let interp_sko = function
-  | Outer -> Lib.SkolemizationInstances.coq_OuterSkolemization
-  | Inner -> Lib.SkolemizationInstances.coq_InnerSkolemization
-
 let main () =
   let file = ref "" in
-  let sko = ref Outer in
   let fancy = ref false in
-  let select_skolemization = function
-    | "inner" -> sko := Inner
-    | _ -> () in
   let optlist =
-    [ ("-skolem", Arg.String select_skolemization, "Skolemization mode of the proof. Default: outer.")
-    ; ("-fancy", Arg.Set fancy, "Print a fancy certificate instead of a simple message on successful verification. Default: false.")
+    [ ("-fancy", Arg.Set fancy, "Print a fancy certificate instead of a simple message on successful verification. Default: false.")
     ] in
   let msg = "Welcome to POULET, the PrOof-checker for tableaUx in first-order Logic Extracted from Tableauxrocq.\n" in
   let _ = Arg.parse optlist (fun s -> file := s) msg in
@@ -67,10 +52,10 @@ let main () =
   begin
     try
       let declarations = Lib.Parser.proof Lib.Lexer.token lexbuf in
-      let fs,sigma,ruletree = Lib.Grammar.interp_decl_list declarations in
-      let status,err = Lib.Checker.coq_CheckProof (interp_sko !sko) fs sigma ruletree in
+      let fs,sigma,sk,ruletree = Lib.Grammar.interp_decl_list declarations in
+      let status,err = Lib.Checker.coq_CheckProof (Lib.Grammar.interp_sko sk) fs sigma ruletree in
       if status then
-        ((if !fancy then print_certificate !file (sko_str !sko)
+        ((if !fancy then print_certificate !file (Lib.Grammar.sko_str sk)
           else Printf.printf "The file contains a valid tableau proof.");
          exit 0)
       else

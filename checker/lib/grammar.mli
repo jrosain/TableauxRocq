@@ -4,6 +4,12 @@ open ProofInstance
 open LocallyNamelessClasses
 open ExtendedSyntax
 
+type sko = Outer | Inner
+
+val sko_str : sko -> string
+
+val interp_sko : sko -> SkolemizationInstances.coq_Skolemization
+
 module Inference : sig
   type t
   type rule =
@@ -23,7 +29,7 @@ module Decl : sig
   val mk : string -> role -> coq_EForm -> Inference.t -> t
   val mk_def : string -> role -> coq_EForm -> t
   val mk_hyp : string -> role -> coq_EForm list -> Inference.t -> t
-  val mk_sub : (sub list) -> t
+  val mk_sub : (sub list) -> sko -> t
 end
 
 exception NoSuchName of string
@@ -32,4 +38,5 @@ exception ProofCycleFound of string list
 exception MultipleSubEncountered
 exception MalformedProof of string
 
-val interp_decl_list : Decl.t list -> (coq_Form list * (RocqStr.t, coq_Term) coq_Substitution * coq_RuleTree)
+val interp_decl_list :
+  Decl.t list -> (coq_Form list * (RocqStr.t, coq_Term) coq_Substitution * sko * coq_RuleTree)

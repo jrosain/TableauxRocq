@@ -47,6 +47,9 @@ rule token = parse
   | "$fot" { tok "FOT"; FOT }
   | "inference" { tok "INFERENCE"; INFERENCE }
 
+  | "outer" { tok "OUTER"; OUTER }
+  | "inner" { tok "INNER"; INNER }
+
   | "|" { tok "LOR"; LOR }
   | "&" { tok "LAND"; LAND }
   | "=>" { tok "LIMP"; LIMP }

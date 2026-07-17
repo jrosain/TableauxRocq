@@ -1,4 +1,4 @@
 (executable
  (public_name poulet)
- (name main)
+ (name poulet)
  (libraries lib))
