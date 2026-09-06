@@ -53,13 +53,13 @@ let main () =
     try
       let declarations = Lib.Parser.proof Lib.Lexer.token lexbuf in
       let fs,sigma,sk,ruletree = Lib.Grammar.interp_decl_list declarations in
-      let status,err = Lib.Checker.coq_CheckProof (Lib.Grammar.interp_sko sk) fs sigma ruletree in
-      if status then
-        ((if !fancy then print_certificate !file (Lib.Grammar.sko_str sk)
+      match Lib.Checker.coq_CheckProof (Lib.Grammar.interp_sko sk) fs sigma ruletree with
+      | Ok _ ->
+         (if !fancy then print_certificate !file (Lib.Grammar.sko_str sk)
           else Printf.printf "The file contains a valid tableau proof.");
-         exit 0)
-      else
-        Printf.printf "Proof checking has reported an error:\n\"%s\"\n" (Lib.Prelude.RocqStr.to_string (List.hd err))
+         exit 0
+      | Err msg ->
+         Printf.printf "Proof checking has reported an error:\n\"%s\"\n" (Lib.Prelude.RocqStr.to_string msg)
     with
     | Lib.Grammar.MultipleSubEncountered ->
        Printf.printf "Error: multiple declarations with the substitution role encountered.\n"

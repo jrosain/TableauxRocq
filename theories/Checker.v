@@ -14,13 +14,19 @@ From Stdlib Require Import Lia.
 (** ** 1. The algorithm *)
 
 (** A small [Result] monad that stores the errors encountered. *)
-Definition Result (A : Type) : Type := A * list string.
+Variant Result (A : Type) : Type :=
+| Ok (x : A)
+| Err (msg : string).
+#[global] Arguments Ok {_} _.
+#[global] Arguments Err {_} _.
 
 #[global] Instance Monad_Result : Monad Result :=
-  {| ret := fun A x => (x, [])
+  {| ret := fun A x => Ok x
   ;  bind A B r f :=
-      let (x, s) := f (fst r) in
-      (x, (snd r ++ s)%list) |}.
+  	   match r with
+  	   | Ok x => f x
+	   | Err msg => Err msg
+	   end |}.
 
 (** *** Utility functions *)
 
@@ -130,7 +136,7 @@ Section ProofCheckerAlgorithm.
 
   Definition result := Result algo_result.
 
-  Definition error (s : string) : result := ({| status := false; symbs := empty_record |}, [s]).
+  Definition error (msg : string) : result := Err msg.
 
   Definition rule_wrapper {A : Type} (Gamma : Ctx.t) (F : Form) (err : string)
     (getter : Form -> option A) (action : A -> result) : result :=
@@ -324,16 +330,10 @@ Section RulesSoundness.
     intros ?????????? e. unfold beta_rule in e.
     apply rule_wrapper_sound in e. destruct e as ((l1 & l2) & eg & hin & hact).
     exists l1, l2; cbn[fst snd] in hact.
-    destruct (CheckProof_aux sko func_symbs (Ctx.union l1 Gamma) sigma record T1); cbn in *.
-    destruct a as (b & s). exists s; repeat split; cbn in *; destruct b; unfold ret in hact; cbn in *;
-      auto.
-
-    2,4: injection hact => _ _ contra; inversion contra.
-
-    all: destruct (CheckProof_aux sko func_symbs (Ctx.union l2 Gamma) sigma s T2); cbn in *;
-      destruct (status a); cbn in *; auto.
-
-    all: injection hact => e _; apply app_eq_nil in e; destruct e as [el el']; subst; auto.
+    destruct (CheckProof_aux sko func_symbs (Ctx.union l1 Gamma) sigma record T1); cbn in *;
+	  try easy.
+	destruct x as [res symbs]; exists symbs.
+	repeat split; cbn in *; destruct res; unfold ret in hact; cbn in *; easy.
   Qed.
 
   Lemma gamma_rule_sound :
@@ -1652,10 +1652,10 @@ Section Soundness.
   Proof using Type.
     intros ??? e.
 
-    cbn in e. destruct (CheckProof_aux sko (function_symbols (isAtom1 := string_atom) Gamma)
-                          (Ctx.from_list Gamma) sigma empty_record R) eqn:esrch; try easy; cbn in *.
-    destruct a; cbn in *. injection e => estatus el; subst.
-    rewrite app_nil_r in estatus; subst.
+    cbn in e.
+	destruct (CheckProof_aux sko (function_symbols (isAtom1 := string_atom) Gamma)
+                (Ctx.from_list Gamma) sigma empty_record R) eqn:esrch; try easy; cbn in *.
+    destruct x as [res symbs]; cbn in *. injection e => e'; subst.
 
     have [s esequence] := CheckProof_Some_RuleTree_to_Sequence_Some esrch.
     exists s; split.
@@ -1711,49 +1711,48 @@ Module Export ExtendedSyntax.
   Definition get_neg_neg (F : Form) : Result Form :=
     match F with
     | Neg (Neg G) => ret G
-    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++ " is not a double negation.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not a double negation.")%string
     end.
 
   Definition get_neg_or (F : Form) : Result (list Form) :=
     match F with
     | Neg (Or F1 F2) => ret [Neg F1 ; Neg F2]
-    | _ => ([], [("Error: the formula " ++ pr_form F ++ " is not a negated disjunction.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not a negated disjunction.")%string
     end.
 
   Definition get_and (F : Form) : Result (list Form) :=
     match F with
     | Neg (Or (Neg F1) (Neg F2)) => ret [F1 ; F2 ; Neg (Neg F1) ; Neg (Neg F2)]
-    | _ => ([], [("Error: the formula " ++ pr_form F ++ " is not a conjunction.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not a conjunction.")%string
     end.
 
   Definition get_neg_imp (F : Form) : Result (list Form) :=
     match F with
     | Neg (Or (Neg F1) F2) => ret [F1 ; Neg F2 ; Neg (Neg F1)]
-    | _ => ([], [("Error: the formula " ++ pr_form F ++ " is not a negated implication.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not a negated implication.")%string
     end.
 
   Definition get_or (F : Form) : Result (Form * Form) :=
     match F with
     | Or F1 F2 => ret (F1, F2)
-    | _ => ((Neg Bot, Neg Bot), [("Error: the formula " ++ pr_form F ++ " is not a disjunction.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not a disjunction.")%string
     end.
 
   Definition get_imp (F : Form) : Result (Form * Form) :=
     match F with
     | Or (Neg F1) F2 => ret (Neg F1, F2)
-    | _ => ((Neg Bot, Neg Bot), [("Error: the formula " ++ pr_form F ++ " is not an implication.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not an implication.")%string
     end.
 
   Definition get_neg_and (F : Form) : Result (list Form * list Form) :=
     match F with
     | Neg (Neg (Or (Neg F1) (Neg F2))) => ret ([Neg F1 ; Or (Neg F1) (Neg F2)], [Neg F2 ; Or (Neg F1) (Neg F2)])
-    | _ => (([], []), [("Error: the formula " ++ pr_form F ++ " is not a negated conjunction.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not a negated conjunction.")%string
     end.
 
   Definition get_equ (F : Form) :
     Result (list Form * list Form * list Form * list Form * list Form) :=
-    let err := (([], [], [], [], []),
-                 [("Error: the formula " ++ pr_form F ++ " is not an equivalence.")%string]) in
+    let err := Err ("Error: the formula " ++ pr_form F ++ " is not an equivalence.")%string in
     match F with
     | Neg (Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F3) F4))) =>
         if negb (eqb F1 F4 && eqb F2 F3) then err
@@ -1764,8 +1763,7 @@ Module Export ExtendedSyntax.
     end.
 
   Definition get_neg_equ (F : Form) : Result (list Form * list Form * Form) :=
-    let err := (([], [], Neg Bot),
-                 [("Error: the formula " ++ pr_form F ++ " is not an equivalence.")%string]) in
+    let err := Err ("Error: the formula " ++ pr_form F ++ " is not an equivalence.")%string in
     match F with
     | Neg (Neg (Or (Neg (Or (Neg F1) F2)) (Neg (Or (Neg F3) F4)))) =>
         if negb (eqb F1 F4 && eqb F2 F3) then err
@@ -1778,26 +1776,26 @@ Module Export ExtendedSyntax.
   Definition get_all (F : Form) : Result Form :=
     match F with
     | All G => ret G
-    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++ " is not a universal quantifier.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not a universal quantifier.")%string
     end.
 
   Definition get_neg_ex (F : Form) : Result Form :=
     match F with
     | Neg (Neg (All (Neg G))) => ret G
-    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++
-                   " is not a negated existential quantifier.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++
+                " is not a negated existential quantifier.")%string
     end.
 
   Definition get_ex (F : Form) : Result Form :=
     match F with
     | Neg (All (Neg G)) => ret G
-    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++ " is not an existential quantifier.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not an existential quantifier.")%string
     end.
 
   Definition get_neg_all (F : Form) : Result Form :=
     match F with
     | Neg (All G) => ret G
-    | _ => (Neg Bot, [("Error: the formula " ++ pr_form F ++ " is not a negated universal quantifier.")%string])
+    | _ => Err ("Error: the formula " ++ pr_form F ++ " is not a negated universal quantifier.")%string
     end.
 
   (* We provide a compilation of the [ExtendedRuleTree] to a [RuleTree]. *)
@@ -1871,7 +1869,7 @@ Module Export ExtendedSyntax.
                              (AlphaNegNeg nnF2) (Leaf None))
                           (AlphaNegNeg nnF1) (Leaf None))
                        (AlphaNegOr F) (Leaf None))
-             | _, _, _ => (Leaf None, ["Anomaly: please report to the developers."])
+             | _, _, _ => Err "Anomaly: please report to the developers."
              end
         | E.BetaNegEqu F =>
             fs <- get_neg_equ F;
@@ -1928,10 +1926,6 @@ Module Export ExtendedSyntax.
     intros ???? echk.
     destruct (compile Gamma R) eqn:comp; try easy.
     unshelve eapply CheckProof_sound; eauto.
-    cbn in echk |- *.
-    have el : l = [].
-    { injection echk => els _. apply app_eq_nil in els; easy. }
-    rewrite el in echk; now cbn in echk.
   Qed.
 
   Export E.
@@ -1942,7 +1936,7 @@ End ExtendedSyntax.
 Ltac tableaux tree :=
   apply (Extended_CheckProof_sound tree); native_compute;
   lazymatch goal with
-  | [ |- (false, ?err :: _) = (true, []) ] =>
-      fail 0 "tableaux failed with the following error message: " err
+  | [ |- Err ?msg = Ok _ ] =>
+      fail 0 "tableaux failed with the following error message: " msg
   | _ => reflexivity
   end.
