@@ -1936,7 +1936,7 @@ End ExtendedSyntax.
 Ltac tableaux tree :=
   apply (Extended_CheckProof_sound tree); native_compute;
   lazymatch goal with
-  | [ |- (false, ?err :: _) = (true, []) ] =>
-      fail 0 "tableaux failed with the following error message: " err
+  | [ |- Err ?msg = Ok _ ] =>
+      fail 0 "tableaux failed with the following error message: " msg
   | _ => reflexivity
   end.
