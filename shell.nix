@@ -3,7 +3,8 @@
 , withDoc ? true
 , withExtraction ? true
 , withOCamlDev ? true
-, withTests ? true }:
+, withTests ? true
+, withRocqDev ? true }:
 
 pkgs.mkShell {
   nativeBuildInputs = with pkgs.buildPackages; [
@@ -14,7 +15,9 @@ pkgs.mkShell {
     rocq-core
     rocqPackages.stdlib
     ocamlPackages.findlib
-  ] ++ (lib.optionals withDoc [
+  ] ++ (lib.optionals withRocqDev [
+    coqPackages.coq-lsp
+  ]) ++ (lib.optionals withDoc [
     # Packages for building the documentation
     pandoc
   ]) ++ (lib.optionals withExtraction [
