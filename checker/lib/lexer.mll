@@ -50,6 +50,7 @@ rule token = parse
   | "outer" { tok "OUTER"; OUTER }
   | "inner" { tok "INNER"; INNER }
 
+  | "=" { tok "EQ"; EQ }
   | "|" { tok "LOR"; LOR }
   | "&" { tok "LAND"; LAND }
   | "=>" { tok "LIMP"; LIMP }

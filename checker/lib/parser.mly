@@ -17,7 +17,7 @@
 
 %token LPAR RPAR COMMA COLON DOT SEMI LBRACK RBRACK LACC RACC BACKQUOTE
 %token FOF PLAIN SUBST AXIOM CONJECTURE NEGATED_CONJECTURE DEFINITION TH LEM COR FOT INFERENCE OUTER INNER
-%token LOR LAND LIMP LIFF LNEG LALL LEX FTRUE FFALSE ARR
+%token EQ LOR LAND LIMP LIFF LNEG LALL LEX FTRUE FFALSE ARR
 %token <int> INT
 %token <string> LOWER_WORD SQ_CHAR UPPER_WORD
 %token FALSE NOT_TRUE HYP NOT_NOT AND NOT_OR NOT_IMP OR IMP NOT_AND IFF NOT_IFF EX NOT_ALL ALL NOT_EX
@@ -130,6 +130,7 @@ rule:
 
 fof_binary_formula:
     fof_unit_formula LIFF fof_unit_formula { EEqu ($1, $3) }
+  | fof_term EQ fof_term { EEq ($1, $3) }
   | fof_binary_rightassoc { $1 }
   | fof_binary_leftassoc { $1 }
 ;
