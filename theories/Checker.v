@@ -55,6 +55,7 @@ Class Pr (A : Type) :=
     match F with
     | Bot => "$false"
     | Pred p l => (p ++ "(" ++ pr_list pr l ++ ")")%string
+    | Eq t u => (pr t ++ " = " ++ pr u)%string
     | Neg F => ("~(" ++ rec F ++ ")")%string
     | Or F1 F2 => ("(" ++ rec F1 ++ " | " ++ rec F2 ++ ")")%string
     | All F => ("! (" ++ rec F ++ ")")%string

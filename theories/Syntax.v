@@ -187,11 +187,12 @@ Qed.
 
 (** ** Minimal first-order logic formulas *)
 Inductive Form {pred func var : Type} `{isAtom pred} `{isAtom func} `{isAtom var} : Type :=
-| Bot  : Form
-| Pred : pred -> list (Term func var) -> Form
-| Neg  : Form -> Form
-| Or   : Form -> Form -> Form
-| All  : Form -> Form.
+| Bot
+| Pred (p : pred) (l : list (Term func var))
+| Eq   (t u : Term func var)
+| Neg  (F : Form)
+| Or   (F G : Form)
+| All  (F : Form).
 
 Arguments Form _ _ _ {_ _ _}.
 
@@ -222,6 +223,7 @@ Section DecEqForms.
     match F, G with
     | Bot, Bot => true
     | Pred p l, Pred p' l' => eqb p p' && eqb l l'
+    | Eq t u, Eq t' u' => eqb t t' && eqb u u'
     | Neg F, Neg G => eqb_form F G
     | Or F1 F2, Or G1 G2 => eqb_form F1 G1 && eqb_form F2 G2
     | All F, All G => eqb_form F G
@@ -235,6 +237,8 @@ Section DecEqForms.
     all: try now intro.
     - intros (e & e')%andb_prop. rewrite !eqbIsEq in e, e'. rewrite e e' //.
     - intros e; injection e => -> ->. apply andb_true_intro; split; apply EqBool_refl.
+    - intros (e & e')%andb_prop; rewrite !eqbIsEq in e, e'; by subst.
+    - intros e; injection e => -> ->; apply andb_true_intro; split; by rewrite eqbIsEq.
     - intro. apply f_equal. rewrite -IHF //.
     - intro e. injection e => <-. rewrite IHF //.
     - intros (e & e')%andb_prop. rewrite IHF1 IHF2 in e, e'. now subst.
@@ -262,6 +266,7 @@ Section OpeningSubstForms.
     match F with
     | Bot => Bot
     | Pred p l => Pred p (map (fun t => t{n \to u}) l)
+    | Eq t t' => Eq (t{n \to u}) (t'{n \to u})
     | Neg  F'  => Neg (opening_form_ n u F')
     | Or F1 F2 => Or (opening_form_ n u F1) (opening_form_ n u F2)
     | All  F'  => All (opening_form_ (n+1) u F')
@@ -276,6 +281,7 @@ Section OpeningSubstForms.
          match F with
          | Bot      => Bot
          | Pred p l => Pred p (map (fun t => t@[sigma]) l)
+         | Eq t u   => Eq t@[sigma] u@[sigma]
          | Neg F'   => Neg (rec F')
          | Or F1 F2 => Or (rec F1) (rec F2)
          | All F'   => All (rec F')
@@ -385,6 +391,7 @@ Section SubstOpeningLemmas.
       { induction l as [|t ts IHts]; auto.
         cbn; rewrite term_subst_opening IHts //. }
       rewrite !map_map hmap //.
+    - by rewrite !term_subst_opening.
     - now rewrite -IHF.
     - now rewrite -IHF1 -IHF2.
     - rewrite -IHF //.
@@ -402,6 +409,7 @@ Section FVForms.
       match F with
       | Bot      => empty_set
       | Pred f l => fold_left (fun s t => s \union (fv t)) l empty_set
+      | Eq t u   => (fv t) \union (fv u)
       | Neg F'   => rec F'
       | Or F1 F2 => (rec F1) \union (rec F2)
       | All F'   => rec F'
@@ -504,6 +512,14 @@ Section isClosedLemmas.
         rewrite empty_unitl in hclosed. now apply is_empty_union1 in hclosed.
   Qed.
 
+  Lemma isClosed_Eq :
+    forall (t u : Term), isClosed (Eq t u) -> isClosed t /\ isClosed u.
+  Proof.
+    intros ?? hclosed; unfold isClosed in hclosed |- *; cbn in hclosed; split.
+    - by apply is_empty_union1 in hclosed.
+    - by apply is_empty_union2 in hclosed.
+  Qed.
+
   Lemma isClosed_subst_form :
     forall (F : Form) (sigma : Substitution var Term),
       isClosed F -> F@[sigma] = F.
@@ -518,6 +534,7 @@ Section isClosedLemmas.
         unfold isClosed in hclosed |- *; cbn in *.
         rewrite set_fold_left in hclosed.
         rewrite empty_unitl in hclosed. now apply is_empty_union1 in hclosed.
+    - cbn; rewrite !isClosed_subst_term; auto; apply (isClosed_Eq t u hclosed).
     - change (Neg (F@[sigma]) = Neg F). rewrite IHF //.
     - change (Or F1@[sigma] F2@[sigma] = Or F1 F2). rewrite IHF1.
       + unfold isClosed in hclosed |- *; cbn in *.
@@ -594,6 +611,7 @@ Section FunctionSymbols.
       match F with
       | Bot => \{ \}
       | Pred _ l => function_symbols l
+      | Eq t u   => function_symbols t \union function_symbols u
       | Neg F | All F => rec F
       | Or F1 F2 => rec F1 \union rec F2
       end.
@@ -636,7 +654,7 @@ Section FunctionSymbols.
       function_symbols (F{n \to t}) \subseteq
         function_symbols F \union function_symbols t.
   Proof using Type.
-    intros F; induction F; intros t n.
+    intros F; induction F; intros u0 n.
     - now intros f contra%empty_spec.
     - cbn; intros f hin. induction l as [|u us IHus].
       + now apply empty_spec in hin.
@@ -651,6 +669,15 @@ Section FunctionSymbols.
           specialize (IHus hus). rewrite union_spec in IHus; destruct IHus as [hus' | ht].
           -- now left; right.
           -- now right.
+    - have ht := function_symbols_opening_terms u0 t n.
+      have hu := function_symbols_opening_terms u0 u n.
+      cbn; intros f [hint | hinu]%union_spec; rewrite !union_spec.
+      + apply ht in hint; rewrite union_spec in hint; destruct hint as [ht' | hu0].
+        * by repeat left.
+        * by right.
+      + apply hu in hinu; rewrite union_spec in hinu; destruct hinu as [hu' | hu0].
+        * by left; right.
+        * by right.
     - intros; now apply IHF.
     - intros f hin; cbn in hin |- *; rewrite !union_spec in hin |- *.
       destruct hin as [hF1 | hF2].
@@ -685,7 +712,7 @@ Section FunctionSymbols.
       function_symbols F \subseteq
         function_symbols (F{n \to t}).
   Proof using Type.
-    intros F; induction F; intros t n.
+    intros F; induction F; intros u0 n.
     - now intros f contra%empty_spec.
     - cbn; intros f hin. induction l as [|u us IHus].
       + now apply empty_spec in hin.
@@ -695,6 +722,11 @@ Section FunctionSymbols.
           eapply function_symbols_opening_terms' in hu; left; eassumption.
         * cbn; rewrite set_fold_left empty_unitl !union_spec. right.
           now apply IHus.
+    - have ht := function_symbols_opening_terms' u0 t n.
+      have hu := function_symbols_opening_terms' u0 u n.
+      cbn; intros f [hint | hinu]%union_spec; rewrite !union_spec.
+      + left; by apply ht.
+      + right; by apply hu.
     - intros; now apply IHF.
     - intros f hin; cbn in hin |- *; rewrite !union_spec in hin |- *.
       destruct hin as [hF1 | hF2].

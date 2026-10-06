@@ -13,6 +13,10 @@ let rec pr_form_ (pr_tm : coq_Term -> Prelude.RocqStr.t) f =
   | Bot -> "$false"
   | Pred (p, ts) ->
      Printf.sprintf "%s(%s)" (Prelude.RocqStr.to_string p) (String.concat ", " (List.map (fun t -> Prelude.RocqStr.to_string (pr_tm t)) ts))
+  | Eq (t, u) ->
+     Printf.sprintf "%s = %s"
+       (Prelude.RocqStr.to_string (pr_tm t))
+       (Prelude.RocqStr.to_string (pr_tm u))
   | Neg f -> Printf.sprintf "~(%s)" (pr_form_ pr_tm f)
   | Or (f, g) -> Printf.sprintf "(%s | %s)" (pr_form_ pr_tm f) (pr_form_ pr_tm g)
   | All f -> Printf.sprintf "! (%s)" (pr_form_ pr_tm f)

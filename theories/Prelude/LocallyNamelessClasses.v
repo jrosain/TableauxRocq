@@ -37,7 +37,7 @@ Section Substitution.
   Arguments substitute {_ _ _ _ _} _ _.
 End Substitution.
 
-Notation "x @[ sigma ]" := (substitute x sigma) (at level 3).
+Notation "x @[ sigma ]" := (substitute x sigma) (at level 3, format "x @[ sigma ]").
 
 (** ** Further free instances of [BV]. *)
 Section BVInstances.

@@ -32,6 +32,7 @@ Section ESyntax.
   | ETop  : EForm
   | EBot  : EForm
   | EPred : string -> list ETerm -> EForm
+  | EEq   : ETerm -> ETerm -> EForm
   | ENeg  : EForm -> EForm
   | EOr   : EForm -> EForm -> EForm
   | EAnd  : EForm -> EForm -> EForm
@@ -99,6 +100,7 @@ Section ESemantics.
       | ETop      => True
       | EBot      => False
       | EPred p l => interp_pred p (map (interpret_eterm rho) l)
+      | EEq t u   => interpret_eterm rho t = interpret_eterm rho u
       | ENeg F    => ~ (rec rho F)
       | EOr F G   => rec rho F \/ rec rho G
       | EAnd F G  => rec rho F /\ rec rho G
@@ -126,7 +128,7 @@ Section ESyntaxTranslation.
 
   Fixpoint bv_eform (F : EForm) : string_set :=
     match F with
-    | EBot | ETop | EPred _ _ => empty_set
+    | EBot | ETop | EPred _ _ | EEq _ _ => empty_set
     | ENeg F => bv_eform F
     | EOr F G | EAnd F G | EImp F G | EEqu F G => (bv_eform F) \union (bv_eform G)
     | EEx x F | EAll x F => add x (bv_eform F)
@@ -466,6 +468,7 @@ Section ESyntaxTranslation.
     | EBot => Bot
     | ETop => Neg Bot
     | EPred f l => Pred f (map (translate_ETerm m) l)
+    | EEq t u => Eq (translate_ETerm m t) (translate_ETerm m u)
     | ENeg F => Neg (translate_EForm_aux m F)
     | EOr F G => Or (translate_EForm_aux m F) (translate_EForm_aux m G)
     | EAnd F G => Neg (Or (Neg (translate_EForm_aux m F)) (Neg (translate_EForm_aux m G)))
@@ -493,6 +496,7 @@ Section ESyntaxTranslation.
     match F with
     | EBot | ETop => F
     | EPred f l => EPred f (map (instantiate_eterm x u) l)
+    | EEq t u' => EEq (instantiate_eterm x u t) (instantiate_eterm x u u')
     | ENeg F => ENeg (instantiate_eform x u F)
     | EOr F G => EOr (instantiate_eform x u F) (instantiate_eform x u G)
     | EAnd F G => EAnd (instantiate_eform x u F) (instantiate_eform x u G)
@@ -561,6 +565,7 @@ Section ESyntaxTranslation.
     intros F t. induction F; try reflexivity.
     - intros. cbn. apply f_equal. induction l; auto.
       cbn; rewrite IHl. rewrite instantiate_shadowed_term //.
+    - intros; cbn. by rewrite !instantiate_shadowed_term.
     - intros; cbn. rewrite IHF //.
     - intros; cbn. rewrite IHF1 IHF2 //.
     - intros; cbn. rewrite IHF1 IHF2 //.
@@ -625,6 +630,7 @@ Section ESyntaxTranslation.
     - intros. rewrite !map_map.
       apply f_equal. induction l as [|u us IHus]; cbn; auto.
       rewrite IHus instantiate_eterm_commutes_instantiate_term //.
+    - intros; by rewrite !instantiate_eterm_commutes_instantiate_term; auto.
     - rewrite IHF //.
     - rewrite IHF1 //.
       + eapply closed_in_union_closed_in_left; eauto.
@@ -797,6 +803,10 @@ Section ValidityEquivalence.
           rewrite IHxs gen_interp_term_interp_eterm; auto. }
         rewrite e //.
 
+      (* Cases: equality *)
+      - intros; cbn.
+        by rewrite !gen_interp_term_interp_eterm.
+
       (* Cases: negation *)
       - intros; cbn. now rewrite IHF.
 
@@ -968,6 +978,7 @@ Module ExtendedSyntaxNotation.
   Notation "P ''( t1 ,, t2 ,, .. ,, tn )" :=
     (EPred P (cons t1 (cons t2 .. (cons tn nil) ..))).
   Notation "'~ P" := (ENeg P) (at level 2).
+  Notation "t '= u" := (EEq t u) (at level 10).
   Notation "P '|| Q" := (EOr P Q) (at level 10).
   Notation "P '&& Q" := (EAnd P Q) (at level 5).
   Notation "P '=> Q" := (EImp P Q) (at level 6).

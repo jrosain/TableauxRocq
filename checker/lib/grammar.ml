@@ -53,7 +53,7 @@ let list_assoc name assoc =
 
 let rec referenced_names f names =
   match f with
-  | ETop | EBot -> []
+  | ETop | EBot | EEq _ -> []
   | EPred (p, _) ->
      let name = RocqStr.to_string p in
      if List.mem name names then [name]
@@ -97,6 +97,7 @@ let normalize_form gamma defs f =
        if RocqStr.to_string p = name
        then nf
        else f
+    | EEq (t, u) -> f
     | ENeg f -> ENeg (normalize_aux name nf f)
     | EOr (f, g) -> EOr (normalize_aux name nf f, normalize_aux name nf g)
     | EAnd (f, g) -> EAnd (normalize_aux name nf f, normalize_aux name nf g)

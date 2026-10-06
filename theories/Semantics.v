@@ -47,11 +47,12 @@ Section SemanticsDef.
   #[global] Instance interpret_form (M : Model) : Interpret M (Form pred func var) Prop :=
     fix rec (rho : list M) (sigma : env M var) (F : Form pred func var) : Prop :=
       match F with
-      | Bot        => False
+      | Bot => False
       | Pred p l => interp_pred p (map (interpret_term M rho sigma) l)
-      | Neg F      => ~ (rec rho sigma F)
-      | Or F G   => rec rho sigma F \/ rec rho sigma G
-      | All F    => forall (x : M), rec (x :: rho) sigma F
+      | Eq t u => interpret_term M rho sigma t = interpret_term M rho sigma u
+      | Neg F => ~ (rec rho sigma F)
+      | Or F G => rec rho sigma F \/ rec rho sigma G
+      | All F => forall (x : M), rec (x :: rho) sigma F
       end.
 
   Definition is_valid (F : Form pred func var) :=
@@ -390,6 +391,7 @@ Section SemanticsFacts.
       { induction l as [|v vs IHvs]; auto; cbn.
         rewrite IHvs term_env_inst_commutes; auto. }
       rewrite hmap //.
+    - rewrite !term_env_inst_commutes; auto.
     - erewrite IHF; eauto.
     - erewrite IHF1, IHF2; eauto.
     - apply prodext=>x. have e := (IHF (x :: rho)).
@@ -442,6 +444,10 @@ Section SemanticsFacts.
       + f_equal. change ([[ M # rho # sigma '|= t ]] = [[ M # rho # mu '|= t ]]).
         apply isClosed_interp_term_env_eq. unfold isClosed;
           rewrite set_fold_left empty_unitl in hclosed; now apply is_empty_union1 in hclosed.
+    - intro.
+      change (([[ M # rho # sigma '|= t ]] = [[ M # rho # sigma '|= u ]]) =
+              ([[ M # rho # mu '|= t ]] = [[ M # rho # mu '|= u ]])).
+      rewrite !(isClosed_interp_term_env_eq _ _ _ _ mu); auto; apply (isClosed_Eq t u hclosed).
     - intros; rewrite IHF //.
     - intros; rewrite IHF1; [| rewrite IHF2 //];
         unfold isClosed in hclosed |- *; cbn in *.
@@ -483,6 +489,12 @@ Section SemanticsFacts.
                   [[ M # rho # subst_to_env M sigma '|= t ]]).
         apply subst_commutes_with_env_terms. }
       now rewrite e.
+    - intros ??.
+      change (([[ M # rho # empty_env M var '|= t@[sigma] ]] =
+               [[ M # rho # empty_env M var '|= u@[sigma] ]]) <->
+              ([[ M # rho # subst_to_env M sigma '|= t ]] =
+               [[ M # rho # subst_to_env M sigma '|= u ]])).
+      by rewrite !subst_commutes_with_env_terms.
     - intros ??. rewrite IHF //.
     - intros; rewrite IHF1 IHF2 //.
     - intros. split; intros h x.
@@ -525,6 +537,13 @@ Section SemanticsFacts.
         intros x hin; apply heq; cbn.
         rewrite set_fold_left empty_unitl union_spec. now right. }
       rewrite el //.
+    - change ([[ M # rho # sigma '|= t ]] = [[ M # rho # sigma '|= u ]] <->
+              [[ M # rho # mu '|= t ]] = [[ M # rho # mu '|= u ]]).
+      rewrite (only_fv_valuation_matters_in_terms _ _ _ _ mu); auto.
+      + intros; apply heq; cbn. rewrite union_spec; now left.
+      + rewrite (only_fv_valuation_matters_in_terms _ _ _ _ mu); auto.
+        * intros; apply heq; cbn. rewrite union_spec; now right.
+        * reflexivity.
     - rewrite IHF //.
     - rewrite IHF1.
       + intros; apply heq; cbn.
@@ -676,6 +695,9 @@ Section RealReplacementModel.
       + rewrite no_skolem_same_interp_term //.
         intro hin; apply hnin; cbn.
         rewrite set_fold_left union_spec empty_unitl; now left.
+    - rewrite !no_skolem_same_interp_term; auto; intro hin; apply hnin; rewrite union_spec.
+      + now left.
+      + now right.
     - rewrite IHG; auto.
     - rewrite IHG1.
       + intro hin. apply hnin. rewrite union_spec; now left.

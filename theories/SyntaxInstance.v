@@ -45,7 +45,7 @@ Fixpoint ltb_term (t u : Term) : bool :=
   | Fun f lf, Fun g lg =>
       match SOrd.compare f g with
       | Lt => true
-      | Eq => ltb_list ltb_term lf lg
+      | Datatypes.Eq => ltb_list ltb_term lf lg
       | Gt => false
       end
   | Fun _ _, _ => false
@@ -148,8 +148,12 @@ Fixpoint lt_form (F G : Form) : Prop :=
         (p = p' /\ lt_list lt_term l l')
   | Pred _ _, _ => True
 
+  | Eq t u, Eq t' u' => lt_term t t' \/ (t = t' /\ lt_term u u')
+  | Eq _ _, Pred _ _ => False
+  | Eq _ _, _ => True
+
   | Neg F, Neg G => lt_form F G
-  | Neg _, Pred _ _ => False
+  | Neg _, Pred _ _ | Neg _, Eq _ _ => False
   | Neg _, _ => True
 
   | Or F1 F2, Or G1 G2 =>
@@ -170,13 +174,17 @@ Fixpoint ltb_form (F G : Form) : bool :=
   | Pred p l, Pred p' l' =>
       match SOrd.compare p p' with
       | Lt => true
-      | Eq => ltb_list ltb_term l l'
+      | Datatypes.Eq => ltb_list ltb_term l l'
       | Gt => false
       end
   | Pred _ _, _ => true
 
+  | Eq t u, Eq t' u' => (ltb_term t t') || (eqb t t' && ltb_term u u')
+  | Eq _ _, Pred _ _ => false
+  | Eq _ _, _ => true
+
   | Neg F, Neg G => ltb_form F G
-  | Neg _, Pred _ _ => false
+  | Neg _, Pred _ _ | Neg _, Eq _ _ => false
   | Neg _, _ => true
 
   | Or F1 F2, Or G1 G2 =>
@@ -193,8 +201,8 @@ Lemma ltb_form_lt_form :
     ltb_form F G = true <-> lt_form F G.
 Proof.
   intro F; induction F; intro G; destruct G; try easy; cbn.
-  - have hspec := SOrd.compare_spec p s.
-    destruct (SOrd.compare p s); inversion hspec.
+  - have hspec := SOrd.compare_spec p p0.
+    destruct (SOrd.compare p p0); inversion hspec.
     + subst; split.
       * intro hltb. right; split; auto.
         rewrite -ltb_list_lt_list; eauto.
@@ -207,9 +215,11 @@ Proof.
     + split.
       * intro contra; inversion contra.
       * intros [ hlt | [ e _ ] ].
-        -- have hlt' : SOrd.lt s s by etransitivity; eauto.
+        -- have hlt' : SOrd.lt p0 p0 by etransitivity; eauto.
            now apply SOrd.lt_strorder in hlt'.
         -- subst; now apply SOrd.lt_strorder in H.
+  - rewrite Bool.orb_true_iff Bool.andb_true_iff.
+    by rewrite !ltb_term_lt_term eqbIsEq.
   - apply IHF.
   - split.
     + intros [hlt | [ e hlt ]%andb_prop ]%Bool.orb_prop.
@@ -230,20 +240,31 @@ Lemma ltb_form_false :
     ltb_form F G = false -> F <> G -> ltb_form G F = true.
 Proof.
   intro F; induction F; intros ? hnlt ne; destruct G; cbn in *; try easy.
-  - have hspec := SOrd.compare_spec p s.
-    destruct (SOrd.compare p s); inversion hspec; cbn in *.
-    + destruct (SOrd.compare s p) eqn:hcomp; try easy.
+  - have hspec := SOrd.compare_spec p p0.
+    destruct (SOrd.compare p p0); inversion hspec; cbn in *.
+    + destruct (SOrd.compare p0 p) eqn:hcomp; try easy.
       * apply ltb_list_false; auto.
         -- intros. apply ltb_term_false; auto.
         -- intro; subst; now apply ne.
       * subst. now rewrite SSet.XOrdProps.ME.compare_refl in hcomp.
-    + destruct (SOrd.compare s p) eqn:hcomp; try easy.
-    + destruct (SOrd.compare s p) eqn:hcomp; try easy.
+    + destruct (SOrd.compare p0 p) eqn:hcomp; try easy.
+    + destruct (SOrd.compare p0 p) eqn:hcomp; try easy.
       * apply SSet.Raw.MX.compare_eq in hcomp; subst.
         inversion hspec. now apply SOrd.lt_strorder in H0.
       * rewrite SSet.Raw.MX.compare_gt_iff in hcomp.
-        have contra : SOrd.lt s s by etransitivity; eauto.
+        have contra : SOrd.lt p0 p0 by etransitivity; eauto.
         now apply SOrd.lt_strorder in contra.
+  - rewrite Bool.orb_true_iff Bool.andb_true_iff.
+    rewrite Bool.orb_false_iff Bool.andb_false_iff in hnlt;
+      destruct hnlt as [e [e' | hnlt]].
+    + left. apply ltb_term_false; auto.
+      by rewrite -EqBool_neq in e'.
+    + destruct (eqDec t t0).
+      * right; split.
+        -- by rewrite eqbIsEq.
+        -- apply ltb_term_false; auto.
+           intro ne'; apply ne; by subst.
+      * left. apply ltb_term_false; auto.
   - apply IHF; auto. congruence.
   - apply Bool.orb_false_elim in hnlt; destruct hnlt as [ne0 h].
     rewrite Bool.andb_false_iff in h; destruct h as [ne1 | ne1];
@@ -325,31 +346,39 @@ Proof.
         -- cbn in contra; destruct contra.
            ++ now apply lt_term_strorder in H.
            ++ destruct H; auto.
+    + intros [contra | [ _ contra ] ]; auto; by apply lt_term_strorder in contra.
     + intros [contra | [ _ contra ] ]; auto.
   - intros F G H hlt0 hlt1. generalize dependent H; generalize dependent F.
     induction G; intros F hlt0 H hlt1.
     + destruct F; easy.
     + destruct F, H; try easy.
-      cbn in *. destruct hlt0 as [ hlt0 | [ e0 hltl0 ] ],
-          hlt1 as [ hlt1 | [ e1 hltl1 ] ].
+      * cbn in *. destruct hlt0 as [ hlt0 | [ e0 hltl0 ] ],
+        hlt1 as [ hlt1 | [ e1 hltl1 ] ].
+        -- left; etransitivity; eauto.
+        -- left. now rewrite -e1.
+        -- left. now rewrite e0.
+        -- right; split.
+           ++ etransitivity; eauto.
+           ++ clear e0 e1 p p0 p1. generalize dependent l; generalize dependent l1;
+              induction l0 as [|t ts IHts];
+              intros l1 l hltlist hltlist1.
+              ** destruct l1, l; easy.
+              ** destruct l1, l; try easy.
+                 cbn in *. destruct hltlist as [ hlt1 | [ e1 hltl ] ],
+                   hltlist1 as [ hlt0 | [ e0 hltl1 ] ].
+                 --- left; etransitivity; eauto.
+                 --- left; now rewrite -e0.
+                 --- left; now rewrite e1.
+                 --- right; split.
+                     +++ etransitivity; eauto.
+                     +++ eapply IHts; eauto.
+    + destruct F, H; try easy.
+      cbn in *; destruct hlt0 as [ hlt0 | [ e0 hlt0 ] ], hlt1 as [ hlt1 | [ e1 hlt1 ] ].
       * left; etransitivity; eauto.
-      * left. now rewrite -e1.
-      * left. now rewrite e0.
-      * right; split.
-        -- etransitivity; eauto.
-        -- clear e0 e1 p s s0. generalize dependent l; generalize dependent l1;
-             induction l0 as [|t ts IHts];
-             intros l1 l hltlist hltlist1.
-           ++ destruct l1, l; easy.
-           ++ destruct l1, l; try easy.
-              cbn in *. destruct hltlist as [ hlt1 | [ e1 hltl ] ],
-                  hltlist1 as [ hlt0 | [ e0 hltl1 ] ].
-              ** left; etransitivity; eauto.
-              ** left; now rewrite -e0.
-              ** left; now rewrite e1.
-              ** right; split.
-                 --- etransitivity; eauto.
-                 --- eapply IHts; eauto.
+      * by left; subst.
+      * by left; subst.
+      * right; split; try congruence.
+        etransitivity; eauto.
     + destruct F, H; try easy.
       cbn in *; eapply IHG; eauto.
     + destruct F, H; try easy.
@@ -383,7 +412,7 @@ Module OrderedForm <: OrderedType.
   Proof. intros F G ->; cbn. intros F H ->; cbn. reflexivity. Qed.
 
   Definition compare (F G : Form) : comparison :=
-    if eqb F G then Eq
+    if eqb F G then Datatypes.Eq
     else if ltb_form F G then Lt
          else Gt.
 
